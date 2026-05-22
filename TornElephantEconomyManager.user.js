@@ -609,28 +609,29 @@
     .tmit-btn-close,.tmit-btn-settings-toggle,.tmit-btn-refresh{background:rgba(0,0,0,0.3);border:1px solid rgba(151,2,173,0.25);color:#7a2090;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all 0.15s;padding:0;line-height:1;}
     .tmit-btn-close:hover,.tmit-btn-settings-toggle:hover,.tmit-btn-refresh:hover{border-color:#9702ad;color:#e040f0;background:rgba(151,2,173,0.12);box-shadow:0 0 8px rgba(151,2,173,0.3);}
     .tmit-tab-bar{display:flex;border-bottom:1px solid rgba(151,2,173,0.2);flex-shrink:0;background:rgba(0,0,0,0.4);}
-    .tmit-tab{flex:1;padding:7px 0;font-size:11px;font-weight:600;text-align:center;cursor:pointer;color:#5a1068;border-bottom:2px solid transparent;transition:all 0.15s;letter-spacing:0.04em;user-select:none;}
+    .tmit-tab{flex:1;padding:7px 0;font-size:11px;font-weight:600;text-align:center;cursor:pointer;color:#b481cc;border-bottom:2px solid transparent;transition:all 0.15s;letter-spacing:0.04em;user-select:none;}
     .tmit-tab:hover{color:#c9a227;}
     .tmit-tab.tmit-tab-active{color:#ffe066;border-bottom-color:#c9a227;background:rgba(201,162,39,0.04);}
     .tmit-tab .tmit-tab-count{display:inline-block;margin-left:4px;font-size:9px;background:rgba(151,2,173,0.15);color:#9702ad;border-radius:8px;padding:0 5px;font-family:monospace;vertical-align:middle;}
     .tmit-tab.tmit-tab-active .tmit-tab-count{background:rgba(201,162,39,0.3);}
     .tmit-controls{padding:7px 12px;border-bottom:1px solid rgba(151,2,173,0.1);display:flex;gap:6px;align-items:center;flex-wrap:wrap;flex-shrink:0;background:rgba(0,0,0,0.35);}
     .tmit-timeframe-group,.tmit-filter-group{display:flex;gap:3px;}
-    .tmit-tf-btn{background:rgba(0,0,0,0.4);border:1px solid rgba(151,2,173,0.15);color:#5a1068;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:monospace;}
+    .tmit-tf-btn{background:rgba(0,0,0,0.4);border:1px solid rgba(151,2,173,0.15);color:#b481cc;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:monospace;}
     .tmit-tf-btn:hover{border-color:#9702ad;color:#cc40f0;}
     .tmit-tf-btn.tmit-active{background:rgba(151,2,173,0.15);border-color:#9702ad;color:#e040f0;box-shadow:0 0 6px rgba(151,2,173,0.25);}
     .tmit-divider{width:1px;height:20px;background:rgba(151,2,173,0.15);margin:0 2px;}
     .tmit-select{background:rgba(0,0,0,0.4);border:1px solid rgba(151,2,173,0.18);color:#c9a227;border-radius:4px;padding:3px 6px;font-size:11px;cursor:pointer;outline:none;font-family:'Inter',sans-serif;}
     .tmit-select option{background:#120010;color:#f0d5f8;}
     .tmit-search{flex:1;min-width:80px;background:rgba(0,0,0,0.4);border:1px solid rgba(151,2,173,0.18);border-radius:4px;color:#f0d5f8;font-size:11px;padding:3px 8px;outline:none;font-family:'Inter',sans-serif;}
-    .tmit-search::placeholder{color:#3a085a;}
+    .tmit-search::placeholder{color:#9b7bb5;opacity:1;}
+    #tmit-panel input::placeholder,#tmit-onboard input::placeholder{color:#9b7bb5;opacity:1;}
     .tmit-search:focus{border-color:rgba(151,2,173,0.5);}
     .tmit-filter-row{padding:5px 12px;border-bottom:1px solid rgba(151,2,173,0.08);display:flex;gap:8px;align-items:center;flex-shrink:0;background:rgba(0,0,0,0.3);}
-    .tmit-filter-label{font-size:10px;color:#5a1068;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;white-space:nowrap;}
+    .tmit-filter-label{font-size:10px;color:#b481cc;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;white-space:nowrap;}
     .tmit-input-sm{background:rgba(0,0,0,0.4);border:1px solid rgba(151,2,173,0.18);border-radius:4px;color:#f0d5f8;font-size:11px;padding:3px 8px;width:100px;outline:none;font-family:monospace;}
     .tmit-input-sm:focus{border-color:rgba(151,2,173,0.5);}
     .tmit-col-headers{display:grid;grid-template-columns:1fr 90px 90px 80px 44px;padding:5px 12px;border-bottom:1px solid rgba(151,2,173,0.12);flex-shrink:0;background:rgba(0,0,0,0.5);}
-    .tmit-col-hdr{font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#5a1068;cursor:pointer;user-select:none;transition:color 0.15s;}
+    .tmit-col-hdr{font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#b481cc;cursor:pointer;user-select:none;transition:color 0.15s;}
     .tmit-col-hdr:hover{color:#c9a227;}
     .tmit-col-hdr.tmit-sorted{color:#c9a227;}
     .tmit-col-hdr:not(:first-child){text-align:right;}
@@ -665,12 +666,12 @@
     .tmit-item-row.tmit-pinned{border-left:2px solid #c9a227;background:rgba(201,162,39,0.04);}
     .tmit-item-name{font-size:12px;font-weight:500;color:#e8caf5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px;}
     .tmit-item-name .tmit-spike-icon{font-size:10px;margin-right:4px;}
-    .tmit-item-type{font-size:9px;color:#3a085a;margin-top:1px;}
+    .tmit-item-type{font-size:9px;color:#9b7bb5;margin-top:1px;}
     .tmit-price{font-family:monospace;font-size:11px;color:#a840c0;text-align:right;}
     .tmit-change{font-family:monospace;font-size:12px;font-weight:700;text-align:right;}
     .tmit-change.up{color:#e8621a;text-shadow:0 0 8px rgba(232,98,26,0.5);}
     .tmit-change.down{color:#3dd6c8;text-shadow:0 0 8px rgba(61,214,200,0.4);}
-    .tmit-change.flat{color:#3a085a;}
+    .tmit-change.flat{color:#9b7bb5;}
     .tmit-signal{text-align:right;}
     .tmit-signal-badge{display:inline-block;font-size:9px;font-weight:700;letter-spacing:0.06em;padding:2px 6px;border-radius:3px;text-transform:uppercase;}
     .tmit-signal-badge.BUY{background:rgba(232,98,26,0.18);color:#ff8c42;border:1px solid rgba(232,98,26,0.4);text-shadow:0 0 6px rgba(232,98,26,0.4);}
@@ -684,7 +685,7 @@
     .tmit-conf-dot.filled{background:#9702ad;box-shadow:0 0 3px rgba(151,2,173,0.5);}
     .tmit-row-btn{background:none;border:none;cursor:pointer;font-size:13px;padding:2px;opacity:0.45;transition:opacity 0.15s;line-height:1;}
     .tmit-row-btn:hover{opacity:1;}
-    .tmit-state-msg{padding:32px 20px;text-align:center;color:#3a085a;font-size:13px;line-height:1.7;}
+    .tmit-state-msg{padding:32px 20px;text-align:center;color:#9b7bb5;font-size:13px;line-height:1.7;}
     .tmit-state-msg .tmit-state-icon{font-size:28px;margin-bottom:8px;}
     .tmit-settings-panel{padding:14px 16px;border-top:1px solid rgba(151,2,173,0.18);background:rgba(0,0,0,0.5);display:none;flex-shrink:0;overflow-y:auto;max-height:320px;}
     .tmit-settings-panel.tmit-open{display:block;}
@@ -696,15 +697,15 @@
     .tmit-btn-save{margin-top:8px;background:linear-gradient(90deg,#c9a227 0%,#8b6e10 50%,#c9a227 100%);background-size:200%;border:none;border-radius:5px;color:#09000d;font-weight:700;font-size:12px;padding:6px 18px;cursor:pointer;font-family:'Inter',sans-serif;transition:background-position 0.4s,filter 0.15s;}
     .tmit-btn-save:hover{background-position:right;filter:brightness(1.15);}
     .tmit-footer{padding:5px 12px;border-top:1px solid rgba(151,2,173,0.1);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:rgba(0,0,0,0.6);}
-    .tmit-footer-stat{font-size:9px;color:#3a085a;font-family:monospace;}
-    .tmit-footer-stat span{color:#5a1068;}
+    .tmit-footer-stat{font-size:9px;color:#9b7bb5;font-family:monospace;}
+    .tmit-footer-stat span{color:#b481cc;}
     .tmit-section-title{font-family:'Cinzel',serif;font-size:11px;font-weight:700;color:#c9a227;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid rgba(201,162,39,0.2);}
     .tmit-war-form{margin-bottom:10px;}
     .tmit-form-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
-    .tmit-form-row label{font-size:10px;color:#5a1068;font-weight:600;width:120px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.05em;}
+    .tmit-form-row label{font-size:10px;color:#b481cc;font-weight:600;width:120px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.05em;}
     .tmit-form-row2{display:flex;gap:8px;margin-bottom:6px;}
     .tmit-form-row2 > div{flex:1;display:flex;flex-direction:column;gap:3px;}
-    .tmit-form-row2 label{font-size:9px;color:#5a1068;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;}
+    .tmit-form-row2 label{font-size:9px;color:#b481cc;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;}
     .tmit-input-full{width:100%;background:rgba(0,0,0,0.4);border:1px solid rgba(151,2,173,0.18);border-radius:4px;color:#f0d5f8;font-size:11px;padding:4px 8px;outline:none;font-family:monospace;}
     .tmit-input-full:focus{border-color:rgba(151,2,173,0.5);}
     .tmit-btn-calc{margin-top:6px;background:linear-gradient(90deg,#c9a227,#8b6e10);border:none;border-radius:5px;color:#09000d;font-weight:700;font-size:11px;padding:5px 16px;cursor:pointer;font-family:'Inter',sans-serif;transition:filter 0.15s;}
@@ -735,16 +736,16 @@
     .tmit-travel-row.rank3{border-left:2px solid #cd7f32;}
     .tmit-travel-flag{font-size:14px;}
     .tmit-travel-dest{font-size:12px;font-weight:500;color:#e8caf5;}
-    .tmit-travel-sub{font-size:9px;color:#5a1068;margin-top:1px;}
+    .tmit-travel-sub{font-size:9px;color:#b481cc;margin-top:1px;}
     .tmit-travel-pph{font-family:monospace;font-size:12px;font-weight:700;color:#e8621a;text-align:right;}
     .tmit-travel-pph.top{color:#ffe066;text-shadow:0 0 8px rgba(255,224,102,0.4);}
-    .tmit-travel-time{font-family:monospace;font-size:10px;color:#5a1068;text-align:right;}
+    .tmit-travel-time{font-family:monospace;font-size:10px;color:#b481cc;text-align:right;}
     .tmit-travel-stock{font-size:9px;text-align:right;font-family:monospace;}
     .tmit-travel-stock.yata{color:#50dc82;}
-    .tmit-travel-stock.assumed{color:#5a1068;}
+    .tmit-travel-stock.assumed{color:#b481cc;}
     .tmit-travel-detail-card{background:rgba(0,0,0,0.3);border:1px solid rgba(151,2,173,0.18);border-radius:6px;padding:10px 12px;}
     .tmit-session-bar{padding:4px 12px;background:rgba(0,0,0,0.4);border-bottom:1px solid rgba(151,2,173,0.1);display:flex;gap:12px;align-items:center;font-size:10px;font-family:monospace;flex-shrink:0;}
-    .tmit-session-item{display:flex;align-items:center;gap:4px;color:#5a1068;}
+    .tmit-session-item{display:flex;align-items:center;gap:4px;color:#b481cc;}
     .tmit-session-val{color:#a840c0;font-weight:600;}
     .tmit-session-val.positive{color:#50dc82;}
     .tmit-session-val.hot{color:#e8621a;}
@@ -752,7 +753,7 @@
     .tmit-age-fresh{background:#50dc82;}
     .tmit-age-stale{background:#c9a227;}
     .tmit-age-old{background:#ff6060;}
-    .tmit-btn-export{background:none;border:1px solid rgba(151,2,173,0.2);color:#5a1068;border-radius:4px;padding:3px 8px;font-size:10px;cursor:pointer;transition:all 0.15s;font-family:'Inter',sans-serif;font-weight:600;}
+    .tmit-btn-export{background:none;border:1px solid rgba(151,2,173,0.2);color:#b481cc;border-radius:4px;padding:3px 8px;font-size:10px;cursor:pointer;transition:all 0.15s;font-family:'Inter',sans-serif;font-weight:600;}
     .tmit-btn-export:hover{border-color:#9702ad;color:#cc40f0;}
     .tmit-btn-retry{display:inline-block;margin-top:8px;background:rgba(151,2,173,0.15);border:1px solid rgba(151,2,173,0.3);border-radius:5px;color:#9702ad;font-size:11px;font-weight:600;padding:5px 14px;cursor:pointer;font-family:'Inter',sans-serif;}
     .tmit-btn-retry:hover{background:rgba(151,2,173,0.25);}
@@ -766,7 +767,7 @@
     .tmit-onboard-card{background:linear-gradient(160deg,#1a0020 0%,#09000d 100%);border:1px solid #9702ad;border-top:3px solid #c9a227;border-radius:12px;width:340px;padding:18px 18px 14px;box-shadow:0 0 40px rgba(151,2,173,0.18),0 16px 48px rgba(0,0,0,0.8);position:relative;}
     .tmit-onboard-logo{width:56px;height:56px;border-radius:50%;border:2px solid #c9a227;margin:0 auto 14px;display:block;}
     .tmit-onboard-title{font-family:'Cinzel',serif;font-size:18px;font-weight:700;color:#c9a227;text-align:center;margin-bottom:4px;letter-spacing:0.05em;}
-    .tmit-onboard-subtitle{font-size:11px;color:#5a1068;text-align:center;margin-bottom:20px;}
+    .tmit-onboard-subtitle{font-size:11px;color:#b481cc;text-align:center;margin-bottom:20px;}
     .tmit-onboard-step{display:none;}
     .tmit-onboard-step.active{display:block;}
     .tmit-onboard-step-title{font-size:13px;font-weight:700;color:#f0d5f8;margin-bottom:8px;}
@@ -781,12 +782,12 @@
     .tmit-onboard-validate.loading{color:#c9a227;}
     .tmit-onboard-capacity-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
     .tmit-onboard-cap-val{font-family:'Cinzel',serif;font-size:28px;color:#ffe066;font-weight:700;text-shadow:0 0 16px rgba(255,224,102,0.5);}
-    .tmit-onboard-cap-detail{font-size:10px;color:#5a1068;line-height:1.6;}
+    .tmit-onboard-cap-detail{font-size:10px;color:#b481cc;line-height:1.6;}
     .tmit-onboard-tab-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;}
     .tmit-onboard-tab-card{background:rgba(0,0,0,0.3);border:1px solid rgba(151,2,173,0.15);border-radius:6px;padding:6px 8px;}
     .tmit-onboard-tab-card .tab-icon{font-size:16px;}
     .tmit-onboard-tab-card .tab-name{font-size:11px;font-weight:700;color:#c9a227;margin:3px 0 2px;}
-    .tmit-onboard-tab-card .tab-desc{font-size:10px;color:#5a1068;line-height:1.5;}
+    .tmit-onboard-tab-card .tab-desc{font-size:10px;color:#b481cc;line-height:1.5;}
     .tmit-onboard-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
     .tmit-onboard-dots{display:flex;gap:5px;}
     .tmit-onboard-dot{width:6px;height:6px;border-radius:50%;background:rgba(151,2,173,0.2);transition:background 0.2s;}
@@ -794,7 +795,7 @@
     .tmit-onboard-btn{background:linear-gradient(90deg,#c9a227,#8b6e10);border:none;border-radius:6px;color:#09000d;font-weight:700;font-size:13px;padding:8px 20px;cursor:pointer;font-family:'Inter',sans-serif;transition:filter 0.15s;}
     .tmit-onboard-btn:hover{filter:brightness(1.15);}
     .tmit-onboard-btn:disabled{opacity:0.4;cursor:default;}
-    .tmit-onboard-skip{font-size:11px;color:#3a085a;cursor:pointer;text-decoration:underline;background:none;border:none;padding:0;}
+    .tmit-onboard-skip{font-size:11px;color:#9b7bb5;cursor:pointer;text-decoration:underline;background:none;border:none;padding:0;}
     .tmit-onboard-skip:hover{color:#7a2090;}
   `);
 
@@ -1375,7 +1376,7 @@
         <div class="tmit-session-item">💰 Session: <span class="tmit-session-val positive" id="tmit-sess-profit">$0</span></div>
         <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
           <span id="tmit-age-dot" class="tmit-age-dot tmit-age-fresh"></span>
-          <span id="tmit-age-text" style="color:#3a2a5a;font-size:9px">—</span>
+          <span id="tmit-age-text" style="color:#9886b8;font-size:9px">—</span>
           <button class="tmit-btn-export" id="tmit-btn-export" title="Export current view to CSV">⬇ CSV</button>
         </div>
       </div>
@@ -1454,7 +1455,7 @@
         <!-- Flight type + carry capacity -->
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px;padding:7px 9px;background:rgba(0,0,0,0.25);border-radius:6px;border:1px solid rgba(201,162,39,0.1);">
           <div style="display:flex;align-items:center;gap:5px;">
-            <span style="font-size:9px;color:#6a5a8a;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Flight</span>
+            <span style="font-size:9px;color:#a294c0;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Flight</span>
             <select id="tmit-flight-type" class="tmit-select" style="font-size:10px;">
               <option value="economy"  ${settings.flightType==='economy'  ?'selected':''}>✈ Economy</option>
               <option value="airstrip" ${settings.flightType==='airstrip' ?'selected':''}>🛫 Airstrip (−30%)</option>
@@ -1463,17 +1464,17 @@
             </select>
           </div>
           <div style="display:flex;align-items:center;gap:5px;">
-            <span style="font-size:9px;color:#6a5a8a;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Carry</span>
+            <span style="font-size:9px;color:#a294c0;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Carry</span>
             <input type="number" id="tmit-travel-capacity" class="tmit-input-sm"
               value="${settings.carryCapacity || 10}" min="1" max="100" style="width:52px;font-size:11px;">
-            <span style="font-size:9px;color:#4a3a6a;">items</span>
+            <span style="font-size:9px;color:#a08fc0;">items</span>
           </div>
           <button class="tmit-btn-calc" style="margin:0;margin-left:auto;padding:4px 10px;font-size:10px;" id="tmit-travel-refresh">↻</button>
         </div>
 
         <!-- Alert conditions -->
         <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px;padding:6px 9px;background:rgba(0,0,0,0.2);border-radius:5px;border:1px solid rgba(201,162,39,0.08);">
-          <span style="font-size:9px;color:#6a5a8a;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Alert when:</span>
+          <span style="font-size:9px;color:#a294c0;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Alert when:</span>
           <label style="display:flex;align-items:center;gap:4px;font-size:10px;color:#8a7aaa;cursor:pointer;">
             <input type="checkbox" id="tmit-alert-drug" ${settings.alertOnDrugClear?'checked':''}
               style="accent-color:#c9a227;cursor:pointer;"> Drug CD clear
@@ -1504,7 +1505,7 @@
         </div>
 
         <div class="tmit-section-title" style="margin-top:14px;">📋 Trip Details</div>
-        <div id="tmit-travel-detail" style="font-size:11px;color:#5a4a7a;padding:6px 0;">
+        <div id="tmit-travel-detail" style="font-size:11px;color:#ab9bce;padding:6px 0;">
           Click a destination above to see trip details.
         </div>
       </div>
@@ -1512,7 +1513,7 @@
       <!-- Quick Items Tab -->
       <div id="tmit-quick-panel" class="tmit-tab-panel" style="display:none;flex:1;overflow-y:auto;padding:12px;">
         <div class="tmit-section-title">⚡ Quick Use Items</div>
-        <div style="font-size:10px;color:#4a3a6a;margin-bottom:10px;line-height:1.6;">
+        <div style="font-size:10px;color:#a08fc0;margin-bottom:10px;line-height:1.6;">
           Pin items here for fast access. TEEM injects a bar at the top of the
           <a href="https://www.torn.com/item.php" style="color:#c9a227;text-decoration:none;">Items page</a>
           with your saved items. Clicking one scrolls directly to that item —
@@ -1529,7 +1530,7 @@
       <div class="tmit-settings-panel" id="tmit-settings-panel">
         <div class="tmit-settings-title">⚙ Settings</div>
 
-        <div style="font-size:10px;color:#4a3a6a;line-height:1.6;margin-bottom:10px;padding:6px 8px;background:rgba(201,162,39,0.05);border:1px solid rgba(201,162,39,0.12);border-radius:5px;">
+        <div style="font-size:10px;color:#a08fc0;line-height:1.6;margin-bottom:10px;padding:6px 8px;background:rgba(201,162,39,0.05);border:1px solid rgba(201,162,39,0.12);border-radius:5px;">
           All keys are stored locally on your device only — never sent anywhere except directly to that service's own API.
           <b style="color:#c9a227">Create a separate key per service</b> so you can revoke them individually if needed.
         </div>
@@ -1538,8 +1539,8 @@
         <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c9a227;margin-bottom:4px;">
           Torn Market API Key <span style="color:#ff6060;font-weight:400;">★ Required</span>
         </div>
-        <div style="font-size:9px;color:#4a3a6a;margin-bottom:5px;line-height:1.5;">
-          Used for live item prices, your stats, energy bars &amp; BB balance.
+        <div style="font-size:9px;color:#a08fc0;margin-bottom:5px;line-height:1.5;">
+          Used for live item prices, your stats, and carry-capacity detection.
           Get yours at <a href="https://www.torn.com/preferences.php#tab=api" target="_blank" rel="noopener"
             style="color:#c9a227;text-decoration:none;">torn.com → Preferences → API ↗</a>
           — a <b style="color:#e8dff5">Limited</b> key is enough.
@@ -1549,16 +1550,16 @@
             value="${settings.apiKey}" autocomplete="off"
             style="flex:1;background:rgba(0,0,0,0.5);border:1px solid rgba(201,162,39,0.25);border-radius:4px;color:#e8dff5;font-size:12px;padding:6px 9px;outline:none;font-family:monospace;">
           <button id="tmit-apikey-toggle" title="Show/hide key"
-            style="background:none;border:1px solid rgba(201,162,39,0.2);color:#6a5a8a;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;">👁</button>
+            style="background:none;border:1px solid rgba(201,162,39,0.2);color:#a294c0;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;">👁</button>
         </div>
         <div id="tmit-apikey-status" style="font-size:10px;min-height:14px;margin-bottom:8px;padding-left:2px;"></div>
 
 
         <!-- YATA API KEY -->
         <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c9a227;margin-bottom:4px;">
-          YATA API Key <span style="color:#6a5a8a;font-weight:400;">Optional</span>
+          YATA API Key <span style="color:#a294c0;font-weight:400;">Optional</span>
         </div>
-        <div style="font-size:9px;color:#4a3a6a;margin-bottom:5px;line-height:1.5;">
+        <div style="font-size:9px;color:#a08fc0;margin-bottom:5px;line-height:1.5;">
           Unlocks <b style="color:#e8dff5">YATA spy data</b> for player overlays and more accurate travel stock estimates.
           Log in at <a href="https://yata.life" target="_blank" rel="noopener"
             style="color:#c9a227;text-decoration:none;">yata.life ↗</a>
@@ -1568,7 +1569,7 @@
           <input type="password" id="tmit-yata-key-input" placeholder="Paste YATA key here…" autocomplete="off" value="${load('yataKey', '')}"
             style="flex:1;background:rgba(0,0,0,0.5);border:1px solid rgba(201,162,39,0.25);border-radius:4px;color:#e8dff5;font-size:12px;padding:6px 9px;outline:none;font-family:monospace;">
           <button id="tmit-yatakey-toggle" title="Show/hide key"
-            style="background:none;border:1px solid rgba(201,162,39,0.2);color:#6a5a8a;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;">👁</button>
+            style="background:none;border:1px solid rgba(201,162,39,0.2);color:#a294c0;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;">👁</button>
         </div>
         <div id="tmit-yata-key-status" style="font-size:10px;min-height:14px;margin-bottom:10px;padding-left:2px;"></div>
 
@@ -1611,14 +1612,14 @@
             <div class="tmit-onboard-title" style="font-size:13px;text-align:left;margin:0;">Welcome to TEEM</div>
             <div class="tmit-onboard-subtitle" style="text-align:left;margin:0;font-size:10px;">Let's get you set up — Torn stays usable the whole time</div>
           </div>
-          <button id="tmit-ob-close-x" style="margin-left:auto;background:none;border:none;color:#3a2a5a;font-size:16px;cursor:pointer;padding:0;line-height:1;" title="Close (set up later via ⚙ in the panel)">✕</button>
+          <button id="tmit-ob-close-x" style="margin-left:auto;background:none;border:none;color:#9886b8;font-size:16px;cursor:pointer;padding:0;line-height:1;" title="Close (set up later via ⚙ in the panel)">✕</button>
         </div>
 
         <!-- Step 1: API Key -->
         <div class="tmit-onboard-step active" id="tmit-ob-step-1">
           <div class="tmit-onboard-step-title">Step 1 of 4 — Connect to Torn</div>
           <div class="tmit-onboard-step-body">
-            TEEM needs a <b>Torn API key</b> to fetch live market prices, your carry capacity, and BB balance.<br><br>
+            TEEM needs a <b>Torn API key</b> to fetch live market prices and your carry capacity.<br><br>
             A <b>Limited</b> key is enough - just enable <code>Market</code>, <code>User</code>, and <code>Torn</code> access when creating it.
           </div>
           <a href="https://www.torn.com/preferences.php#tab=api" target="_blank" rel="noopener"
@@ -1627,7 +1628,7 @@
             onmouseout="this.style.background='rgba(201,162,39,0.12)'">
             🔑 Open Torn API Settings (new tab) ↗
           </a>
-          <div style="font-size:10px;color:#4a3a6a;margin-bottom:8px;">
+          <div style="font-size:10px;color:#a08fc0;margin-bottom:8px;">
             Come back here and paste your key below once you've created it — this window stays open.
           </div>
           <input type="password" class="tmit-onboard-input" id="tmit-ob-apikey" placeholder="Paste your API key here…" autocomplete="off">
@@ -1647,13 +1648,13 @@
               <div class="tmit-onboard-cap-detail" id="tmit-ob-cap-detail">Detecting from API…</div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;width:100%;">
-              <label style="font-size:11px;color:#6a5a8a;white-space:nowrap;">Adjust if wrong:</label>
+              <label style="font-size:11px;color:#a294c0;white-space:nowrap;">Adjust if wrong:</label>
               <input type="number" id="tmit-ob-cap-input" min="1" max="100"
                 style="width:70px;background:rgba(0,0,0,0.4);border:1px solid rgba(201,162,39,0.3);border-radius:5px;color:#ffe066;font-family:monospace;font-size:16px;font-weight:700;padding:4px 8px;outline:none;text-align:center;"
                 placeholder="29">
-              <span style="font-size:10px;color:#4a3a6a;">items per trip</span>
+              <span style="font-size:10px;color:#a08fc0;">items per trip</span>
             </div>
-            <div style="font-size:10px;color:#4a3a6a;">You can always change this in the ✈ Travel tab.</div>
+            <div style="font-size:10px;color:#a08fc0;">You can always change this in the ✈ Travel tab.</div>
           </div>
         </div>
 
@@ -1679,12 +1680,12 @@
             <div class="tmit-onboard-tab-card">
               <div class="tab-icon">⚔</div>
               <div class="tab-name">War Gear</div>
-              <div class="tab-desc">Calculator for ranked war weapons and armor. Score + BB value.</div>
+              <div class="tab-desc">Live market prices for ranked war weapons & armor, with BB trade-in values.</div>
             </div>
             <div class="tmit-onboard-tab-card">
-              <div class="tab-icon">��</div>
-              <div class="tab-name">BB Calc</div>
-              <div class="tab-desc">Full Bunker Bucks calculator. Grind estimator, trade-in table, cache costs.</div>
+              <div class="tab-icon">⚡</div>
+              <div class="tab-name">Quick</div>
+              <div class="tab-desc">Pin items for one-click access from the Torn Items page.</div>
             </div>
             <div class="tmit-onboard-tab-card">
               <div class="tab-icon">💰</div>
@@ -1826,11 +1827,10 @@
       if (settings.apiKey) startPolling();
     }
 
-    // Auto-open Torn API settings page so user can get their key immediately
-    // Small delay so user can see what's happening first
-    setTimeout(() => {
-      window.open('https://www.torn.com/preferences.php#tab=api', '_blank', 'noopener');
-    }, 800);
+    // NOTE: the API settings page is opened only when the user clicks the
+    // "Open Torn API Settings" button above. Auto-opening it caused an
+    // infinite tab loop — the new torn.com tab re-ran onboarding and
+    // auto-opened another tab, endlessly.
 
     // Start with next disabled until key validated
     nextBtn.disabled = true;
@@ -2244,7 +2244,7 @@
     const listEl = document.getElementById('tmit-quick-list');
     if (!listEl) return;
     if (!quickItems.length) {
-      listEl.innerHTML = '<div style="font-size:10px;color:#3a2a5a;padding:8px 0;">No items saved yet. Add some above.</div>';
+      listEl.innerHTML = '<div style="font-size:10px;color:#9886b8;padding:8px 0;">No items saved yet. Add some above.</div>';
       return;
     }
     listEl.innerHTML = quickItems.map((item, idx) => `
@@ -2283,7 +2283,7 @@
       listEl.innerHTML = `<div class="tmit-state-msg" style="padding:16px 0;">
         <div class="tmit-state-icon" style="font-size:20px">⚔</div>
         No war gear detected yet in market data.<br>
-        <span style="font-size:10px;color:#3a2a5a">War weapons and armor will appear here as price history accumulates.</span>
+        <span style="font-size:10px;color:#9886b8">War weapons and armor will appear here as price history accumulates.</span>
       </div>`;
       return;
     }
@@ -2316,7 +2316,7 @@
       return `<div class="tmit-war-row ${rarity ? rarity+'-item' : ''}">
         <div>
           <div class="tmit-war-name" title="${r.name}">${rarityDot}${r.name}</div>
-          <div style="font-size:9px;color:#3a2a5a">${r.type}${weapType ? ' · '+weapType : ''}</div>
+          <div style="font-size:9px;color:#9886b8">${r.type}${weapType ? ' · '+weapType : ''}</div>
         </div>
         <div class="tmit-war-price" style="text-align:right">$${r.currentPrice >= 1_000_000
           ? (r.currentPrice/1_000_000).toFixed(1)+'M'
@@ -2330,7 +2330,7 @@
     listEl.innerHTML = rows.join('');
   }
 
-  // ── BB Calculator Tab ──────────────────────────────────────────────────────
+  // ── Market List ────────────────────────────────────────────────────────────
 
   function renderList() {
     const listEl = document.getElementById('tmit-list');
@@ -2760,7 +2760,7 @@
       + 'border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.6);font-family:monospace;'
       + 'max-width:90vw;flex-wrap:wrap;';
 
-    bar.innerHTML = '<span style="font-size:9px;color:#6a5a8a;font-weight:700;'
+    bar.innerHTML = '<span style="font-size:9px;color:#a294c0;font-weight:700;'
       + 'text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;">⚡ Quick Use</span>'
       + quickItems.map(item =>
           '<button class="teem-quick-btn" data-item="' + item.name + '" '
@@ -2768,7 +2768,7 @@
           + 'border-radius:5px;color:#e8dff5;font-size:11px;padding:4px 10px;cursor:pointer;'
           + 'font-family:monospace;white-space:nowrap;">' + item.name + '</button>'
         ).join('')
-      + '<button id="teem-quick-bar-close" style="background:none;border:none;color:#4a3a6a;'
+      + '<button id="teem-quick-bar-close" style="background:none;border:none;color:#a08fc0;'
       + 'cursor:pointer;font-size:14px;padding:0 3px;margin-left:4px;">✕</button>';
 
     document.body.appendChild(bar);
@@ -2915,7 +2915,7 @@
       <div style="font-size:13px;color:#c9a227;font-weight:700;margin-bottom:8px;">⚡ TEEM Sell</div>
       <div style="font-size:11px;color:#d8c8f0;margin-bottom:4px;">${name}</div>
       <div style="font-size:11px;color:#8a7aaa;margin-bottom:12px;">${qty}x @ $${price.toLocaleString()}</div>
-      <div style="font-size:10px;color:#4a3a6a;margin-bottom:14px;">Price fields have been auto-filled.<br>Click Confirm to submit the listing.</div>
+      <div style="font-size:10px;color:#a08fc0;margin-bottom:14px;">Price fields have been auto-filled.<br>Click Confirm to submit the listing.</div>
       <div style="display:flex;gap:8px;justify-content:center;">
         <button id="teem-sell-ok" style="background:rgba(80,180,100,0.2);border:1px solid rgba(80,180,100,0.4);
           border-radius:5px;color:#50dc82;padding:6px 16px;cursor:pointer;font-family:monospace;font-size:11px;">
