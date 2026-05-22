@@ -439,6 +439,7 @@
 
   let lastYataPrices = {};
   let analysisCache  = [];
+  let lastRenderedIds = [];  // item IDs currently shown in the panel — fed into the live-fetch priority list
   let watchlist      = new Set(load('watchlist', []));
   let myBattleStats    = load('myBattleStats', null);
   let statHistory      = load('statHistory', []);         // [ { ts, str, def, spd, dex, ts_total } ]
@@ -848,7 +849,7 @@
   //   4. Record snapshot: live price if available, else YATA, else market_value
   //      BUT only record market_value if it changed — avoids flat history poison
   //
-  const MAX_LIVE_ITEMS   = 15;
+  const MAX_LIVE_ITEMS   = 50;
   const METADATA_TTL_MS  = 6 * 60 * 60 * 1000
   let   lastMetadataFetch = load('lastMetadataFetch', 0);
 
@@ -895,14 +896,27 @@
   // Fetch live lowest-listing price for a single item (average of lowest 5)
   async function fetchLivePrice(apiKey, itemId) {
     try {
+      // Torn API v2 item market — the current live-listings endpoint.
+      // The old v1 `market?selections=itemmarket` no longer returns the
+      // live item-market listings, which left every item stuck on a stale
+      // 6-hour average and showing 0% movement.
       const data = await apiGetWithTimeout(
-        `https://api.torn.com/market/${itemId}?selections=itemmarket&key=${apiKey}&comment=TEEM`,
-        5000
+        `https://api.torn.com/v2/market/${itemId}/itemmarket?key=${apiKey}&comment=TEEM`,
+        6000
       );
-      if (data.error) return 0;
-      const listings = data?.itemmarket ?? {};
-      const prices = Object.values(listings)
-        .map(l => l.cost ?? l.price ?? 0)
+      if (!data || data._error || data.error) return 0;
+      // v2 shape: { itemmarket: { item:{...}, listings:[{price,amount},...] } }
+      let listings = data?.itemmarket?.listings;
+      // tolerate object-keyed shapes just in case
+      if (!Array.isArray(listings)) {
+        const im = data?.itemmarket;
+        if (im && typeof im === 'object') {
+          listings = Object.values(im).filter(v => v && typeof v === 'object' && (v.price || v.cost));
+        }
+      }
+      if (!Array.isArray(listings) || !listings.length) return 0;
+      const prices = listings
+        .map(l => l.price ?? l.cost ?? 0)
         .filter(p => p > 0)
         .sort((a, b) => a - b)
         .slice(0, 5);
@@ -939,6 +953,12 @@
     for (const id of ALWAYS_LIVE_IDS) ids.add(id);
     // Watchlist
     for (const id of watchlist) ids.add(id);
+    // Items currently shown in the panel — so the view the user is actually
+    // looking at gets live minute-by-minute prices and real movement
+    for (const id of lastRenderedIds) {
+      if (ids.size >= MAX_LIVE_ITEMS) break;
+      if (Number.isFinite(id)) ids.add(id);
+    }
     for (const country of COUNTRIES) {
       for (const item of country.items) {
         const id = travelItemIdMap[item.itemName];
@@ -975,7 +995,7 @@
     if (!ids.length) return {};
     const live = {};
     const BATCH = 5;
-    const deadline = Date.now() + 20000;
+    const deadline = Date.now() + 35000;
     for (let i = 0; i < ids.length; i += BATCH) {
       if (Date.now() > deadline) break;
       const batch = ids.slice(i, i + BATCH);
@@ -2357,6 +2377,10 @@
       return true;
     });
 
+    // Remember which items are on screen so the next poll fetches live prices
+    // for exactly the view the user is looking at
+    lastRenderedIds = filtered.map(r => r.itemId).filter(Number.isFinite);
+
     if (filtered.length === 0) {
       let msg;
       if (isWatchTab) {
@@ -2695,6 +2719,19 @@
 
     // Notification permission request (needed for travel + spike alerts)
     if (Notification.permission === 'default') { Notification.requestPermission(); }
+
+    // Catch-up poll when the tab regains focus. Browsers throttle and
+    // sometimes freeze setInterval in backgrounded tabs, which would leave
+    // prices stale until the next active tick. Refresh immediately on
+    // refocus, but throttle to no more than once per 30s.
+    let lastVisPoll = 0;
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!settings.apiKey) return;
+      if (Date.now() - lastVisPoll < 30000) return;
+      lastVisPoll = Date.now();
+      poll();
+    });
 
     // Show onboarding for new users, otherwise start polling
     if (!onboardingDone || !settings.apiKey) {
