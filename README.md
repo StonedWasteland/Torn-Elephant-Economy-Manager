@@ -135,17 +135,17 @@ TEEM ranks all 11 destinations by **profit per hour** accounting for:
 
 | Country | Primary Items | Flight (one-way) |
 |---|---|---|
-| 🇲🇽 Mexico | Jaguar Plushie, Dahlia | 18 min |
-| 🇰🇾 Cayman Islands | Stingray Plushie, Banana Orchid | 25 min |
-| 🇨🇦 Canada | Wolverine Plushie, Crocus | 29 min |
-| 🌺 Hawaii | Orchid, Large Suitcase | 54 min |
-| 🇬🇧 United Kingdom | Red Fox Plushie, Nessie Plushie, Heather | 111 min |
-| 🇦🇷 Argentina | Monkey Plushie, Ceibo Flower, Tear Gas | 112 min |
-| 🇨🇭 Switzerland | Chamois Plushie, Edelweiss, Flash Grenade | 123 min |
-| 🇯🇵 Japan | Cherry Blossom, Xanax | 158 min |
-| 🇨🇳 China | Panda Plushie, Peony | 169 min |
-| 🇦🇪 UAE | Camel Plushie, Tribulus Omanense | 190 min |
-| 🇿🇦 South Africa | Lion Plushie, African Violet, Xanax | 208 min |
+| 🇲🇽 Mexico | Jaguar Plushie, Dahlia | 20 min |
+| 🇰🇾 Cayman Islands | Stingray Plushie, Banana Orchid | 57 min |
+| 🇨🇦 Canada | Wolverine Plushie, Crocus | 41 min |
+| 🌺 Hawaii | Orchid, Large Suitcase | 121 min |
+| 🇬🇧 United Kingdom | Red Fox Plushie, Nessie Plushie, Heather | 152 min |
+| 🇦🇷 Argentina | Monkey Plushie, Ceibo Flower, Tear Gas | 189 min |
+| 🇨🇭 Switzerland | Chamois Plushie, Edelweiss, Flash Grenade | 169 min |
+| 🇯🇵 Japan | Cherry Blossom | 203 min |
+| 🇨🇳 China | Panda Plushie, Peony | 219 min |
+| 🇦🇪 UAE | Camel Plushie, Tribulus Omanense | 259 min |
+| 🇿🇦 South Africa | Lion Plushie, African Violet, Xanax | 311 min |
 
 ---
 
@@ -232,4 +232,5 @@ TEEM is a fan-made tool and is not affiliated with or endorsed by Torn City or C
 
 ---
 
+*Built with 💛 for the Torn community. May your markets be hot and your flights be profitable.*
 *Built with 💛 for the Torn community. May your markets be hot and your flights be profitable.*
