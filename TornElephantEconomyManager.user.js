@@ -1341,6 +1341,13 @@
     // FAB
     const fab = document.createElement('div');
     fab.id = 'tmit-fab';
+    // Inline styles guarantee visibility even if the GM_addStyle stylesheet
+    // fails to load or is blocked — the FAB must never be invisible.
+    fab.style.cssText = 'position:fixed;bottom:28px;right:28px;width:52px;height:52px;'
+      + 'border-radius:50%;background:radial-gradient(circle at 35% 35%,#320042,#09000d);'
+      + 'border:2px solid #c9a227;cursor:pointer;display:flex;align-items:center;'
+      + 'justify-content:center;z-index:2147483000;box-shadow:0 0 14px rgba(151,2,173,0.6),'
+      + '0 4px 24px rgba(0,0,0,0.8);';
     fab.innerHTML = `<img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🐘%3C/text%3E%3C/svg%3E" style="width:34px;height:34px;border-radius:50%;pointer-events:none;" draggable="false"><div class="tmit-alert-dot"></div>`;
     fab.title = "TEEM — Torn's Elephant Economy Manager";
     document.body.appendChild(fab);
