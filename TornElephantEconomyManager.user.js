@@ -1,4 +1,4 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
 // @version      6.0.0
@@ -21,8 +21,8 @@
 
 
   const SCRIPT_KEY   = 'tmit_';
-  // Poll intervals are user-configurable via settings â€” see startPolling()
-  // Tiered history retention â€” keeps long-term trends without storage bloat
+  // Poll intervals are user-configurable via settings — see startPolling()
+  // Tiered history retention — keeps long-term trends without storage bloat
   // Resolution tiers per snapshot age:
   //   0-24h:   keep every snapshot (full resolution)
   //   1-7d:    keep one per hour
@@ -49,7 +49,7 @@
   // Categories built dynamically from whatever Torn API actually returns
   let CATEGORIES = ['All'];
 
-  // â”€â”€ Bunker Bucks data (used by war calculator and BB tab) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Bunker Bucks data (used by war calculator and BB tab) ──────────────────
   const BB_TABLE = {
     Yellow: { 'Pistol/SMG': 4, 'Melee': 6, 'Shotgun/Rifle': 10, 'Armour': 12, 'Heavies': 14 },
     Orange: {
@@ -70,29 +70,29 @@
     return BB_TABLE[r]?.[b]?.[weaponType] ?? 0;
   }
 
-  // â”€â”€ Travel data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Travel countries â€” items identified by NAME, resolved to IDs at runtime
+  // ── Travel data ─────────────────────────────────────────────────────────────
+  // Travel countries — items identified by NAME, resolved to IDs at runtime
   // Sources: Torn wiki, community guides (verified Aug 2025)
   // Buy prices = in-store abroad price (Torn $)
   // Travel times = one-way economy flight in minutes
   // Capacity = approximate max items available per restock cycle
   const COUNTRIES = [
     {
-      name: 'Mexico', code: 'mex', flagEmoji: 'ðŸ‡²ðŸ‡½', travelTime: 20,
+      name: 'Mexico', code: 'mex', flagEmoji: '🇲🇽', travelTime: 20,
       items: [
         { itemName: 'Jaguar Plushie', buyPrice: 10000, capacity: 400  },
         { itemName: 'Dahlia',         buyPrice: 300,   capacity: 1000 },
       ]
     },
     {
-      name: 'Cayman Islands', code: 'cay', flagEmoji: 'ðŸ‡°ðŸ‡¾', travelTime: 57,
+      name: 'Cayman Islands', code: 'cay', flagEmoji: '🇰🇾', travelTime: 57,
       items: [
         { itemName: 'Stingray Plushie', buyPrice: 400,  capacity: 400  },
         { itemName: 'Banana Orchid',    buyPrice: 4000, capacity: 1000 },
       ]
     },
     {
-      name: 'Canada', code: 'can', flagEmoji: 'ðŸ‡¨ðŸ‡¦', travelTime: 41,
+      name: 'Canada', code: 'can', flagEmoji: '🇨🇦', travelTime: 41,
       items: [
         { itemName: 'Wolverine Plushie', buyPrice: 30,  capacity: 400  },
         { itemName: 'Crocus',            buyPrice: 600, capacity: 1000 },
@@ -100,14 +100,14 @@
       ]
     },
     {
-      name: 'Hawaii', code: 'haw', flagEmoji: 'ðŸŒº', travelTime: 121,
+      name: 'Hawaii', code: 'haw', flagEmoji: '🌺', travelTime: 121,
       items: [
         { itemName: 'Orchid',         buyPrice: 700,      capacity: 1000 },
         { itemName: 'Large Suitcase', buyPrice: 10000000, capacity: 100  },
       ]
     },
     {
-      name: 'United Kingdom', code: 'uk', flagEmoji: 'ðŸ‡¬ðŸ‡§', travelTime: 159,
+      name: 'United Kingdom', code: 'uk', flagEmoji: '🇬🇧', travelTime: 159,
       items: [
         { itemName: 'Red Fox Plushie', buyPrice: 1000, capacity: 400  },
         { itemName: 'Nessie Plushie',  buyPrice: 200,  capacity: 400  },
@@ -116,7 +116,7 @@
       ]
     },
     {
-      name: 'Argentina', code: 'arg', flagEmoji: 'ðŸ‡¦ðŸ‡·', travelTime: 189,
+      name: 'Argentina', code: 'arg', flagEmoji: '🇦🇷', travelTime: 189,
       items: [
         { itemName: 'Monkey Plushie', buyPrice: 400,   capacity: 400  },
         { itemName: 'Ceibo Flower',   buyPrice: 500,   capacity: 1000 },
@@ -125,7 +125,7 @@
       ]
     },
     {
-      name: 'Switzerland', code: 'swi', flagEmoji: 'ðŸ‡¨ðŸ‡­', travelTime: 169,
+      name: 'Switzerland', code: 'swi', flagEmoji: '🇨🇭', travelTime: 169,
       items: [
         { itemName: 'Chamois Plushie', buyPrice: 400,   capacity: 400  },
         { itemName: 'Edelweiss',       buyPrice: 900,   capacity: 1000 },
@@ -134,7 +134,7 @@
       ]
     },
     {
-      name: 'Japan', code: 'jap', flagEmoji: 'ðŸ‡¯ðŸ‡µ', travelTime: 225,
+      name: 'Japan', code: 'jap', flagEmoji: '🇯🇵', travelTime: 225,
       items: [
         { itemName: 'Cherry Blossom', buyPrice: 500, capacity: 1000 },
         { itemName: 'Xanax',          buyPrice: 750, capacity: 100  },
@@ -142,7 +142,7 @@
       ]
     },
     {
-      name: 'China', code: 'chi', flagEmoji: 'ðŸ‡¨ðŸ‡³', travelTime: 219,
+      name: 'China', code: 'chi', flagEmoji: '🇨🇳', travelTime: 219,
       items: [
         { itemName: 'Panda Plushie', buyPrice: 400,  capacity: 400  },
         { itemName: 'Peony',         buyPrice: 5000, capacity: 1000 },
@@ -151,14 +151,14 @@
       ]
     },
     {
-      name: 'UAE', code: 'uae', flagEmoji: 'ðŸ‡¦ðŸ‡ª', travelTime: 259,
+      name: 'UAE', code: 'uae', flagEmoji: '🇦🇪', travelTime: 259,
       items: [
         { itemName: 'Camel Plushie',     buyPrice: 14000, capacity: 400  },
         { itemName: 'Tribulus Omanense', buyPrice: 6000,  capacity: 1000 },
       ]
     },
     {
-      name: 'South Africa', code: 'saf', flagEmoji: 'ðŸ‡¿ðŸ‡¦', travelTime: 297,
+      name: 'South Africa', code: 'saf', flagEmoji: '🇿🇦', travelTime: 297,
       items: [
         { itemName: 'Lion Plushie',   buyPrice: 400,  capacity: 400  },
         { itemName: 'African Violet', buyPrice: 2000, capacity: 1000 },
@@ -242,7 +242,7 @@
   function classifyWeaponType(name, apiType) {
     const n = (name || '').toLowerCase();
     const t = (apiType || '').toLowerCase();
-    // All comparisons lowercased â€” Torn is inconsistent with capitalisation
+    // All comparisons lowercased — Torn is inconsistent with capitalisation
     if (t === 'melee' || t === 'piercing' || t === 'slashing' || t === 'clubbing' || t === 'mechanical') return 'Melee';
     if (t === 'heavy artillery') return 'Heavies';
     if (t === 'shotgun' || t === 'rifle' || t === 'machine gun') return 'Shotgun/Rifle';
@@ -252,7 +252,7 @@
     return null;
   }
 
-  // Canonical RW item type check â€” case-insensitive to handle Torn API inconsistencies
+  // Canonical RW item type check — case-insensitive to handle Torn API inconsistencies
   // Torn returns: 'Rifle', 'SMG', 'Shotgun', 'Pistol', 'Machine gun', 'Heavy artillery'
   // Melee subtypes: 'Piercing', 'Slashing', 'Clubbing', 'Mechanical'
   const RW_WEAPON_TYPE_LOWER = new Set([
@@ -264,7 +264,7 @@
 
   function isRWItem(name, type) {
     if (!name) return false;
-    // Check hardcoded weapon name list first â€” most reliable
+    // Check hardcoded weapon name list first — most reliable
     if (RW_KNOWN_WEAPONS.has(name)) return true;
     // Check type string (case-insensitive)
     if (type) {
@@ -300,19 +300,19 @@
     // Heavy Artillery
     'Anti-Tank Missile Launcher','Flamethrower','Milkor MGL','Minigun',
     'RPG Launcher','SMAW Launcher',
-    // Melee â€” Piercing
+    // Melee — Piercing
     'Dagger','DBK','Dual Bladed Katars','Harpoon','Kitchen Knife',
     'Macana','Swiss Army Knife',
-    // Melee â€” Slashing
+    // Melee — Slashing
     'Guandao','Katana','Kukri','Machete',
-    // Melee â€” Clubbing
+    // Melee — Clubbing
     'Baseball Bat','Bo Staff','Dual Hammers','Flail','Metal Nunchucks',
     'Wushu Double Axes','Wooden Nunchaku',
     // Mechanical
     'Chainsaw','Taser',
   ]);
 
-  // Ranked war weapon bonuses â€” community verified (May 2026)
+  // Ranked war weapon bonuses — community verified (May 2026)
   // Source: wiki.torn.com/wiki/Weapon_Bonus + community guides
   const RW_BONUSES = {
     // Bonuses that can appear on ALL ranged weapons (rifle, SMG, pistol, shotgun, MG, heavy)
@@ -349,12 +349,12 @@
       const v = GM_getValue(SCRIPT_KEY + key);
       if (v === undefined || v === null || v === '') return def;
       const parsed = JSON.parse(v);
-      // Sanity check â€” if type doesn't match default, return default
+      // Sanity check — if type doesn't match default, return default
       if (Array.isArray(def) && !Array.isArray(parsed)) return def;
       if (def !== null && typeof def === 'object' && !Array.isArray(def) && typeof parsed !== 'object') return def;
       return parsed;
     } catch(e) {
-      // Corrupted storage â€” clear it and return default
+      // Corrupted storage — clear it and return default
       try { GM_setValue(SCRIPT_KEY + key, JSON.stringify(def)); } catch(e2) {}
       return def;
     }
@@ -414,12 +414,12 @@
 
       if (!lastKept[key]) { result.push(s);
         lastKept[key] = true; }
-      // Otherwise skip â€” a snapshot for this time bucket already kept
+      // Otherwise skip — a snapshot for this time bucket already kept
     }
     return result;
   }
 
-  // Run thinning on all existing history on startup â€” cleans up old flat data
+  // Run thinning on all existing history on startup — cleans up old flat data
   // and compacts history that was stored before tiered thinning was introduced
   function thinAllHistory() {
     const now = Date.now();
@@ -451,18 +451,18 @@
 
   function saveWatchlist() { store('watchlist', [...watchlist]); }
 
-  // â”€â”€ Session tracker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Session tracker ───────────────────────────────────────────────────────
   let sessionStart      = Date.now();
   let sessionStartPrices = {}; // { itemId: price at session start }
   let sessionProfit     = 0;
 
-  // â”€â”€ Onboarding â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Onboarding ────────────────────────────────────────────────────────────
   let onboardingDone  = load('onboardingDone', false);
   thinAllHistory()
   let bbPerDollar      = load('bbPerDollar', 7000000);
   let userBBBalance    = 0;
-  let userInventory   = {};  // { itemId: { name, quantity, uid } } â€” refreshed each poll
-  let quickItems      = load('quickItems',   []);  // [{ name }] â€” saved items for quick-use bar
+  let userInventory   = {};  // { itemId: { name, quantity, uid } } — refreshed each poll
+  let quickItems      = load('quickItems',   []);  // [{ name }] — saved items for quick-use bar
 
   try { if (Object.keys(itemMeta).length === 0) {
     for (const name of RW_KNOWN_WEAPONS) {
@@ -470,16 +470,16 @@
     }
   } } catch(e) {}
 
-  // â”€â”€ Travel alert tracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Travel alert tracking ─────────────────────────────────────────────────
   let lastTopTravelCode = load('lastTravelCode', null);
   let lastTopTravelPPH  = load('lastTravelPPH',  0);
 
-  // â”€â”€ Tooltip state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Tooltip state ─────────────────────────────────────────────────────────
   const TOOLTIPS = {
     signal:     'Signal shows the price trend direction.\nBUY = rising 5%+. HOLD = mild uptrend. WATCH = volatile, no clear direction. SELL = falling 8%+.',
-    confidence: 'Confidence dots show how strong the signal is.\nâ— â— â— = strong trend, lots of data.\nâ— â— â—‹ = moderate.\nâ— â—‹ â—‹ = early/thin data.',
-    pph:        'Profit Per Hour â€” estimated $ earned per hour of round-trip travel, after 5% sales tax.',
-    stock:      'YATA âœ“ = live crowd-sourced stock data from yata.life.\n~stock = no data, assuming full stock (optimistic).',
+    confidence: 'Confidence dots show how strong the signal is.\n● ● ● = strong trend, lots of data.\n● ● ○ = moderate.\n● ○ ○ = early/thin data.',
+    pph:        'Profit Per Hour — estimated $ earned per hour of round-trip travel, after 5% sales tax.',
+    stock:      'YATA ✓ = live crowd-sourced stock data from yata.life.\n~stock = no data, assuming full stock (optimistic).',
     change:     'Price change % over your selected timeframe.\nOrange = price rising (hot). Teal = falling (cold).',
     dataAge:    'How long ago prices were last fetched. Green = fresh. Yellow = >5min old. Red = >15min.',
   };
@@ -545,7 +545,7 @@
     return `${m}m`;
   }
 
-  // â”€â”€ Carry capacity auto-detect â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Carry capacity auto-detect ───────────────────────────────────────────
   async function detectCarryCapacity(apiKey) {
     try {
       const data = await apiGet(
@@ -565,7 +565,7 @@
       if (hasLargeSuitcase) base += 4;
       else if (hasMedSuitcase) base += 2;
 
-      // Faction Excursion special â€” up to +10
+      // Faction Excursion special — up to +10
       const factionPerks = data.faction_perks ?? data.perks?.faction ?? [];
       const excursion = factionPerks.find?.(p =>
         typeof p === 'string' ? p.toLowerCase().includes('excursion') :
@@ -576,8 +576,8 @@
         if (match) base += Math.min(10, parseInt(match[1]));
       }
 
-      // Lingerie Store 3* job special (+2) â€” can't reliably detect, skip
-      // Cruise Line Agency 3*/10* (+2/+3) â€” same
+      // Lingerie Store 3* job special (+2) — can't reliably detect, skip
+      // Cruise Line Agency 3*/10* (+2/+3) — same
 
       return Math.max(5, base);
     } catch(e) {
@@ -585,7 +585,7 @@
     }
   }
 
-  // â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Styles ────────────────────────────────────────────────────────────────────
   GM_addStyle(`
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap');
     #tmit-fab{position:fixed;bottom:28px;right:28px;width:52px;height:52px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#320042,#09000d);border:2px solid #c9a227;box-shadow:0 0 14px rgba(151,2,173,0.5),0 4px 24px rgba(0,0,0,0.8);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;z-index:999999;transition:all 0.3s ease;user-select:none;}
@@ -798,10 +798,10 @@
     .tmit-onboard-skip:hover{color:#7a2090;}
   `);
 
-  // â”€â”€ API calls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── API calls ─────────────────────────────────────────────────────────────────
 
   // apiGet with a custom timeout
-  // Core HTTP helper â€” uses Promise.race to guarantee timeout fires
+  // Core HTTP helper — uses Promise.race to guarantee timeout fires
   // even if GM_xmlhttpRequest ignores the timeout field (some browsers/versions do)
   function _gmFetch(url) {
     return new Promise((resolve, reject) => {
@@ -825,12 +825,12 @@
     );
   }
 
-  // apiGet â€” 12s hard timeout via Promise.race
+  // apiGet — 12s hard timeout via Promise.race
   function apiGet(url) {
     return Promise.race([_gmFetch(url), _timeout(12000, 'API call')]);
   }
 
-  // apiGetWithTimeout â€” custom timeout via Promise.race
+  // apiGetWithTimeout — custom timeout via Promise.race
   function apiGetWithTimeout(url, timeoutMs) {
     return Promise.race([
       _gmFetch(url).catch(() => ({ _error: 'network' })),
@@ -838,21 +838,21 @@
     ]);
   }
 
-  // â”€â”€ Price fetching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Price fetching ────────────────────────────────────────────────────────
   //
   // Each poll:
-  //   1. Fetch torn/items â€” metadata (name, type) + market_value for all items
+  //   1. Fetch torn/items — metadata (name, type) + market_value for all items
   //   2. Fetch YATA prices in parallel
   //   3. Fetch live market listings for up to MAX_LIVE_ITEMS priority items
   //   4. Record snapshot: live price if available, else YATA, else market_value
-  //      BUT only record market_value if it changed â€” avoids flat history poison
+  //      BUT only record market_value if it changed — avoids flat history poison
   //
   const MAX_LIVE_ITEMS   = 15;
   const METADATA_TTL_MS  = 6 * 60 * 60 * 1000
   let   lastMetadataFetch = load('lastMetadataFetch', 0);
 
-  // Fetch all items â€” metadata + market_value fallback prices
-  // Cached for 6h in GM storage â€” most page loads skip this entirely
+  // Fetch all items — metadata + market_value fallback prices
+  // Cached for 6h in GM storage — most page loads skip this entirely
   async function fetchAllItems(apiKey) {
     const now = Date.now();
     const hasMeta = Object.keys(itemMeta).length > 0;
@@ -862,16 +862,16 @@
     if (hasMeta && !isStale) return {};
 
     // If we have stale cached data, try to refresh but don't block the poll
-    // â€” use a reasonable timeout and fall back gracefully
+    // — use a reasonable timeout and fall back gracefully
     try {
       const data = await apiGetWithTimeout(
         `https://api.torn.com/torn/?selections=items&key=${apiKey}&comment=TEEM`,
         20000
       );
       if (data?._error) {
-        // Timeout or network error â€” use cached data if available
+        // Timeout or network error — use cached data if available
         if (hasMeta) return {};
-        throw new Error('Torn API unreachable â€” check your connection');
+        throw new Error('Torn API unreachable — check your connection');
       }
       if (data?.error) {
         if (hasMeta) return {};
@@ -913,7 +913,7 @@
   }
 
   // Build priority list for live fetches
-  // High-traffic items always fetched live â€” these drive most market signals
+  // High-traffic items always fetched live — these drive most market signals
   // IDs verified from torn/items API (May 2026)
   const ALWAYS_LIVE_IDS = new Set([
     206,  // Xanax
@@ -1049,13 +1049,13 @@
 
     const changePct = ((effectivePrice - oldestPrice) / oldestPrice) * 100;
 
-    // Volatility â€” std dev of price changes in window
+    // Volatility — std dev of price changes in window
     const prices = effectiveWindow.map(h => h.price || h.yataPrice || 0).filter(Boolean);
     const mean = prices.reduce((a, b) => a + b, 0) / prices.length;
     const variance = prices.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / prices.length;
     const volatility = Math.sqrt(variance) / mean * 100;
 
-    // Trend â€” simple linear regression slope
+    // Trend — simple linear regression slope
     const n = effectiveWindow.length;
     const xs = effectiveWindow.map((_, i) => i);
     const ys = effectiveWindow.map(h => h.price || h.yataPrice || 0);
@@ -1119,7 +1119,7 @@
       if (result) { results.push(result); seen.add(parseInt(idStr)); }
     }
 
-    // Items in itemMeta with no history yet â€” show with market_value as price
+    // Items in itemMeta with no history yet — show with market_value as price
     for (const [idStr, meta] of Object.entries(itemMeta)) {
       const id = parseInt(idStr);
       if (seen.has(id)) continue;
@@ -1179,7 +1179,7 @@
     try {
       // Only show loading spinner if no cached data is displayed yet
       const hasDisplayedData = Object.keys(priceHistory).length > 0;
-      if (!hasDisplayedData) setStatus('loading', 'Fetchingâ€¦');
+      if (!hasDisplayedData) setStatus('loading', 'Fetching…');
 
       // Step 1: Fetch all items + YATA in parallel
       // fetchAllItems returns {} if itemMeta cache is still fresh
@@ -1211,7 +1211,7 @@
       // Always rebuild seenTypes from current itemMeta
       for (const m of Object.values(itemMeta)) { if (m.type) seenTypes.add(m.type); }
 
-      // Step 3: Resolve travel IDs â€” skip temp seeded entries (no real numeric ID)
+      // Step 3: Resolve travel IDs — skip temp seeded entries (no real numeric ID)
       resolveTravelItemIds(
         Object.fromEntries(
           Object.entries(itemMeta)
@@ -1259,7 +1259,7 @@
           const hist = priceHistory[id];
           const lastMv = hist?.length ? hist[hist.length - 1].price : -1;
           if (mv === lastMv) {
-            // mv unchanged â€” still record yata update if we have one
+            // mv unchanged — still record yata update if we have one
             if (yataPrice > 0) appendHistory(id, 0, yataPrice);
             continue;
           }
@@ -1281,8 +1281,8 @@
       saveHistory();
 
       const liveCount = Object.keys(livePrices).length;
-      const srcLabel  = liveCount > 0 ? `âš¡ ${liveCount} live` : '~ Avg';
-      setStatus('ok', `${srcLabel} Â· ${new Date().toLocaleTimeString()}`);
+      const srcLabel  = liveCount > 0 ? `⚡ ${liveCount} live` : '~ Avg';
+      setStatus('ok', `${srcLabel} · ${new Date().toLocaleTimeString()}`);
 
       // Fetch inventory for buy/sell features
       try {
@@ -1332,7 +1332,7 @@
     }, Math.min(statsMs / 2, 15000));
   }
 
-  // â”€â”€ UI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── UI ────────────────────────────────────────────────────────────────────────
 
   function buildUI() {
     if (uiBuilt) return;
@@ -1341,8 +1341,8 @@
     // FAB
     const fab = document.createElement('div');
     fab.id = 'tmit-fab';
-    fab.innerHTML = `<img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3EðŸ˜%3C/text%3E%3C/svg%3E" style="width:34px;height:34px;border-radius:50%;pointer-events:none;" draggable="false"><div class="tmit-alert-dot"></div>`;
-    fab.title = "TEEM â€” Torn's Elephant Economy Manager";
+    fab.innerHTML = `<img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🐘%3C/text%3E%3C/svg%3E" style="width:34px;height:34px;border-radius:50%;pointer-events:none;" draggable="false"><div class="tmit-alert-dot"></div>`;
+    fab.title = "TEEM — Torn's Elephant Economy Manager";
     document.body.appendChild(fab);
 
     // Panel
@@ -1352,33 +1352,33 @@
     panel.innerHTML = `
       <div class="tmit-header" id="tmit-drag-handle">
         <div class="tmit-title">
-          <img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3EðŸ˜%3C/text%3E%3C/svg%3E" style="width:22px;height:22px;border-radius:50%;flex-shrink:0;" draggable="false">
+          <img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🐘%3C/text%3E%3C/svg%3E" style="width:22px;height:22px;border-radius:50%;flex-shrink:0;" draggable="false">
           Elephant Economy Manager
         </div>
         <div class="tmit-header-right">
-          <span class="tmit-status-pill" id="tmit-status">Loadingâ€¦</span>
-          <button class="tmit-btn-refresh" id="tmit-btn-refresh" title="Refresh now">â†»</button>
-          <button class="tmit-btn-settings-toggle" id="tmit-btn-settings-toggle" title="Settings">âš™</button>
-          <button class="tmit-btn-close" id="tmit-btn-close" title="Close">âœ•</button>
+          <span class="tmit-status-pill" id="tmit-status">Loading…</span>
+          <button class="tmit-btn-refresh" id="tmit-btn-refresh" title="Refresh now">↻</button>
+          <button class="tmit-btn-settings-toggle" id="tmit-btn-settings-toggle" title="Settings">⚙</button>
+          <button class="tmit-btn-close" id="tmit-btn-close" title="Close">✕</button>
         </div>
       </div>
 
       <div class="tmit-session-bar" id="tmit-session-bar">
-        <div class="tmit-session-item">ðŸ“¦ Inventory: <span class="tmit-session-val" id="tmit-sess-inv">â€”</span></div>
-        <div class="tmit-session-item">ðŸ’° Session: <span class="tmit-session-val positive" id="tmit-sess-profit">$0</span></div>
+        <div class="tmit-session-item">📦 Inventory: <span class="tmit-session-val" id="tmit-sess-inv">—</span></div>
+        <div class="tmit-session-item">💰 Session: <span class="tmit-session-val positive" id="tmit-sess-profit">$0</span></div>
         <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
           <span id="tmit-age-dot" class="tmit-age-dot tmit-age-fresh"></span>
-          <span id="tmit-age-text" style="color:#3a2a5a;font-size:9px">â€”</span>
-          <button class="tmit-btn-export" id="tmit-btn-export" title="Export current view to CSV">â¬‡ CSV</button>
+          <span id="tmit-age-text" style="color:#3a2a5a;font-size:9px">—</span>
+          <button class="tmit-btn-export" id="tmit-btn-export" title="Export current view to CSV">⬇ CSV</button>
         </div>
       </div>
 
       <div class="tmit-tab-bar">
         <div class="tmit-tab tmit-tab-active" data-tab="all">Market</div>
-        <div class="tmit-tab" data-tab="watchlist">â­ Watch <span class="tmit-tab-count" id="tmit-watch-count">0</span></div>
-        <div class="tmit-tab" data-tab="war">âš” War Gear</div>
-        <div class="tmit-tab" data-tab="travel">âœˆ Travel</div>
-        <div class="tmit-tab" data-tab="quick">âš¡ Quick</div>
+        <div class="tmit-tab" data-tab="watchlist">⭐ Watch <span class="tmit-tab-count" id="tmit-watch-count">0</span></div>
+        <div class="tmit-tab" data-tab="war">⚔ War Gear</div>
+        <div class="tmit-tab" data-tab="travel">✈ Travel</div>
+        <div class="tmit-tab" data-tab="quick">⚡ Quick</div>
       </div>
 
       <div class="tmit-controls">
@@ -1394,15 +1394,15 @@
             `<option value="${c}"${c === settings.selectedCategory ? ' selected' : ''}>${c}</option>`
           ).join('')}
         </select>
-        <input type="text" class="tmit-search" id="tmit-search" placeholder="Search itemsâ€¦">
+        <input type="text" class="tmit-search" id="tmit-search" placeholder="Search items…">
       </div>
 
       <div class="tmit-filter-row">
         <span class="tmit-filter-label">Budget</span>
         <input type="number" class="tmit-input-sm" id="tmit-budget-input"
-          placeholder="Max priceâ€¦" value="${settings.maxBudget || ''}">
+          placeholder="Max price…" value="${settings.maxBudget || ''}">
         <div class="tmit-divider"></div>
-        <span class="tmit-filter-label">Min Î”%</span>
+        <span class="tmit-filter-label">Min Δ%</span>
         <input type="number" class="tmit-input-sm" id="tmit-minpct-input"
           placeholder="e.g. 5" value="${settings.minProfit || ''}">
       </div>
@@ -1417,24 +1417,24 @@
 
       <div class="tmit-list" id="tmit-list">
         <div class="tmit-state-msg">
-          <div class="tmit-state-icon">ðŸ’Ž</div>
-          ${settings.apiKey ? 'Fetching market dataâ€¦' : 'Open âš™ settings and enter your Torn API key.'}
+          <div class="tmit-state-icon">💎</div>
+          ${settings.apiKey ? 'Fetching market data…' : 'Open ⚙ settings and enter your Torn API key.'}
         </div>
       </div>
 
       <!-- War Gear Tab -->
       <div id="tmit-war-panel" class="tmit-tab-panel" style="display:none;flex:1;overflow-y:auto;padding:12px;">
-        <div class="tmit-section-title">âš” War Gear Price Tracker</div>
+        <div class="tmit-section-title">⚔ War Gear Price Tracker</div>
         <div style="display:grid;grid-template-columns:1fr 80px 80px 70px 55px;padding:4px 8px;background:rgba(0,0,0,0.4);border:1px solid rgba(201,162,39,0.12);border-radius:4px 4px 0 0;margin-bottom:1px;">
           <div class="tmit-col-hdr">Item Name</div>
           <div class="tmit-col-hdr" style="text-align:right">Price</div>
           <div class="tmit-col-hdr" style="text-align:right">BB Value</div>
           <div class="tmit-col-hdr" style="text-align:right">$ equiv</div>
-          <div class="tmit-col-hdr" style="text-align:right">Î”%</div>
+          <div class="tmit-col-hdr" style="text-align:right">Δ%</div>
         </div>
         <div id="tmit-war-tracker-list" class="tmit-war-tracker">
           <div class="tmit-state-msg" style="padding:16px 0;">
-            <div class="tmit-state-icon" style="font-size:20px">âš”</div>
+            <div class="tmit-state-icon" style="font-size:20px">⚔</div>
             War gear prices appear here once the market poll detects weapon/armor items.
           </div>
         </div>
@@ -1442,17 +1442,17 @@
 
       <!-- Travel Tab -->
       <div id="tmit-travel-panel" class="tmit-tab-panel" style="display:none;flex:1;overflow-y:auto;padding:12px;">
-        <div class="tmit-section-title">âœˆ Travel Profit Rankings</div>
+        <div class="tmit-section-title">✈ Travel Profit Rankings</div>
 
         <!-- Flight type + carry capacity -->
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px;padding:7px 9px;background:rgba(0,0,0,0.25);border-radius:6px;border:1px solid rgba(201,162,39,0.1);">
           <div style="display:flex;align-items:center;gap:5px;">
             <span style="font-size:9px;color:#6a5a8a;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Flight</span>
             <select id="tmit-flight-type" class="tmit-select" style="font-size:10px;">
-              <option value="economy"  ${settings.flightType==='economy'  ?'selected':''}>âœˆ Economy</option>
-              <option value="airstrip" ${settings.flightType==='airstrip' ?'selected':''}>ðŸ›« Airstrip (âˆ’30%)</option>
-              <option value="business" ${settings.flightType==='business' ?'selected':''}>ðŸ’º Business (âˆ’50%)</option>
-              <option value="wlt"      ${settings.flightType==='wlt'      ?'selected':''}>ðŸŒŸ WLT (âˆ’50%)</option>
+              <option value="economy"  ${settings.flightType==='economy'  ?'selected':''}>✈ Economy</option>
+              <option value="airstrip" ${settings.flightType==='airstrip' ?'selected':''}>🛫 Airstrip (−30%)</option>
+              <option value="business" ${settings.flightType==='business' ?'selected':''}>💺 Business (−50%)</option>
+              <option value="wlt"      ${settings.flightType==='wlt'      ?'selected':''}>🌟 WLT (−50%)</option>
             </select>
           </div>
           <div style="display:flex;align-items:center;gap:5px;">
@@ -1461,7 +1461,7 @@
               value="${settings.carryCapacity || 10}" min="1" max="100" style="width:52px;font-size:11px;">
             <span style="font-size:9px;color:#4a3a6a;">items</span>
           </div>
-          <button class="tmit-btn-calc" style="margin:0;margin-left:auto;padding:4px 10px;font-size:10px;" id="tmit-travel-refresh">â†»</button>
+          <button class="tmit-btn-calc" style="margin:0;margin-left:auto;padding:4px 10px;font-size:10px;" id="tmit-travel-refresh">↻</button>
         </div>
 
         <!-- Alert conditions -->
@@ -1491,12 +1491,12 @@
 
         <div id="tmit-travel-list">
           <div class="tmit-state-msg">
-            <div class="tmit-state-icon">âœˆ</div>
+            <div class="tmit-state-icon">✈</div>
             Travel data loads with the next market poll.
           </div>
         </div>
 
-        <div class="tmit-section-title" style="margin-top:14px;">ðŸ“‹ Trip Details</div>
+        <div class="tmit-section-title" style="margin-top:14px;">📋 Trip Details</div>
         <div id="tmit-travel-detail" style="font-size:11px;color:#5a4a7a;padding:6px 0;">
           Click a destination above to see trip details.
         </div>
@@ -1504,7 +1504,7 @@
 
       <!-- Quick Items Tab -->
       <div id="tmit-quick-panel" class="tmit-tab-panel" style="display:none;flex:1;overflow-y:auto;padding:12px;">
-        <div class="tmit-section-title">âš¡ Quick Use Items</div>
+        <div class="tmit-section-title">⚡ Quick Use Items</div>
         <div style="font-size:10px;color:#4a3a6a;margin-bottom:10px;line-height:1.6;">
           Pin items here for fast access. TEEM injects a bar at the top of the
           <a href="https://www.torn.com/item.php" style="color:#c9a227;text-decoration:none;">Items page</a>
@@ -1520,29 +1520,29 @@
       </div>
 
       <div class="tmit-settings-panel" id="tmit-settings-panel">
-        <div class="tmit-settings-title">âš™ Settings</div>
+        <div class="tmit-settings-title">⚙ Settings</div>
 
         <div style="font-size:10px;color:#4a3a6a;line-height:1.6;margin-bottom:10px;padding:6px 8px;background:rgba(201,162,39,0.05);border:1px solid rgba(201,162,39,0.12);border-radius:5px;">
-          All keys are stored locally on your device only â€” never sent anywhere except directly to that service's own API.
+          All keys are stored locally on your device only — never sent anywhere except directly to that service's own API.
           <b style="color:#c9a227">Create a separate key per service</b> so you can revoke them individually if needed.
         </div>
 
         <!-- TORN MARKET API KEY -->
         <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c9a227;margin-bottom:4px;">
-          Torn Market API Key <span style="color:#ff6060;font-weight:400;">â˜… Required</span>
+          Torn Market API Key <span style="color:#ff6060;font-weight:400;">★ Required</span>
         </div>
         <div style="font-size:9px;color:#4a3a6a;margin-bottom:5px;line-height:1.5;">
           Used for live item prices, your stats, energy bars &amp; BB balance.
           Get yours at <a href="https://www.torn.com/preferences.php#tab=api" target="_blank" rel="noopener"
-            style="color:#c9a227;text-decoration:none;">torn.com â†’ Preferences â†’ API â†—</a>
-          â€” a <b style="color:#e8dff5">Limited</b> key is enough.
+            style="color:#c9a227;text-decoration:none;">torn.com → Preferences → API ↗</a>
+          — a <b style="color:#e8dff5">Limited</b> key is enough.
         </div>
         <div style="display:flex;gap:4px;margin-bottom:3px;">
-          <input type="password" id="tmit-apikey-input" placeholder="Paste Torn API key hereâ€¦"
+          <input type="password" id="tmit-apikey-input" placeholder="Paste Torn API key here…"
             value="${settings.apiKey}" autocomplete="off"
             style="flex:1;background:rgba(0,0,0,0.5);border:1px solid rgba(201,162,39,0.25);border-radius:4px;color:#e8dff5;font-size:12px;padding:6px 9px;outline:none;font-family:monospace;">
           <button id="tmit-apikey-toggle" title="Show/hide key"
-            style="background:none;border:1px solid rgba(201,162,39,0.2);color:#6a5a8a;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;">ðŸ‘</button>
+            style="background:none;border:1px solid rgba(201,162,39,0.2);color:#6a5a8a;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;">👁</button>
         </div>
         <div id="tmit-apikey-status" style="font-size:10px;min-height:14px;margin-bottom:8px;padding-left:2px;"></div>
 
@@ -1554,24 +1554,24 @@
         <div style="font-size:9px;color:#4a3a6a;margin-bottom:5px;line-height:1.5;">
           Unlocks <b style="color:#e8dff5">YATA spy data</b> for player overlays and more accurate travel stock estimates.
           Log in at <a href="https://yata.life" target="_blank" rel="noopener"
-            style="color:#c9a227;text-decoration:none;">yata.life â†—</a>
-          with your Torn account â€” your YATA key is in your profile settings there.
+            style="color:#c9a227;text-decoration:none;">yata.life ↗</a>
+          with your Torn account — your YATA key is in your profile settings there.
         </div>
         <div style="display:flex;gap:4px;margin-bottom:3px;">
-          <input type="password" id="tmit-yata-key-input" placeholder="Paste YATA key hereâ€¦" autocomplete="off" value="${load('yataKey', '')}"
+          <input type="password" id="tmit-yata-key-input" placeholder="Paste YATA key here…" autocomplete="off" value="${load('yataKey', '')}"
             style="flex:1;background:rgba(0,0,0,0.5);border:1px solid rgba(201,162,39,0.25);border-radius:4px;color:#e8dff5;font-size:12px;padding:6px 9px;outline:none;font-family:monospace;">
           <button id="tmit-yatakey-toggle" title="Show/hide key"
-            style="background:none;border:1px solid rgba(201,162,39,0.2);color:#6a5a8a;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;">ðŸ‘</button>
+            style="background:none;border:1px solid rgba(201,162,39,0.2);color:#6a5a8a;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;">👁</button>
         </div>
         <div id="tmit-yata-key-status" style="font-size:10px;min-height:14px;margin-bottom:10px;padding-left:2px;"></div>
 
-        <button class="tmit-btn-save" id="tmit-btn-save" style="width:100%;">ðŸ’¾ Save All Settings</button>
+        <button class="tmit-btn-save" id="tmit-btn-save" style="width:100%;">💾 Save All Settings</button>
       </div>
 
       <div class="tmit-footer">
         <span class="tmit-footer-stat">Items tracked: <span id="tmit-item-count">0</span></span>
         <span class="tmit-footer-stat">Snapshots: <span id="tmit-snapshot-count">0</span></span>
-        <span class="tmit-footer-stat">Next poll: <span id="tmit-next-poll">â€”</span></span>
+        <span class="tmit-footer-stat">Next poll: <span id="tmit-next-poll">—</span></span>
       </div>
     `;
     document.body.appendChild(panel);
@@ -1588,10 +1588,10 @@
       fab.style.top    = settings.fabY + 'px';
     }
 
-    // Panel starts hidden â€” position is set when it opens (see openPanel())
+    // Panel starts hidden — position is set when it opens (see openPanel())
   }
 
-  // â”€â”€ Onboarding â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Onboarding ────────────────────────────────────────────────────────────
 
   function buildOnboarding(iconDataUrl) {
     const el = document.createElement('div');
@@ -1602,14 +1602,14 @@
           <img class="tmit-onboard-logo" src="${iconDataUrl}" alt="TEEM" style="width:36px;height:36px;margin:0;flex-shrink:0;">
           <div>
             <div class="tmit-onboard-title" style="font-size:13px;text-align:left;margin:0;">Welcome to TEEM</div>
-            <div class="tmit-onboard-subtitle" style="text-align:left;margin:0;font-size:10px;">Let's get you set up â€” Torn stays usable the whole time</div>
+            <div class="tmit-onboard-subtitle" style="text-align:left;margin:0;font-size:10px;">Let's get you set up — Torn stays usable the whole time</div>
           </div>
-          <button id="tmit-ob-close-x" style="margin-left:auto;background:none;border:none;color:#3a2a5a;font-size:16px;cursor:pointer;padding:0;line-height:1;" title="Close (set up later via âš™ in the panel)">âœ•</button>
+          <button id="tmit-ob-close-x" style="margin-left:auto;background:none;border:none;color:#3a2a5a;font-size:16px;cursor:pointer;padding:0;line-height:1;" title="Close (set up later via ⚙ in the panel)">✕</button>
         </div>
 
         <!-- Step 1: API Key -->
         <div class="tmit-onboard-step active" id="tmit-ob-step-1">
-          <div class="tmit-onboard-step-title">Step 1 of 4 â€” Connect to Torn</div>
+          <div class="tmit-onboard-step-title">Step 1 of 4 — Connect to Torn</div>
           <div class="tmit-onboard-step-body">
             TEEM needs a <b>Torn API key</b> to fetch live market prices, your carry capacity, and BB balance.<br><br>
             A <b>Limited</b> key is enough - just enable <code>Market</code>, <code>User</code>, and <code>Torn</code> access when creating it.
@@ -1618,26 +1618,26 @@
             style="display:inline-flex;align-items:center;gap:6px;margin-bottom:10px;padding:7px 14px;background:rgba(201,162,39,0.12);border:1px solid rgba(201,162,39,0.3);border-radius:6px;color:#ffe066;font-size:11px;font-weight:700;text-decoration:none;transition:background 0.15s;"
             onmouseover="this.style.background='rgba(201,162,39,0.22)'"
             onmouseout="this.style.background='rgba(201,162,39,0.12)'">
-            ðŸ”‘ Open Torn API Settings (new tab) â†—
+            🔑 Open Torn API Settings (new tab) ↗
           </a>
           <div style="font-size:10px;color:#4a3a6a;margin-bottom:8px;">
-            Come back here and paste your key below once you've created it â€” this window stays open.
+            Come back here and paste your key below once you've created it — this window stays open.
           </div>
-          <input type="password" class="tmit-onboard-input" id="tmit-ob-apikey" placeholder="Paste your API key hereâ€¦" autocomplete="off">
+          <input type="password" class="tmit-onboard-input" id="tmit-ob-apikey" placeholder="Paste your API key here…" autocomplete="off">
           <div class="tmit-onboard-validate" id="tmit-ob-validate"></div>
         </div>
 
         <!-- Step 2: Carry capacity -->
         <div class="tmit-onboard-step" id="tmit-ob-step-2">
-          <div class="tmit-onboard-step-title">Step 2 of 4 â€” Your Carry Capacity</div>
+          <div class="tmit-onboard-step-title">Step 2 of 4 — Your Carry Capacity</div>
           <div class="tmit-onboard-step-body">
             How many items can you carry per trip? Check your <b>Travel page in-game</b> for the exact number.<br><br>
-            Common sources of capacity: base (5) + suitcase (+2/+4) + faction Excursion (+1â€“10) + property airstrip (+10) + job specials (+2â€“5).
+            Common sources of capacity: base (5) + suitcase (+2/+4) + faction Excursion (+1–10) + property airstrip (+10) + job specials (+2–5).
           </div>
           <div class="tmit-onboard-capacity-row" style="align-items:flex-start;flex-direction:column;gap:8px;">
             <div style="display:flex;align-items:center;gap:10px;">
-              <div class="tmit-onboard-cap-val" id="tmit-ob-cap-val">â€”</div>
-              <div class="tmit-onboard-cap-detail" id="tmit-ob-cap-detail">Detecting from APIâ€¦</div>
+              <div class="tmit-onboard-cap-val" id="tmit-ob-cap-val">—</div>
+              <div class="tmit-onboard-cap-detail" id="tmit-ob-cap-detail">Detecting from API…</div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;width:100%;">
               <label style="font-size:11px;color:#6a5a8a;white-space:nowrap;">Adjust if wrong:</label>
@@ -1646,41 +1646,41 @@
                 placeholder="29">
               <span style="font-size:10px;color:#4a3a6a;">items per trip</span>
             </div>
-            <div style="font-size:10px;color:#4a3a6a;">You can always change this in the âœˆ Travel tab.</div>
+            <div style="font-size:10px;color:#4a3a6a;">You can always change this in the ✈ Travel tab.</div>
           </div>
         </div>
 
         <!-- Step 3: Tab tour -->
         <div class="tmit-onboard-step" id="tmit-ob-step-3">
-          <div class="tmit-onboard-step-title">Step 3 of 4 â€” What's Inside</div>
+          <div class="tmit-onboard-step-title">Step 3 of 4 — What's Inside</div>
           <div class="tmit-onboard-tab-grid">
             <div class="tmit-onboard-tab-card">
-              <div class="tab-icon">ðŸ“ˆ</div>
+              <div class="tab-icon">📈</div>
               <div class="tab-name">Market</div>
               <div class="tab-desc">Tracks all item prices. Hot/cold signals show what's rising or falling.</div>
             </div>
             <div class="tmit-onboard-tab-card">
-              <div class="tab-icon">â­</div>
+              <div class="tab-icon">⭐</div>
               <div class="tab-name">Watchlist</div>
               <div class="tab-desc">Pin items to watch. Click any WATCH badge to add it here.</div>
             </div>
             <div class="tmit-onboard-tab-card">
-              <div class="tab-icon">âœˆ</div>
+              <div class="tab-icon">✈</div>
               <div class="tab-name">Travel</div>
               <div class="tab-desc">Ranks all 11 destinations by profit/hr. Click any for full trip details.</div>
             </div>
             <div class="tmit-onboard-tab-card">
-              <div class="tab-icon">âš”</div>
+              <div class="tab-icon">⚔</div>
               <div class="tab-name">War Gear</div>
               <div class="tab-desc">Calculator for ranked war weapons and armor. Score + BB value.</div>
             </div>
             <div class="tmit-onboard-tab-card">
-              <div class="tab-icon">ðŸª™</div>
+              <div class="tab-icon">��</div>
               <div class="tab-name">BB Calc</div>
               <div class="tab-desc">Full Bunker Bucks calculator. Grind estimator, trade-in table, cache costs.</div>
             </div>
             <div class="tmit-onboard-tab-card">
-              <div class="tab-icon">ðŸ’°</div>
+              <div class="tab-icon">💰</div>
               <div class="tab-name">Session Bar</div>
               <div class="tab-desc">Live inventory estimate and session profit tracked at the top.</div>
             </div>
@@ -1689,13 +1689,13 @@
 
         <!-- Step 4: You're ready -->
         <div class="tmit-onboard-step" id="tmit-ob-step-4">
-          <div class="tmit-onboard-step-title">Step 4 of 4 â€” You're Ready ðŸ˜</div>
+          <div class="tmit-onboard-step-title">Step 4 of 4 — You're Ready 🐘</div>
           <div class="tmit-onboard-step-body">
             TEEM is now running. A few tips:<br><br>
-            â€¢ <b>Drag</b> the ðŸ˜ TEEM button anywhere on screen<br>
-            â€¢ <b>Alt+T</b> toggles the panel from anywhere in Torn<br>
-            â€¢ Data builds over time â€” signals get smarter the longer it runs<br>
-            â€¢ <b>Prices update every minute</b> using live Torn API data<br><br>
+            • <b>Drag</b> the 🐘 TEEM button anywhere on screen<br>
+            • <b>Alt+T</b> toggles the panel from anywhere in Torn<br>
+            • Data builds over time — signals get smarter the longer it runs<br>
+            • <b>Prices update every minute</b> using live Torn API data<br><br>
             Good luck out there. May the market be ever in your favour.
           </div>
         </div>
@@ -1709,7 +1709,7 @@
           </div>
           <div style="display:flex;gap:10px;align-items:center;">
             <button class="tmit-onboard-skip" id="tmit-ob-skip">Skip setup</button>
-            <button class="tmit-onboard-btn" id="tmit-ob-next" disabled>Next â†’</button>
+            <button class="tmit-onboard-btn" id="tmit-ob-next" disabled>Next →</button>
           </div>
         </div>
       </div>
@@ -1732,7 +1732,7 @@
         el.querySelector(`#tmit-ob-step-${i}`).classList.toggle('active', i === n);
         el.querySelector(`#tmit-ob-dot-${i}`).classList.toggle('active', i === n);
       }
-      nextBtn.textContent = n === totalSteps ? 'Start TEEM â†’' : 'Next â†’';
+      nextBtn.textContent = n === totalSteps ? 'Start TEEM →' : 'Next →';
       nextBtn.disabled = (n === 1 && !validatedKey);
     }
 
@@ -1747,23 +1747,23 @@
       if (val.length < 16) return;
       validateTimer = setTimeout(async () => {
         validateEl.className = 'tmit-onboard-validate loading';
-        validateEl.textContent = 'Checking keyâ€¦';
+        validateEl.textContent = 'Checking key…';
         try {
           const data = await apiGet(
             `https://api.torn.com/user/?selections=basic&key=${val}&comment=TEEM`
           );
           if (data.error) {
             validateEl.className = 'tmit-onboard-validate err';
-            validateEl.textContent = `âœ— ${data.error.error}`;
+            validateEl.textContent = `✗ ${data.error.error}`;
           } else {
             validateEl.className = 'tmit-onboard-validate ok';
-            validateEl.textContent = `âœ“ Connected as ${data.name}`;
+            validateEl.textContent = `✓ Connected as ${data.name}`;
             validatedKey = val;
             nextBtn.disabled = false;
           }
         } catch(e) {
           validateEl.className = 'tmit-onboard-validate err';
-          validateEl.textContent = `âœ— ${e.message}`;
+          validateEl.textContent = `✗ ${e.message}`;
         }
       }, 600);
     });
@@ -1778,16 +1778,16 @@
         const capVal    = el.querySelector('#tmit-ob-cap-val');
         const capDetail  = el.querySelector('#tmit-ob-cap-detail');
         const capInput   = el.querySelector('#tmit-ob-cap-input');
-        capVal.textContent = 'â€¦';
-        capDetail.textContent = 'Checking APIâ€¦';
+        capVal.textContent = '…';
+        capDetail.textContent = 'Checking API…';
         const cap = await detectCarryCapacity(validatedKey);
         detectedCapacity = cap ?? 10;
         capVal.textContent = detectedCapacity;
         capInput.value = detectedCapacity;
         const isGuess = !cap || cap === 10;
         capDetail.textContent = isGuess
-          ? 'âš  Could not auto-detect â€” please enter your actual number above'
-          : 'âœ“ Detected from your API data â€” adjust if needed';
+          ? '⚠ Could not auto-detect — please enter your actual number above'
+          : '✓ Detected from your API data — adjust if needed';
         capDetail.style.color = isGuess ? '#e8621a' : '#50dc82';
 
         // Keep settings in sync when user edits the input
@@ -1808,7 +1808,7 @@
 
     skipBtn.addEventListener('click', finishOnboarding);
 
-    // X button in top-right â€” same as skip
+    // X button in top-right — same as skip
     el.querySelector('#tmit-ob-close-x')?.addEventListener('click', finishOnboarding);
 
     function finishOnboarding() {
@@ -1839,7 +1839,7 @@
       panel.style.left   = settings.posX + 'px';
       panel.style.top    = settings.posY + 'px';
     } else {
-      // First open â€” position relative to FAB
+      // First open — position relative to FAB
       const fabRect    = fab.getBoundingClientRect();
       const panelW     = 480;
       const panelH     = 600;
@@ -1859,7 +1859,7 @@
   }
 
   function bindEvents(fab, panel) {
-    // FAB â€” simple click to open/close, drag to reposition
+    // FAB — simple click to open/close, drag to reposition
     let fabDragging = false;
     let fabStartX = 0, fabStartY = 0, fabOx = 0, fabOy = 0;
 
@@ -1893,7 +1893,7 @@
           settings.posX = null; settings.posY = null;
           saveSettings();
         } else {
-          // Simple click â€” toggle panel
+          // Simple click — toggle panel
           if (panel.classList.contains('tmit-hidden')) openPanel(fab, panel);
           else panel.classList.add('tmit-hidden');
         }
@@ -1909,7 +1909,7 @@
     // Refresh
     panel.querySelector('#tmit-btn-refresh').addEventListener('click', () => poll(true));
 
-    // Eye toggle buttons â€” show/hide API key fields
+    // Eye toggle buttons — show/hide API key fields
     panel.addEventListener('click', (e) => {
       const toggleMap = {
         'tmit-apikey-toggle':  '#tmit-apikey-input',
@@ -1920,13 +1920,13 @@
       const inp = panel.querySelector(selector);
       if (!inp) return;
       inp.type = inp.type === 'password' ? 'text' : 'password';
-      e.target.textContent = inp.type === 'password' ? 'ðŸ‘' : 'ðŸ™ˆ';
+      e.target.textContent = inp.type === 'password' ? '👁' : '🙈';
     });
 
     // Settings toggle
     panel.querySelector('#tmit-btn-settings-toggle').addEventListener('click', () => {
       panel.querySelector('#tmit-settings-panel').classList.toggle('tmit-open');
-      // Ensure key fields are populated (safety net â€” should already be set from build)
+      // Ensure key fields are populated (safety net — should already be set from build)
       const yataInput = panel.querySelector('#tmit-yata-key-input');
       if (yataInput && !yataInput.value) yataInput.value = load('yataKey', '');
     });
@@ -2036,7 +2036,7 @@
       }
     });
 
-    // Quick items tab â€” add/remove
+    // Quick items tab — add/remove
     panel.addEventListener('click', (e) => {
       if (e.target.id === 'tmit-quick-add-btn') {
         const input = document.getElementById('tmit-quick-add-name');
@@ -2134,7 +2134,7 @@
     makeDraggable(panel, panel.querySelector('#tmit-drag-handle'));
   }
 
-  // â”€â”€ Stats Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Stats Tab ─────────────────────────────────────────────────────────────
 
   function switchTab(tab) {
     settings.activeTab = tab;
@@ -2168,7 +2168,7 @@
     else if (tab === 'travel') renderTravelTab();
   }
 
-  // â”€â”€ Travel Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Travel Tab ────────────────────────────────────────────────────────────
 
   function renderTravelTab() {
     const listEl = document.getElementById('tmit-travel-list');
@@ -2176,8 +2176,8 @@
 
     if (!travelRanking.length) {
       listEl.innerHTML = `<div class="tmit-state-msg">
-        <div class="tmit-state-icon">âœˆ</div>
-        Waiting for market data. Hit â†» to force a refresh.
+        <div class="tmit-state-icon">✈</div>
+        Waiting for market data. Hit ↻ to force a refresh.
       </div>`;
       return;
     }
@@ -2187,13 +2187,13 @@
       const pphClass  = i === 0 ? 'tmit-travel-pph top' : 'tmit-travel-pph';
       const stockPct  = r.bestItem ? Math.round(r.bestItem.stockLevel * 100) : 100;
       const stockConf = r.bestItem?.stockConf ?? 'assumed';
-      const stockTxt  = stockConf === 'yata' ? `${stockPct}% âœ“` : '~stock';
+      const stockTxt  = stockConf === 'yata' ? `${stockPct}% ✓` : '~stock';
 
       return `<div class="tmit-travel-row ${rankClass}" data-code="${r.code}">
         <div class="tmit-travel-flag">${r.flagEmoji}</div>
         <div>
           <div class="tmit-travel-dest">${r.country}</div>
-          <div class="tmit-travel-sub">${r.bestItem?.name ?? 'â€”'}</div>
+          <div class="tmit-travel-sub">${r.bestItem?.name ?? '—'}</div>
         </div>
         <div class="${pphClass}">${formatPPH(r.profitPerHour)}</div>
         <div class="tmit-travel-time">${getAdjustedTravelTime(r.travelTime)}m ea</div>
@@ -2214,24 +2214,24 @@
         const item = r.bestItem;
         detailEl.innerHTML = `<div class="tmit-travel-detail-card">
           <div class="tmit-result-row"><span class="tmit-result-label">${r.flagEmoji} Destination</span><span class="tmit-result-val gold">${r.country}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Best Item</span><span class="tmit-result-val">${item?.name ?? 'â€”'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Buy Price (abroad)</span><span class="tmit-result-val icy">$${item?.buyPrice?.toLocaleString() ?? 'â€”'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Market Price</span><span class="tmit-result-val hot">$${item?.sellPrice?.toLocaleString() ?? 'â€”'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">After 5% Tax</span><span class="tmit-result-val hot">$${item?.netSellPrice?.toLocaleString() ?? 'â€”'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Profit / Item</span><span class="tmit-result-val green">$${item?.profitPerItem?.toLocaleString() ?? 'â€”'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Carry (effective)</span><span class="tmit-result-val">${item?.actualCap ?? 'â€”'} items</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Total Profit</span><span class="tmit-result-val green">$${item ? Math.round(item.profitPerItem * item.actualCap).toLocaleString() : 'â€”'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Best Item</span><span class="tmit-result-val">${item?.name ?? '—'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Buy Price (abroad)</span><span class="tmit-result-val icy">$${item?.buyPrice?.toLocaleString() ?? '—'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Market Price</span><span class="tmit-result-val hot">$${item?.sellPrice?.toLocaleString() ?? '—'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">After 5% Tax</span><span class="tmit-result-val hot">$${item?.netSellPrice?.toLocaleString() ?? '—'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Profit / Item</span><span class="tmit-result-val green">$${item?.profitPerItem?.toLocaleString() ?? '—'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Carry (effective)</span><span class="tmit-result-val">${item?.actualCap ?? '—'} items</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Total Profit</span><span class="tmit-result-val green">$${item ? Math.round(item.profitPerItem * item.actualCap).toLocaleString() : '—'}</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Flight Type</span><span class="tmit-result-val gold">${({'economy':'Economy','airstrip':'Airstrip -30%','business':'Business -50%','wlt':'WLT -50%'})[settings.flightType] ?? 'Economy'}</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">One-way time</span><span class="tmit-result-val">${getAdjustedTravelTime(r.travelTime)} min</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Round Trip</span><span class="tmit-result-val">${r.roundTripHours.toFixed(1)} hrs</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Profit / Hour</span><span class="tmit-result-val gold">${formatPPH(r.profitPerHour)}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Stock Data</span><span class="tmit-result-val ${item?.stockConf === 'yata' ? 'green' : ''}">${item?.stockConf === 'yata' ? 'YATA âœ“' : 'Assumed full'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Stock Data</span><span class="tmit-result-val ${item?.stockConf === 'yata' ? 'green' : ''}">${item?.stockConf === 'yata' ? 'YATA ✓' : 'Assumed full'}</span></div>
         </div>`;
       });
     });
   }
 
-  // â”€â”€ War Gear Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── War Gear Tab ──────────────────────────────────────────────────────────
 
   function renderQuickTab() {
     const listEl = document.getElementById('tmit-quick-list');
@@ -2246,7 +2246,7 @@
         <span style="flex:1;font-size:11px;color:#d8c8f0;">${item.name}</span>
         <button data-quick-remove="${idx}"
           style="font-size:10px;color:#ff6060;background:none;border:none;cursor:pointer;
-                 padding:2px 6px;opacity:0.7;">âœ• Remove</button>
+                 padding:2px 6px;opacity:0.7;">✕ Remove</button>
       </div>
     `).join('');
   }
@@ -2274,7 +2274,7 @@
 
     if (warItems.length === 0) {
       listEl.innerHTML = `<div class="tmit-state-msg" style="padding:16px 0;">
-        <div class="tmit-state-icon" style="font-size:20px">âš”</div>
+        <div class="tmit-state-icon" style="font-size:20px">⚔</div>
         No war gear detected yet in market data.<br>
         <span style="font-size:10px;color:#3a2a5a">War weapons and armor will appear here as price history accumulates.</span>
       </div>`;
@@ -2286,7 +2286,7 @@
 
     const rows = sorted.map(r => {
       // Determine rarity from market price ranges (rough heuristic)
-      // Yellow < ~50M, Orange 50Mâ€“500M, Red > 500M
+      // Yellow < ~50M, Orange 50M–500M, Red > 500M
       const price = r.currentPrice;
       const rarity = price > 500_000_000 ? 'red'
                    : price > 50_000_000  ? 'orange'
@@ -2298,23 +2298,23 @@
 
       const weapType = classifyWeaponType(r.name, r.type);
       const bbVal    = rarity ? getBBValue(rarity, 1, weapType) : 0;
-      const bbDollar = bbVal > 0 ? `$${Math.round(bbVal * bbPerDollar / 1_000_000)}M` : 'â€”';
+      const bbDollar = bbVal > 0 ? `$${Math.round(bbVal * bbPerDollar / 1_000_000)}M` : '—';
 
       // Rarity dot indicator
-      const rarityDot = rarity === 'red'    ? '<span style="color:#ff4040;font-size:8px">â—</span> '
-                      : rarity === 'orange' ? '<span style="color:#e8621a;font-size:8px">â—</span> '
-                      : rarity === 'yellow' ? '<span style="color:#ffe066;font-size:8px">â—</span> '
+      const rarityDot = rarity === 'red'    ? '<span style="color:#ff4040;font-size:8px">●</span> '
+                      : rarity === 'orange' ? '<span style="color:#e8621a;font-size:8px">●</span> '
+                      : rarity === 'yellow' ? '<span style="color:#ffe066;font-size:8px">●</span> '
                       : '';
 
       return `<div class="tmit-war-row ${rarity ? rarity+'-item' : ''}">
         <div>
           <div class="tmit-war-name" title="${r.name}">${rarityDot}${r.name}</div>
-          <div style="font-size:9px;color:#3a2a5a">${r.type}${weapType ? ' Â· '+weapType : ''}</div>
+          <div style="font-size:9px;color:#3a2a5a">${r.type}${weapType ? ' · '+weapType : ''}</div>
         </div>
         <div class="tmit-war-price" style="text-align:right">$${r.currentPrice >= 1_000_000
           ? (r.currentPrice/1_000_000).toFixed(1)+'M'
           : r.currentPrice.toLocaleString()}</div>
-        <div class="tmit-war-bb" style="text-align:right">${bbVal ? bbVal+' BB' : 'â€”'}</div>
+        <div class="tmit-war-bb" style="text-align:right">${bbVal ? bbVal+' BB' : '—'}</div>
         <div style="text-align:right;font-size:10px;color:#50dc82">${bbDollar}</div>
         <div class="${changeClass}" style="text-align:right">${changeSign}${Number(r.changePct).toFixed(1)}%</div>
       </div>`;
@@ -2323,7 +2323,7 @@
     listEl.innerHTML = rows.join('');
   }
 
-  // â”€â”€ BB Calculator Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── BB Calculator Tab ──────────────────────────────────────────────────────
 
   function renderList() {
     const listEl = document.getElementById('tmit-list');
@@ -2353,11 +2353,11 @@
     if (filtered.length === 0) {
       let msg;
       if (isWatchTab) {
-        msg = `<div class="tmit-state-msg"><div class="tmit-state-icon">â­</div>Your watchlist is empty.<br><span style="font-size:11px">Click any <b style="color:#80b0ff">WATCH</b> badge on the All Items tab to pin it here.</span></div>`;
+        msg = `<div class="tmit-state-msg"><div class="tmit-state-icon">⭐</div>Your watchlist is empty.<br><span style="font-size:11px">Click any <b style="color:#80b0ff">WATCH</b> badge on the All Items tab to pin it here.</span></div>`;
       } else if (Object.keys(priceHistory).length === 0) {
-        msg = `<div class="tmit-state-msg"><div class="tmit-state-icon">â³</div>Collecting dataâ€¦ check back after the first poll completes.</div>`;
+        msg = `<div class="tmit-state-msg"><div class="tmit-state-icon">⏳</div>Collecting data… check back after the first poll completes.</div>`;
       } else {
-        msg = `<div class="tmit-state-msg"><div class="tmit-state-icon">ðŸ”</div>No items match your filters.</div>`;
+        msg = `<div class="tmit-state-msg"><div class="tmit-state-icon">🔍</div>No items match your filters.</div>`;
       }
       listEl.innerHTML = msg;
       document.getElementById('tmit-item-count').textContent = 0;
@@ -2370,11 +2370,11 @@
       // Hot/icy row classes based on direction of change
       let rowClass = 'tmit-item-row';
       let spikeIcon = '';
-      if (r.changePct >= 30)       { rowClass = 'tmit-item-row tmit-hot-big'; spikeIcon = 'ðŸ”¥'; }
-      else if (r.changePct >= 15)  { rowClass = 'tmit-item-row tmit-hot';     spikeIcon = 'ðŸ”¥'; }
+      if (r.changePct >= 30)       { rowClass = 'tmit-item-row tmit-hot-big'; spikeIcon = '🔥'; }
+      else if (r.changePct >= 15)  { rowClass = 'tmit-item-row tmit-hot';     spikeIcon = '🔥'; }
       else if (r.changePct > 0)    { rowClass = 'tmit-item-row tmit-hot'; }
-      else if (r.changePct <= -30) { rowClass = 'tmit-item-row tmit-icy-big'; spikeIcon = 'ðŸ§Š'; }
-      else if (r.changePct <= -15) { rowClass = 'tmit-item-row tmit-icy';     spikeIcon = 'ðŸ§Š'; }
+      else if (r.changePct <= -30) { rowClass = 'tmit-item-row tmit-icy-big'; spikeIcon = '🧊'; }
+      else if (r.changePct <= -15) { rowClass = 'tmit-item-row tmit-icy';     spikeIcon = '🧊'; }
       else if (r.changePct < 0)    { rowClass = 'tmit-item-row tmit-icy'; }
       const confDots    = [1,2,3].map(i =>
         `<div class="tmit-conf-dot${i <= r.confidence ? ' filled' : ''}"></div>`
@@ -2401,9 +2401,9 @@
           <div style="display:flex;gap:3px;align-items:center;">
             <button class="tmit-row-btn tmit-pin-row" data-id="${r.itemId}"
               title="${isPinned ? 'Remove from watchlist' : 'Add to watchlist'}"
-              style="color:${isPinned ? '#c9a227' : 'rgba(201,162,39,0.3)'};">â˜…</button>
+              style="color:${isPinned ? '#c9a227' : 'rgba(201,162,39,0.3)'};">★</button>
             <button class="tmit-row-btn tmit-buy-btn" data-id="${r.itemId}" data-name="${r.name}" data-cat="${r.type}"
-              title="Buy on market">ðŸ›’</button>
+              title="Buy on market">🛒</button>
           </div>
         </div>`;
     });
@@ -2433,17 +2433,17 @@
     const lastAlertWindow = load('lastTravelAlertWindow', '');
     if (windowKey === lastAlertWindow) return;
 
-    // â”€â”€ Cooldown checks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Cooldown checks ──────────────────────────────────────────────────
     if (settings.alertOnDrugClear && myBattleStats?.drugCd > 0) return;
     if (settings.alertOnBoosterClear && myBattleStats?.boosterCd > 0) return;
 
-    // â”€â”€ Stock check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Stock check ──────────────────────────────────────────────────────
     if (settings.alertRequireStock && top.bestItem) {
       const stockLevel = top.bestItem.stockLevel ?? 1;
       if (stockLevel < 0.1) return
     }
 
-    // â”€â”€ Build notification body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Build notification body ──────────────────────────────────────────
     const mult     = getFlightMultiplier();
     const oneWay   = getAdjustedTravelTime(top.travelTime);
     const flightLabel = {
@@ -2452,7 +2452,7 @@
     }[settings.flightType] ?? 'Economy';
 
     const stockStr = top.bestItem?.stockConf === 'yata'
-      ? ` Â· Stock: ${Math.round((top.bestItem.stockLevel ?? 1) * 100)}%`
+      ? ` · Stock: ${Math.round((top.bestItem.stockLevel ?? 1) * 100)}%`
       : '';
 
     const cdStr = [];
@@ -2460,9 +2460,9 @@
     if (myBattleStats?.boosterCd > 0) cdStr.push('Booster CD: ' + formatCooldown(myBattleStats.boosterCd));
 
     const body = [
-      `${top.flagEmoji} ${top.country} â€” ${formatPPH(top.profitPerHour)}`,
-      `${top.bestItem?.itemName ?? ''} Â· ${flightLabel} Â· ${oneWay}min each way${stockStr}`,
-      cdStr.length ? cdStr.join(' Â· ') : 'No active cooldowns âœ“',
+      `${top.flagEmoji} ${top.country} — ${formatPPH(top.profitPerHour)}`,
+      `${top.bestItem?.itemName ?? ''} · ${flightLabel} · ${oneWay}min each way${stockStr}`,
+      cdStr.length ? cdStr.join(' · ') : 'No active cooldowns ✓',
     ].join('\n');
 
     lastTopTravelCode = top.code;
@@ -2472,7 +2472,7 @@
     store('lastTravelAlertWindow', windowKey);
 
     try {
-      new Notification('TEEM âœˆ Good Time to Fly!', { body, icon: '', silent: false });
+      new Notification('TEEM ✈ Good Time to Fly!', { body, icon: '', silent: false });
     } catch(e) {}
   }
 
@@ -2512,11 +2512,11 @@
     } else if (tab === 'travel') {
       headers = ['Rank','Country','Item','Buy Price','Sell Price','Profit/Item','Carry','Total Profit','Round Trip hrs','Profit/Hr','Stock Confidence'];
       rows = travelRanking.map((r,i) => [
-        i+1, r.country, r.bestItem?.itemName ?? 'â€”',
+        i+1, r.country, r.bestItem?.itemName ?? '—',
         r.bestItem?.buyPrice ?? 0, r.bestItem?.netSellPrice ?? 0,
         r.bestItem?.profitPerItem ?? 0, r.bestItem?.actualCap ?? 0,
         r.bestItem ? Math.round(r.bestItem.profitPerItem * r.bestItem.actualCap) : 0,
-        r.roundTripHours.toFixed(1), r.profitPerHour, r.bestItem?.stockConf ?? 'â€”'
+        r.roundTripHours.toFixed(1), r.profitPerHour, r.bestItem?.stockConf ?? '—'
       ]);
     } else if (tab === 'war') {
       headers = ['Item','Type','Price','BB Value','Dollar Equiv','Change%'];
@@ -2535,7 +2535,7 @@
     if (!rows.length) {
       // Show brief feedback
       const btn = document.getElementById('tmit-btn-export');
-      if (btn) { btn.textContent = 'âœ— No data'; setTimeout(() => btn.textContent = 'â¬‡ CSV', 1500); }
+      if (btn) { btn.textContent = '✗ No data'; setTimeout(() => btn.textContent = '⬇ CSV', 1500); }
       return;
     }
 
@@ -2546,7 +2546,7 @@
     try {
       navigator.clipboard.writeText(csv).then(() => {
         const btn = document.getElementById('tmit-btn-export');
-        if (btn) { btn.textContent = 'âœ“ Copied!'; setTimeout(() => btn.textContent = 'â¬‡ CSV', 2000); }
+        if (btn) { btn.textContent = '✓ Copied!'; setTimeout(() => btn.textContent = '⬇ CSV', 2000); }
       });
     } catch(e) {
       // Fallback: create download
@@ -2588,7 +2588,7 @@
     }
 
     if (invEl) invEl.textContent = watchedVal > 0
-      ? `$${(watchedVal/1_000_000).toFixed(1)}M` : 'â€”';
+      ? `$${(watchedVal/1_000_000).toFixed(1)}M` : '—';
 
     if (profitEl) {
       const sign = sessionProfit >= 0 ? '+' : '';
@@ -2634,7 +2634,7 @@
     if (nextEl) nextEl.textContent = '~1m';
   }
 
-  // â”€â”€ Drag â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Drag ──────────────────────────────────────────────────────────────────────
 
   function makeDraggable(el, handle) {
     let ox = 0, oy = 0, startX = 0, startY = 0;
@@ -2669,7 +2669,7 @@
     });
   }
 
-  // â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Init ──────────────────────────────────────────────────────────────────────
 
   function init() {
     buildUI();
@@ -2695,7 +2695,7 @@
       const iconSrc = fabImg ? fabImg.src : '';
       buildOnboarding(iconSrc);
     } else {
-      // â”€â”€ Instant render from cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // ── Instant render from cache ──────────────────────────────────────
       // Render immediately from whatever is in memory (loaded from GM storage
       // at script start) so the market list appears instantly on page load.
       // The background poll will update prices and show a fresh timestamp.
@@ -2724,9 +2724,9 @@
             `<option value="${c}"${c === currentVal ? ' selected' : ''}>${c}</option>`
           ).join('');
         }
-        setStatus('ok', `Cached Â· ${new Date().toLocaleTimeString()}`);
+        setStatus('ok', `Cached · ${new Date().toLocaleTimeString()}`);
       }
-      // Start polling in background â€” updates prices without blocking UI
+      // Start polling in background — updates prices without blocking UI
       startPolling();
     }
 
@@ -2737,7 +2737,7 @@
     if (settings.apiKey) { setTimeout(() => fetchMyBattleStats(settings.apiKey), 3000); }
   }
 
-  // â”€â”€ Page injector â€” quick bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Page injector — quick bar ─────────────────────────────────────────────
 
   // Run injector on page load and on DOM changes (Torn is a SPA)
   function injectQuickBar() {
@@ -2754,7 +2754,7 @@
       + 'max-width:90vw;flex-wrap:wrap;';
 
     bar.innerHTML = '<span style="font-size:9px;color:#6a5a8a;font-weight:700;'
-      + 'text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;">âš¡ Quick Use</span>'
+      + 'text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;">⚡ Quick Use</span>'
       + quickItems.map(item =>
           '<button class="teem-quick-btn" data-item="' + item.name + '" '
           + 'style="background:rgba(201,162,39,0.12);border:1px solid rgba(201,162,39,0.25);'
@@ -2762,7 +2762,7 @@
           + 'font-family:monospace;white-space:nowrap;">' + item.name + '</button>'
         ).join('')
       + '<button id="teem-quick-bar-close" style="background:none;border:none;color:#4a3a6a;'
-      + 'cursor:pointer;font-size:14px;padding:0 3px;margin-left:4px;">âœ•</button>';
+      + 'cursor:pointer;font-size:14px;padding:0 3px;margin-left:4px;">✕</button>';
 
     document.body.appendChild(bar);
 
@@ -2817,7 +2817,7 @@
         : 'https://www.torn.com/page.php?sid=ItemMarket';
       return;
     }
-    // Already on market page â€” find and click the item
+    // Already on market page — find and click the item
     await waitForElement('.item-info-wrap, .item-market-wrap', 3000);
     const nameEls = document.querySelectorAll('.t-overflow, .bold.name, [class*="name"]');
     for (const el of nameEls) {
@@ -2886,7 +2886,7 @@
           const priceInput = document.querySelector('input[name="price"], input[class*="price"]');
           if (priceInput) { priceInput.value = price; priceInput.dispatchEvent(new Event('input', { bubbles: true })); }
 
-          // Show confirmation overlay instead of auto-submitting â€” user confirms final price
+          // Show confirmation overlay instead of auto-submitting — user confirms final price
           showSellConfirm(itemName, quantity, price);
         }
         return;
@@ -2905,18 +2905,18 @@
       + 'border-radius:10px;padding:20px 24px;font-family:monospace;min-width:280px;'
       + 'box-shadow:0 8px 32px rgba(0,0,0,0.8);text-align:center;';
     box.innerHTML = `
-      <div style="font-size:13px;color:#c9a227;font-weight:700;margin-bottom:8px;">âš¡ TEEM Sell</div>
+      <div style="font-size:13px;color:#c9a227;font-weight:700;margin-bottom:8px;">⚡ TEEM Sell</div>
       <div style="font-size:11px;color:#d8c8f0;margin-bottom:4px;">${name}</div>
       <div style="font-size:11px;color:#8a7aaa;margin-bottom:12px;">${qty}x @ $${price.toLocaleString()}</div>
       <div style="font-size:10px;color:#4a3a6a;margin-bottom:14px;">Price fields have been auto-filled.<br>Click Confirm to submit the listing.</div>
       <div style="display:flex;gap:8px;justify-content:center;">
         <button id="teem-sell-ok" style="background:rgba(80,180,100,0.2);border:1px solid rgba(80,180,100,0.4);
           border-radius:5px;color:#50dc82;padding:6px 16px;cursor:pointer;font-family:monospace;font-size:11px;">
-          âœ“ Confirm
+          ✓ Confirm
         </button>
         <button id="teem-sell-cancel" style="background:rgba(255,96,96,0.1);border:1px solid rgba(255,96,96,0.3);
           border-radius:5px;color:#ff6060;padding:6px 16px;cursor:pointer;font-family:monospace;font-size:11px;">
-          âœ• Cancel
+          ✕ Cancel
         </button>
       </div>
     `;
@@ -2959,7 +2959,7 @@
       const f = document.createElement('div');
       f.id = 'tmit-fab';
       f.style.cssText = 'position:fixed;bottom:28px;right:28px;width:52px;height:52px;border-radius:50%;background:#2d1b69;border:2px solid #c9a227;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;z-index:2147483646;';
-      f.textContent = 'ðŸ˜';
+      f.textContent = '🐘';
       f.title = 'TEEM error: ' + e.message;
       f.onclick = () => alert('TEEM init error: ' + e.message + '\n\nTry clearing TEEM storage in Tampermonkey dashboard.');
       document.body.appendChild(f);
@@ -2976,12 +2976,12 @@
 
 
   } catch(e) {
-    // Fatal error â€” show minimal FAB with error info
+    // Fatal error — show minimal FAB with error info
     function showError(msg) {
       if (document.body) {
         const f = document.createElement('div');
         f.style.cssText = 'position:fixed;bottom:28px;right:28px;width:52px;height:52px;border-radius:50%;background:#8b0000;border:2px solid #ff4040;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;z-index:2147483647;';
-        f.textContent = 'ðŸ˜';
+        f.textContent = '🐘';
         f.onclick = () => {
           alert('TEEM Error: ' + msg + '\n\nPlease report this to the developer.');
         };
