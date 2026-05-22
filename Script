@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      3.0.6
+// @version      3.0.7
 // @description  TEEM v3: Torn's Elephant Economy Manager — onboarding, market tracker, travel profit, war gear, BB calculator, smart alerts, session tracker, CSV export.
 // @author       TornTravelTracker
 // @match        https://www.torn.com/*
@@ -66,7 +66,7 @@
   // Buy prices = in-store abroad price (Torn $)
   // Travel times = one-way economy flight in minutes
   // Capacity = approximate max items available per restock cycle
-  // Travel countries — verified against Torn wiki + community guides (May 2026)
+  // Travel countries — verified against individual Torn wiki pages (May 2026)
   // travelTime = one-way economy flight in minutes (no upgrades)
   // Sources: wiki.torn.com per-country pages, torncity.fandom.com/wiki/Travelling
   // Buy prices: community guide thread 16212587 (verified)
@@ -90,6 +90,7 @@
       items: [
         { itemName: 'Wolverine Plushie', buyPrice: 30,  capacity: 400  },
         { itemName: 'Crocus',            buyPrice: 600, capacity: 1000 },
+        { itemName: 'Xanax',             buyPrice: 750, capacity: 100  },
       ]
     },
     {
@@ -100,11 +101,12 @@
       ]
     },
     {
-      name: 'United Kingdom', code: 'uk', flagEmoji: '🇬🇧', travelTime: 152,
+      name: 'United Kingdom', code: 'uk', flagEmoji: '🇬🇧', travelTime: 159,
       items: [
         { itemName: 'Red Fox Plushie', buyPrice: 1000, capacity: 400  },
         { itemName: 'Nessie Plushie',  buyPrice: 200,  capacity: 400  },
         { itemName: 'Heather',         buyPrice: 5000, capacity: 1000 },
+        { itemName: 'Xanax',           buyPrice: 750,  capacity: 100  },
       ]
     },
     {
@@ -113,6 +115,7 @@
         { itemName: 'Monkey Plushie', buyPrice: 400,   capacity: 400  },
         { itemName: 'Ceibo Flower',   buyPrice: 500,   capacity: 1000 },
         { itemName: 'Tear Gas',       buyPrice: 15000, capacity: 500  },
+        { itemName: 'LSD',            buyPrice: 150,   capacity: 100  },
       ]
     },
     {
@@ -121,12 +124,15 @@
         { itemName: 'Chamois Plushie', buyPrice: 400,   capacity: 400  },
         { itemName: 'Edelweiss',       buyPrice: 900,   capacity: 1000 },
         { itemName: 'Flash Grenade',   buyPrice: 12000, capacity: 500  },
+        { itemName: 'LSD',             buyPrice: 150,   capacity: 100  },
       ]
     },
     {
-      name: 'Japan', code: 'jap', flagEmoji: '🇯🇵', travelTime: 203,
+      name: 'Japan', code: 'jap', flagEmoji: '🇯🇵', travelTime: 225,
       items: [
         { itemName: 'Cherry Blossom', buyPrice: 500, capacity: 1000 },
+        { itemName: 'Xanax',          buyPrice: 750, capacity: 100  },
+        { itemName: 'Opium',          buyPrice: 75,  capacity: 100  },
       ]
     },
     {
@@ -134,6 +140,8 @@
       items: [
         { itemName: 'Panda Plushie', buyPrice: 400,  capacity: 400  },
         { itemName: 'Peony',         buyPrice: 5000, capacity: 1000 },
+        { itemName: 'LSD',           buyPrice: 150,  capacity: 100  },
+        { itemName: 'Opium',         buyPrice: 75,   capacity: 100  },
       ]
     },
     {
@@ -144,11 +152,13 @@
       ]
     },
     {
-      name: 'South Africa', code: 'saf', flagEmoji: '🇿🇦', travelTime: 311,
+      name: 'South Africa', code: 'saf', flagEmoji: '🇿🇦', travelTime: 297,
       items: [
         { itemName: 'Lion Plushie',   buyPrice: 400,  capacity: 400  },
         { itemName: 'African Violet', buyPrice: 2000, capacity: 1000 },
         { itemName: 'Xanax',          buyPrice: 750,  capacity: 100  },
+        { itemName: 'LSD',            buyPrice: 150,  capacity: 100  },
+        { itemName: 'Opium',          buyPrice: 75,   capacity: 100  },
       ]
     },
   ];
