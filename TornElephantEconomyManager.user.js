@@ -1,8 +1,8 @@
-// ==UserScript==
+﻿// ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      5.2.6
-// @description  TEEM — Torn's Elephant Economy Manager. Market tracker with hot/cold signals, travel profit rankings, war gear calculator, quick item use, battle stats & spy overlays.
+// @version      6.0.0
+// @description  TEEM — Torn's Elephant Economy Manager. Market tracker with hot/cold signals, travel profit rankings, war gear price tracker, and quick item use.
 // @author       TornTravelTracker
 // @match        https://www.torn.com/*
 // @grant        GM_setValue
@@ -12,8 +12,6 @@
 // @connect      api.torn.com
 // @connect      yata.life
 // @connect      yata.yt
-// @connect      tornstats.com
-// @connect      www.tornstats.com
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -23,8 +21,8 @@
 
 
   const SCRIPT_KEY   = 'tmit_';
-  // Poll intervals are user-configurable via settings — see startPolling()
-  // Tiered history retention — keeps long-term trends without storage bloat
+  // Poll intervals are user-configurable via settings â€” see startPolling()
+  // Tiered history retention â€” keeps long-term trends without storage bloat
   // Resolution tiers per snapshot age:
   //   0-24h:   keep every snapshot (full resolution)
   //   1-7d:    keep one per hour
@@ -51,7 +49,7 @@
   // Categories built dynamically from whatever Torn API actually returns
   let CATEGORIES = ['All'];
 
-  // ── Bunker Bucks data (used by war calculator and BB tab) ──────────────────
+  // â”€â”€ Bunker Bucks data (used by war calculator and BB tab) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const BB_TABLE = {
     Yellow: { 'Pistol/SMG': 4, 'Melee': 6, 'Shotgun/Rifle': 10, 'Armour': 12, 'Heavies': 14 },
     Orange: {
@@ -64,15 +62,6 @@
     },
   };
 
-  const BB_CACHE_COSTS = {
-    'Yellow Small':   2,  'Yellow Melee':    3,  'Yellow Large':    5,  'Yellow Heavy':    7,
-    'Yellow Armour': 12,
-    'Orange Small':   6,  'Orange Melee':    9,  'Orange Large':   15,  'Orange Heavy':   21,
-    'Orange Armour': 13,
-    'Red Small':     18,  'Red Melee':       27,  'Red Large':      45,  'Red Heavy':      63,
-    'Red Armour':    54,
-  };
-
   function getBBValue(rarity, bonuses, weaponType) {
     if (!rarity || !weaponType) return 0;
     const r = rarity.charAt(0).toUpperCase() + rarity.slice(1).toLowerCase();
@@ -81,29 +70,29 @@
     return BB_TABLE[r]?.[b]?.[weaponType] ?? 0;
   }
 
-  // ── Travel data ─────────────────────────────────────────────────────────────
-  // Travel countries — items identified by NAME, resolved to IDs at runtime
+  // â”€â”€ Travel data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Travel countries â€” items identified by NAME, resolved to IDs at runtime
   // Sources: Torn wiki, community guides (verified Aug 2025)
   // Buy prices = in-store abroad price (Torn $)
   // Travel times = one-way economy flight in minutes
   // Capacity = approximate max items available per restock cycle
   const COUNTRIES = [
     {
-      name: 'Mexico', code: 'mex', flagEmoji: '🇲🇽', travelTime: 20,
+      name: 'Mexico', code: 'mex', flagEmoji: 'ðŸ‡²ðŸ‡½', travelTime: 20,
       items: [
         { itemName: 'Jaguar Plushie', buyPrice: 10000, capacity: 400  },
         { itemName: 'Dahlia',         buyPrice: 300,   capacity: 1000 },
       ]
     },
     {
-      name: 'Cayman Islands', code: 'cay', flagEmoji: '🇰🇾', travelTime: 57,
+      name: 'Cayman Islands', code: 'cay', flagEmoji: 'ðŸ‡°ðŸ‡¾', travelTime: 57,
       items: [
         { itemName: 'Stingray Plushie', buyPrice: 400,  capacity: 400  },
         { itemName: 'Banana Orchid',    buyPrice: 4000, capacity: 1000 },
       ]
     },
     {
-      name: 'Canada', code: 'can', flagEmoji: '🇨🇦', travelTime: 41,
+      name: 'Canada', code: 'can', flagEmoji: 'ðŸ‡¨ðŸ‡¦', travelTime: 41,
       items: [
         { itemName: 'Wolverine Plushie', buyPrice: 30,  capacity: 400  },
         { itemName: 'Crocus',            buyPrice: 600, capacity: 1000 },
@@ -111,14 +100,14 @@
       ]
     },
     {
-      name: 'Hawaii', code: 'haw', flagEmoji: '🌺', travelTime: 121,
+      name: 'Hawaii', code: 'haw', flagEmoji: 'ðŸŒº', travelTime: 121,
       items: [
         { itemName: 'Orchid',         buyPrice: 700,      capacity: 1000 },
         { itemName: 'Large Suitcase', buyPrice: 10000000, capacity: 100  },
       ]
     },
     {
-      name: 'United Kingdom', code: 'uk', flagEmoji: '🇬🇧', travelTime: 159,
+      name: 'United Kingdom', code: 'uk', flagEmoji: 'ðŸ‡¬ðŸ‡§', travelTime: 159,
       items: [
         { itemName: 'Red Fox Plushie', buyPrice: 1000, capacity: 400  },
         { itemName: 'Nessie Plushie',  buyPrice: 200,  capacity: 400  },
@@ -127,7 +116,7 @@
       ]
     },
     {
-      name: 'Argentina', code: 'arg', flagEmoji: '🇦🇷', travelTime: 189,
+      name: 'Argentina', code: 'arg', flagEmoji: 'ðŸ‡¦ðŸ‡·', travelTime: 189,
       items: [
         { itemName: 'Monkey Plushie', buyPrice: 400,   capacity: 400  },
         { itemName: 'Ceibo Flower',   buyPrice: 500,   capacity: 1000 },
@@ -136,7 +125,7 @@
       ]
     },
     {
-      name: 'Switzerland', code: 'swi', flagEmoji: '🇨🇭', travelTime: 169,
+      name: 'Switzerland', code: 'swi', flagEmoji: 'ðŸ‡¨ðŸ‡­', travelTime: 169,
       items: [
         { itemName: 'Chamois Plushie', buyPrice: 400,   capacity: 400  },
         { itemName: 'Edelweiss',       buyPrice: 900,   capacity: 1000 },
@@ -145,7 +134,7 @@
       ]
     },
     {
-      name: 'Japan', code: 'jap', flagEmoji: '🇯🇵', travelTime: 225,
+      name: 'Japan', code: 'jap', flagEmoji: 'ðŸ‡¯ðŸ‡µ', travelTime: 225,
       items: [
         { itemName: 'Cherry Blossom', buyPrice: 500, capacity: 1000 },
         { itemName: 'Xanax',          buyPrice: 750, capacity: 100  },
@@ -153,7 +142,7 @@
       ]
     },
     {
-      name: 'China', code: 'chi', flagEmoji: '🇨🇳', travelTime: 219,
+      name: 'China', code: 'chi', flagEmoji: 'ðŸ‡¨ðŸ‡³', travelTime: 219,
       items: [
         { itemName: 'Panda Plushie', buyPrice: 400,  capacity: 400  },
         { itemName: 'Peony',         buyPrice: 5000, capacity: 1000 },
@@ -162,14 +151,14 @@
       ]
     },
     {
-      name: 'UAE', code: 'uae', flagEmoji: '🇦🇪', travelTime: 259,
+      name: 'UAE', code: 'uae', flagEmoji: 'ðŸ‡¦ðŸ‡ª', travelTime: 259,
       items: [
         { itemName: 'Camel Plushie',     buyPrice: 14000, capacity: 400  },
         { itemName: 'Tribulus Omanense', buyPrice: 6000,  capacity: 1000 },
       ]
     },
     {
-      name: 'South Africa', code: 'saf', flagEmoji: '🇿🇦', travelTime: 297,
+      name: 'South Africa', code: 'saf', flagEmoji: 'ðŸ‡¿ðŸ‡¦', travelTime: 297,
       items: [
         { itemName: 'Lion Plushie',   buyPrice: 400,  capacity: 400  },
         { itemName: 'African Violet', buyPrice: 2000, capacity: 1000 },
@@ -253,7 +242,7 @@
   function classifyWeaponType(name, apiType) {
     const n = (name || '').toLowerCase();
     const t = (apiType || '').toLowerCase();
-    // All comparisons lowercased — Torn is inconsistent with capitalisation
+    // All comparisons lowercased â€” Torn is inconsistent with capitalisation
     if (t === 'melee' || t === 'piercing' || t === 'slashing' || t === 'clubbing' || t === 'mechanical') return 'Melee';
     if (t === 'heavy artillery') return 'Heavies';
     if (t === 'shotgun' || t === 'rifle' || t === 'machine gun') return 'Shotgun/Rifle';
@@ -263,7 +252,7 @@
     return null;
   }
 
-  // Canonical RW item type check — case-insensitive to handle Torn API inconsistencies
+  // Canonical RW item type check â€” case-insensitive to handle Torn API inconsistencies
   // Torn returns: 'Rifle', 'SMG', 'Shotgun', 'Pistol', 'Machine gun', 'Heavy artillery'
   // Melee subtypes: 'Piercing', 'Slashing', 'Clubbing', 'Mechanical'
   const RW_WEAPON_TYPE_LOWER = new Set([
@@ -275,7 +264,7 @@
 
   function isRWItem(name, type) {
     if (!name) return false;
-    // Check hardcoded weapon name list first — most reliable
+    // Check hardcoded weapon name list first â€” most reliable
     if (RW_KNOWN_WEAPONS.has(name)) return true;
     // Check type string (case-insensitive)
     if (type) {
@@ -311,19 +300,19 @@
     // Heavy Artillery
     'Anti-Tank Missile Launcher','Flamethrower','Milkor MGL','Minigun',
     'RPG Launcher','SMAW Launcher',
-    // Melee — Piercing
+    // Melee â€” Piercing
     'Dagger','DBK','Dual Bladed Katars','Harpoon','Kitchen Knife',
     'Macana','Swiss Army Knife',
-    // Melee — Slashing
+    // Melee â€” Slashing
     'Guandao','Katana','Kukri','Machete',
-    // Melee — Clubbing
+    // Melee â€” Clubbing
     'Baseball Bat','Bo Staff','Dual Hammers','Flail','Metal Nunchucks',
     'Wushu Double Axes','Wooden Nunchaku',
     // Mechanical
     'Chainsaw','Taser',
   ]);
 
-  // Ranked war weapon bonuses — community verified (May 2026)
+  // Ranked war weapon bonuses â€” community verified (May 2026)
   // Source: wiki.torn.com/wiki/Weapon_Bonus + community guides
   const RW_BONUSES = {
     // Bonuses that can appear on ALL ranged weapons (rifle, SMG, pistol, shotgun, MG, heavy)
@@ -351,18 +340,6 @@
     ],
   };
 
-  function getBonusesForType(weaponType) {
-    if (!weaponType) return [];
-    const wt = weaponType.toLowerCase();
-    if (wt === 'armour' || wt === 'armor') return [...RW_BONUSES.armour].sort();
-    if (wt === 'melee') return [...RW_BONUSES.melee].sort();
-    // All ranged types — Pistol/SMG, Shotgun/Rifle, Heavies map here
-    let bonuses = [...RW_BONUSES.ranged];
-    if (wt.includes('shotgun')) bonuses = [...bonuses, ...RW_BONUSES.shotgun_extra];
-    if (wt === 'smg' || wt === 'pistol/smg' || wt.includes('smg')) bonuses = [...bonuses, ...RW_BONUSES.smg_extra];
-    return [...new Set(bonuses)].sort();
-  }
-
   function store(key, val) {
     try { GM_setValue(SCRIPT_KEY + key, JSON.stringify(val)); } catch(e) {}
   }
@@ -372,12 +349,12 @@
       const v = GM_getValue(SCRIPT_KEY + key);
       if (v === undefined || v === null || v === '') return def;
       const parsed = JSON.parse(v);
-      // Sanity check — if type doesn't match default, return default
+      // Sanity check â€” if type doesn't match default, return default
       if (Array.isArray(def) && !Array.isArray(parsed)) return def;
       if (def !== null && typeof def === 'object' && !Array.isArray(def) && typeof parsed !== 'object') return def;
       return parsed;
     } catch(e) {
-      // Corrupted storage — clear it and return default
+      // Corrupted storage â€” clear it and return default
       try { GM_setValue(SCRIPT_KEY + key, JSON.stringify(def)); } catch(e2) {}
       return def;
     }
@@ -437,12 +414,12 @@
 
       if (!lastKept[key]) { result.push(s);
         lastKept[key] = true; }
-      // Otherwise skip — a snapshot for this time bucket already kept
+      // Otherwise skip â€” a snapshot for this time bucket already kept
     }
     return result;
   }
 
-  // Run thinning on all existing history on startup — cleans up old flat data
+  // Run thinning on all existing history on startup â€” cleans up old flat data
   // and compacts history that was stored before tiered thinning was introduced
   function thinAllHistory() {
     const now = Date.now();
@@ -465,34 +442,6 @@
   let watchlist      = new Set(load('watchlist', []));
   let myBattleStats    = load('myBattleStats', null);
   let statHistory      = load('statHistory', []);         // [ { ts, str, def, spd, dex, ts_total } ]
-  // Player cache persisted to GM storage — survives page loads
-  const PLAYER_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
-
-  function loadPlayerCache() {
-    try {
-      const raw = load('playerCache', {});
-      const now = Date.now();
-      // Prune expired entries
-      const pruned = {};
-      for (const [id, entry] of Object.entries(raw)) {
-        if (entry.cachedAt && (now - entry.cachedAt) < PLAYER_CACHE_TTL) { pruned[id] = entry; }
-      }
-      return pruned;
-    } catch(e) { return {}; }
-  }
-
-  let playerCache = loadPlayerCache();
-
-  function savePlayerCache() {
-    // Only save up to 500 entries to avoid storage bloat
-    const entries = Object.entries(playerCache);
-    if (entries.length > 500) {
-      // Keep newest 500
-      const sorted = entries.sort((a,b) => (b[1].cachedAt||0) - (a[1].cachedAt||0)).slice(0, 500);
-      playerCache = Object.fromEntries(sorted);
-    }
-    store('playerCache', playerCache);
-  }
   const MAX_STAT_HISTORY = 100;
 
   function saveStatHistory() { store('statHistory', statHistory); }
@@ -502,19 +451,18 @@
 
   function saveWatchlist() { store('watchlist', [...watchlist]); }
 
-  // ── Session tracker ───────────────────────────────────────────────────────
+  // â”€â”€ Session tracker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let sessionStart      = Date.now();
   let sessionStartPrices = {}; // { itemId: price at session start }
   let sessionProfit     = 0;
 
-  // ── Onboarding ────────────────────────────────────────────────────────────
+  // â”€â”€ Onboarding â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let onboardingDone  = load('onboardingDone', false);
   thinAllHistory()
   let bbPerDollar      = load('bbPerDollar', 7000000);
   let userBBBalance    = 0;
-  let warItemStats     = load('warItemStats', {});
-  let userInventory   = {};  // { itemId: { name, quantity, uid } } — refreshed each poll  // { itemName: {damage,accuracy,armor,stealth,exp} }
-  let quickItems      = load('quickItems',   []);  // [{ name }] — saved items for quick-use bar
+  let userInventory   = {};  // { itemId: { name, quantity, uid } } â€” refreshed each poll
+  let quickItems      = load('quickItems',   []);  // [{ name }] â€” saved items for quick-use bar
 
   try { if (Object.keys(itemMeta).length === 0) {
     for (const name of RW_KNOWN_WEAPONS) {
@@ -522,16 +470,16 @@
     }
   } } catch(e) {}
 
-  // ── Travel alert tracking ─────────────────────────────────────────────────
+  // â”€â”€ Travel alert tracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let lastTopTravelCode = load('lastTravelCode', null);
   let lastTopTravelPPH  = load('lastTravelPPH',  0);
 
-  // ── Tooltip state ─────────────────────────────────────────────────────────
+  // â”€â”€ Tooltip state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const TOOLTIPS = {
     signal:     'Signal shows the price trend direction.\nBUY = rising 5%+. HOLD = mild uptrend. WATCH = volatile, no clear direction. SELL = falling 8%+.',
-    confidence: 'Confidence dots show how strong the signal is.\n● ● ● = strong trend, lots of data.\n● ● ○ = moderate.\n● ○ ○ = early/thin data.',
-    pph:        'Profit Per Hour — estimated $ earned per hour of round-trip travel, after 5% sales tax.',
-    stock:      'YATA ✓ = live crowd-sourced stock data from yata.life.\n~stock = no data, assuming full stock (optimistic).',
+    confidence: 'Confidence dots show how strong the signal is.\nâ— â— â— = strong trend, lots of data.\nâ— â— â—‹ = moderate.\nâ— â—‹ â—‹ = early/thin data.',
+    pph:        'Profit Per Hour â€” estimated $ earned per hour of round-trip travel, after 5% sales tax.',
+    stock:      'YATA âœ“ = live crowd-sourced stock data from yata.life.\n~stock = no data, assuming full stock (optimistic).',
     change:     'Price change % over your selected timeframe.\nOrange = price rising (hot). Teal = falling (cold).',
     dataAge:    'How long ago prices were last fetched. Green = fresh. Yellow = >5min old. Red = >15min.',
   };
@@ -589,75 +537,6 @@
     }
   }
 
-  // Fetch spy data for a player from TornStats
-  async function fetchTornStatsSpy(tsKey, playerId) {
-    try {
-      const data = await apiGet(`https://www.tornstats.com/api/v2/${tsKey}/spy/user/${playerId}`);
-      if (!data?.status || !data?.spy) return null;
-      const s = data.spy;
-      return {
-        source:    'TornStats',
-        str:       s.strength    ?? 0,
-        def:       s.defense     ?? 0,
-        spd:       s.speed       ?? 0,
-        dex:       s.dexterity   ?? 0,
-        total:     s.total       ?? (s.strength + s.defense + s.speed + s.dexterity),
-        timestamp: s.timestamp   ?? 0,
-        name:      s.name        ?? '',
-      };
-    } catch(e) { return null; }
-  }
-
-  // Fetch spy data from YATA
-  async function fetchYataSpy(playerId) {
-    try {
-      const yataKey = load('yataKey', '');
-      const url = yataKey
-        ? `https://yata.life/api/v1/spies/${playerId}/?format=json&key=${yataKey}`
-        : `https://yata.life/api/v1/spies/${playerId}/?format=json`;
-      const data = await apiGet(url);
-      if (!data || data.error) return null;
-      const s = data;
-      return {
-        source:    'YATA',
-        str:       s.strength  ?? 0,
-        def:       s.defense   ?? 0,
-        spd:       s.speed     ?? 0,
-        dex:       s.dexterity ?? 0,
-        total:     (s.strength ?? 0) + (s.defense ?? 0) + (s.speed ?? 0) + (s.dexterity ?? 0),
-        timestamp: s.timestamp ?? 0,
-        name:      s.name      ?? '',
-      };
-    } catch(e) { return null; }
-  }
-
-  // Estimate stat range from level (rough heuristic based on community data)
-  // Returns { low, mid, high } as total battle stats
-  function estimateFromLevel(level) {
-    // Level is a very poor proxy for battle stats in Torn.
-    // Level = attacks done. Stats = gym energy spent. Almost independent.
-    // Ranges are intentionally wide — add TornStats/YATA for real data.
-    const brackets = [
-      { maxLvl:   5, low:    1e3,  high:   500e3  },
-      { maxLvl:  15, low:   10e3,  high:     5e6  },
-      { maxLvl:  30, low:   50e3,  high:    50e6  },
-      { maxLvl:  50, low:  100e3,  high:   200e6  },
-      { maxLvl: 100, low:  500e3,  high:     1e9  },
-      { maxLvl: Infinity, low: 1e6, high:  200e9  },
-    ];
-    const b = brackets.find(br => level <= br.maxLvl) ?? brackets[brackets.length - 1];
-    return { low: b.low, high: b.high };
-  }
-
-  function formatStatShort(n) {
-    if (!n) return '?';
-    if (n >= 1e12) return (n/1e12).toFixed(1) + 'T';
-    if (n >= 1e9)  return (n/1e9).toFixed(1)  + 'B';
-    if (n >= 1e6)  return (n/1e6).toFixed(1)  + 'M';
-    if (n >= 1e3)  return (n/1e3).toFixed(1)  + 'K';
-    return n.toString();
-  }
-
   function formatCooldown(secs) {
     if (!secs || secs <= 0) return null;
     const h = Math.floor(secs / 3600);
@@ -666,7 +545,7 @@
     return `${m}m`;
   }
 
-  // ── Carry capacity auto-detect ───────────────────────────────────────────
+  // â”€â”€ Carry capacity auto-detect â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async function detectCarryCapacity(apiKey) {
     try {
       const data = await apiGet(
@@ -686,7 +565,7 @@
       if (hasLargeSuitcase) base += 4;
       else if (hasMedSuitcase) base += 2;
 
-      // Faction Excursion special — up to +10
+      // Faction Excursion special â€” up to +10
       const factionPerks = data.faction_perks ?? data.perks?.faction ?? [];
       const excursion = factionPerks.find?.(p =>
         typeof p === 'string' ? p.toLowerCase().includes('excursion') :
@@ -697,8 +576,8 @@
         if (match) base += Math.min(10, parseInt(match[1]));
       }
 
-      // Lingerie Store 3* job special (+2) — can't reliably detect, skip
-      // Cruise Line Agency 3*/10* (+2/+3) — same
+      // Lingerie Store 3* job special (+2) â€” can't reliably detect, skip
+      // Cruise Line Agency 3*/10* (+2/+3) â€” same
 
       return Math.max(5, base);
     } catch(e) {
@@ -706,15 +585,223 @@
     }
   }
 
-  // ── Styles ────────────────────────────────────────────────────────────────────
+  // â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   GM_addStyle(`
-    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap');#tmit-fab{position:fixed;bottom:28px;right:28px;width:52px;height:52px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#2d1b69,#0d0010);border:2px solid #c9a227;box-shadow:0 0 14px rgba(201,162,39,0.5),0 4px 24px rgba(0,0,0,0.8);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;z-index:999999;transition:all 0.3s ease;user-select:none;}#tmit-fab:hover{transform:scale(1.1);box-shadow:0 0 26px rgba(201,162,39,0.8),0 4px 28px rgba(0,0,0,0.9);}#tmit-fab.tmit-alert{animation:tmit-pulse 1.4s ease-in-out infinite;border-color:#ffe066;}@keyframes tmit-pulse{0%{box-shadow:0 0 0 0 rgba(255,224,102,0.9),0 4px 20px rgba(0,0,0,0.7);}60%{box-shadow:0 0 0 18px rgba(255,224,102,0),0 4px 20px rgba(0,0,0,0.7);}100%{box-shadow:0 0 0 0 rgba(255,224,102,0),0 4px 20px rgba(0,0,0,0.7);}}#tmit-fab .tmit-alert-dot{display:none;position:absolute;top:2px;right:2px;width:12px;height:12px;background:#ff4d4d;border-radius:50%;border:2px solid #0d0010;animation:tmit-dotpop 0.3s ease;}#tmit-fab.tmit-alert .tmit-alert-dot{display:block;}@keyframes tmit-dotpop{from{transform:scale(0);}to{transform:scale(1);}}#tmit-panel{position:fixed;bottom:90px;right:28px;width:480px;max-height:620px;background:linear-gradient(180deg,rgba(45,27,105,0.97) 0%,rgba(18,6,40,0.99) 40%,rgba(5,2,12,1) 100%);border:1px solid #c9a227;border-top:3px solid #c9a227;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,0.8),0 0 50px rgba(201,162,39,0.12),0 24px 80px rgba(0,0,0,0.9),inset 0 1px 0 rgba(201,162,39,0.15);z-index:999998;display:flex;flex-direction:column;overflow:hidden;font-family:'Inter',sans-serif;color:#e8dff5;transition:opacity 0.2s,transform 0.2s;}#tmit-panel.tmit-hidden{opacity:0;pointer-events:none;transform:translateY(12px);}.tmit-header{background:linear-gradient(90deg,rgba(45,27,105,1) 0%,rgba(20,10,50,1) 60%,rgba(8,4,20,1) 100%);border-bottom:1px solid rgba(201,162,39,0.35);padding:11px 16px;display:flex;align-items:center;justify-content:space-between;cursor:move;flex-shrink:0;position:relative;}.tmit-header::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent 0%,#c9a227 30%,#ffe066 50%,#c9a227 70%,transparent 100%);opacity:0.7;}.tmit-title{font-family:'Cinzel',serif;font-size:14px;font-weight:700;color:#c9a227;letter-spacing:0.06em;display:flex;align-items:center;gap:8px;text-shadow:0 0 12px rgba(201,162,39,0.4);}.tmit-title-icon{font-size:16px;}.tmit-header-right{display:flex;align-items:center;gap:8px;}.tmit-status-pill{font-size:10px;padding:2px 8px;border-radius:20px;background:rgba(201,162,39,0.08);border:1px solid rgba(201,162,39,0.25);color:#c9a227;font-family:monospace;}.tmit-status-pill.tmit-ok{border-color:rgba(80,220,130,0.4);color:#50dc82;background:rgba(80,220,130,0.07);}.tmit-status-pill.tmit-live{border-color:rgba(255,200,50,0.5);color:#ffe066;background:rgba(255,200,50,0.07);}.tmit-status-pill.tmit-err{border-color:rgba(255,80,80,0.4);color:#ff6060;background:rgba(255,80,80,0.07);}.tmit-btn-close,.tmit-btn-settings-toggle,.tmit-btn-refresh{background:rgba(0,0,0,0.3);border:1px solid rgba(201,162,39,0.2);color:#7a6020;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all 0.15s;padding:0;line-height:1;}.tmit-btn-close:hover,.tmit-btn-settings-toggle:hover,.tmit-btn-refresh:hover{border-color:#c9a227;color:#ffe066;background:rgba(201,162,39,0.1);box-shadow:0 0 8px rgba(201,162,39,0.2);}.tmit-tab-bar{display:flex;border-bottom:1px solid rgba(201,162,39,0.2);flex-shrink:0;background:rgba(0,0,0,0.4);}.tmit-tab{flex:1;padding:7px 0;font-size:11px;font-weight:600;text-align:center;cursor:pointer;color:#4a3a6a;border-bottom:2px solid transparent;transition:all 0.15s;letter-spacing:0.04em;user-select:none;}.tmit-tab:hover{color:#c9a227;}.tmit-tab.tmit-tab-active{color:#ffe066;border-bottom-color:#c9a227;background:rgba(201,162,39,0.04);}.tmit-tab .tmit-tab-count{display:inline-block;margin-left:4px;font-size:9px;background:rgba(201,162,39,0.15);color:#c9a227;border-radius:8px;padding:0 5px;font-family:monospace;vertical-align:middle;}.tmit-tab.tmit-tab-active .tmit-tab-count{background:rgba(201,162,39,0.3);}.tmit-controls{padding:7px 12px;border-bottom:1px solid rgba(201,162,39,0.1);display:flex;gap:6px;align-items:center;flex-wrap:wrap;flex-shrink:0;background:rgba(0,0,0,0.35);}.tmit-timeframe-group,.tmit-filter-group{display:flex;gap:3px;}.tmit-tf-btn{background:rgba(0,0,0,0.4);border:1px solid rgba(201,162,39,0.15);color:#6a5a8a;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:monospace;}.tmit-tf-btn:hover{border-color:#c9a227;color:#c9a227;}.tmit-tf-btn.tmit-active{background:rgba(201,162,39,0.15);border-color:#c9a227;color:#ffe066;box-shadow:0 0 6px rgba(201,162,39,0.2);}.tmit-divider{width:1px;height:20px;background:rgba(201,162,39,0.15);margin:0 2px;}.tmit-select{background:rgba(0,0,0,0.4);border:1px solid rgba(201,162,39,0.18);color:#c9a227;border-radius:4px;padding:3px 6px;font-size:11px;cursor:pointer;outline:none;font-family:'Inter',sans-serif;}.tmit-select option{background:#0d0520;color:#e8dff5;}.tmit-search{flex:1;min-width:80px;background:rgba(0,0,0,0.4);border:1px solid rgba(201,162,39,0.18);border-radius:4px;color:#e8dff5;font-size:11px;padding:3px 8px;outline:none;font-family:'Inter',sans-serif;}.tmit-search::placeholder{color:#3a2a5a;}.tmit-search:focus{border-color:rgba(201,162,39,0.45);}.tmit-filter-row{padding:5px 12px;border-bottom:1px solid rgba(201,162,39,0.08);display:flex;gap:8px;align-items:center;flex-shrink:0;background:rgba(0,0,0,0.3);}.tmit-filter-label{font-size:10px;color:#4a3a6a;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;white-space:nowrap;}.tmit-input-sm{background:rgba(0,0,0,0.4);border:1px solid rgba(201,162,39,0.18);border-radius:4px;color:#e8dff5;font-size:11px;padding:3px 8px;width:100px;outline:none;font-family:monospace;}.tmit-input-sm:focus{border-color:rgba(201,162,39,0.45);}.tmit-col-headers{display:grid;grid-template-columns:1fr 90px 90px 80px;padding:5px 12px;border-bottom:1px solid rgba(201,162,39,0.12);flex-shrink:0;background:rgba(0,0,0,0.5);}.tmit-col-hdr{font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#4a3a6a;cursor:pointer;user-select:none;transition:color 0.15s;}.tmit-col-hdr:hover{color:#c9a227;}.tmit-col-hdr.tmit-sorted{color:#c9a227;}.tmit-col-hdr:not(:first-child){text-align:right;}.tmit-list{overflow-y:auto;flex:1;scrollbar-width:thin;scrollbar-color:rgba(201,162,39,0.25) transparent;}.tmit-list::-webkit-scrollbar{width:4px;}.tmit-list::-webkit-scrollbar-track{background:transparent;}.tmit-list::-webkit-scrollbar-thumb{background:rgba(201,162,39,0.25);border-radius:2px;}.tmit-tab-panel{scrollbar-width:thin;scrollbar-color:rgba(160,80,255,0.5) rgba(255,255,255,0.04);}.tmit-tab-panel::-webkit-scrollbar{width:5px;}.tmit-tab-panel::-webkit-scrollbar-track{background:rgba(255,255,255,0.04);border-radius:3px;}.tmit-tab-panel::-webkit-scrollbar-thumb{background:rgba(160,80,255,0.5);border-radius:3px;}.tmit-tab-panel::-webkit-scrollbar-thumb:hover{background:rgba(160,80,255,0.8);}.tmit-settings-panel{scrollbar-width:thin;scrollbar-color:rgba(160,80,255,0.5) rgba(255,255,255,0.04);}.tmit-settings-panel::-webkit-scrollbar{width:5px;}.tmit-settings-panel::-webkit-scrollbar-track{background:rgba(255,255,255,0.04);border-radius:3px;}.tmit-settings-panel::-webkit-scrollbar-thumb{background:rgba(160,80,255,0.5);border-radius:3px;}.tmit-settings-panel::-webkit-scrollbar-thumb:hover{background:rgba(160,80,255,0.8);}.tmit-item-row{display:grid;grid-template-columns:1fr 90px 90px 80px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,0.03);align-items:center;transition:background 0.12s;cursor:default;position:relative;}.tmit-item-row:hover{background:rgba(201,162,39,0.05);}.tmit-item-row.tmit-hot{background:linear-gradient(90deg,rgba(232,98,26,0.08) 0%,transparent 100%);border-left:2px solid #e8621a;}.tmit-item-row.tmit-hot::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,#ffe066,#e8621a,#8b2500);box-shadow:0 0 6px rgba(232,98,26,0.6);}.tmit-item-row.tmit-hot:hover{background:linear-gradient(90deg,rgba(232,98,26,0.13) 0%,transparent 100%);}.tmit-item-row.tmit-hot-big{background:linear-gradient(90deg,rgba(232,98,26,0.14) 0%,transparent 70%);border-left:2px solid #ff6a00;animation:tmit-ember 2s ease-in-out infinite alternate;}.tmit-item-row.tmit-hot-big::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,#fff0a0,#ff6a00,#8b2500);box-shadow:0 0 10px rgba(255,106,0,0.8);}@keyframes tmit-ember{from{background:linear-gradient(90deg,rgba(232,98,26,0.10) 0%,transparent 70%);}to{background:linear-gradient(90deg,rgba(232,98,26,0.20) 0%,transparent 70%);}}.tmit-item-row.tmit-icy{background:linear-gradient(90deg,rgba(61,214,200,0.07) 0%,transparent 100%);border-left:2px solid #3dd6c8;}.tmit-item-row.tmit-icy::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,#e0ffff,#3dd6c8,#0a5a54);box-shadow:0 0 6px rgba(61,214,200,0.5);}.tmit-item-row.tmit-icy:hover{background:linear-gradient(90deg,rgba(61,214,200,0.11) 0%,transparent 100%);}.tmit-item-row.tmit-icy-big{background:linear-gradient(90deg,rgba(61,214,200,0.12) 0%,transparent 70%);border-left:2px solid #00e5ff;animation:tmit-frost 2.5s ease-in-out infinite alternate;}.tmit-item-row.tmit-icy-big::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,#ffffff,#00e5ff,#005566);box-shadow:0 0 10px rgba(0,229,255,0.7);}@keyframes tmit-frost{from{background:linear-gradient(90deg,rgba(61,214,200,0.08) 0%,transparent 70%);}to{background:linear-gradient(90deg,rgba(61,214,200,0.16) 0%,transparent 70%);}}.tmit-item-row.tmit-pinned{border-left:2px solid #c9a227;background:rgba(201,162,39,0.04);}.tmit-item-name{font-size:12px;font-weight:500;color:#d8c8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px;}.tmit-item-name .tmit-spike-icon{font-size:10px;margin-right:4px;}.tmit-item-type{font-size:9px;color:#3a2a5a;margin-top:1px;}.tmit-price{font-family:monospace;font-size:11px;color:#9080b0;text-align:right;}.tmit-change{font-family:monospace;font-size:12px;font-weight:700;text-align:right;}.tmit-change.up{color:#e8621a;text-shadow:0 0 8px rgba(232,98,26,0.5);}.tmit-change.down{color:#3dd6c8;text-shadow:0 0 8px rgba(61,214,200,0.4);}.tmit-change.flat{color:#3a2a5a;}.tmit-signal{text-align:right;}.tmit-signal-badge{display:inline-block;font-size:9px;font-weight:700;letter-spacing:0.06em;padding:2px 6px;border-radius:3px;text-transform:uppercase;}.tmit-signal-badge.BUY{background:rgba(232,98,26,0.18);color:#ff8c42;border:1px solid rgba(232,98,26,0.4);text-shadow:0 0 6px rgba(232,98,26,0.4);}.tmit-signal-badge.SELL{background:rgba(61,214,200,0.15);color:#3dd6c8;border:1px solid rgba(61,214,200,0.35);text-shadow:0 0 6px rgba(61,214,200,0.3);}.tmit-signal-badge.HOLD{background:rgba(201,162,39,0.15);color:#c9a227;border:1px solid rgba(201,162,39,0.3);}.tmit-signal-badge.WATCH{background:rgba(160,100,255,0.12);color:#b080ff;border:1px solid rgba(160,100,255,0.28);cursor:pointer;transition:all 0.2s;}.tmit-signal-badge.WATCH:hover{background:rgba(201,162,39,0.18);color:#ffe066;border-color:rgba(201,162,39,0.5);}.tmit-signal-badge.WATCH.tmit-watched{background:rgba(201,162,39,0.22);color:#ffe066;border-color:#c9a227;box-shadow:0 0 7px rgba(201,162,39,0.45);}.tmit-confidence-bar{display:flex;gap:2px;align-items:center;}.tmit-conf-dot{width:5px;height:5px;border-radius:50%;background:rgba(201,162,39,0.12);}.tmit-conf-dot.filled{background:#c9a227;box-shadow:0 0 3px rgba(201,162,39,0.4);}.tmit-state-msg{padding:32px 20px;text-align:center;color:#3a2a5a;font-size:13px;line-height:1.7;}.tmit-state-msg .tmit-state-icon{font-size:28px;margin-bottom:8px;}.tmit-settings-panel{padding:14px 16px;border-top:1px solid rgba(201,162,39,0.18);background:rgba(0,0,0,0.5);display:none;flex-shrink:0;}.tmit-settings-panel.tmit-open{display:block;}.tmit-settings-title{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c9a227;margin-bottom:10px;}.tmit-setting-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}.tmit-setting-row label{font-size:11px;color:#7060a0;width:100px;flex-shrink:0;}.tmit-setting-row input{flex:1;background:rgba(0,0,0,0.5);border:1px solid rgba(201,162,39,0.22);border-radius:4px;color:#e8dff5;font-size:12px;padding:5px 9px;outline:none;font-family:monospace;}.tmit-setting-row input:focus{border-color:rgba(201,162,39,0.55);}.tmit-btn-save{margin-top:8px;background:linear-gradient(90deg,#c9a227 0%,#8b6e10 50%,#c9a227 100%);background-size:200%;border:none;border-radius:5px;color:#0d0010;font-weight:700;font-size:12px;padding:6px 18px;cursor:pointer;font-family:'Inter',sans-serif;transition:background-position 0.4s,filter 0.15s;}.tmit-btn-save:hover{background-position:right;filter:brightness(1.15);}.tmit-footer{padding:5px 12px;border-top:1px solid rgba(201,162,39,0.1);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:rgba(0,0,0,0.6);}.tmit-footer-stat{font-size:9px;color:#3a2a5a;font-family:monospace;}.tmit-footer-stat span{color:#6a5a8a;}.tmit-section-title{font-family:'Cinzel',serif;font-size:11px;font-weight:700;color:#c9a227;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid rgba(201,162,39,0.2);}.tmit-war-form{margin-bottom:10px;}.tmit-form-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}.tmit-form-row label{font-size:10px;color:#6a5a8a;font-weight:600;width:120px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.05em;}.tmit-form-row2{display:flex;gap:8px;margin-bottom:6px;}.tmit-form-row2 > div{flex:1;display:flex;flex-direction:column;gap:3px;}.tmit-form-row2 label{font-size:9px;color:#6a5a8a;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;}.tmit-input-full{width:100%;background:rgba(0,0,0,0.4);border:1px solid rgba(201,162,39,0.18);border-radius:4px;color:#e8dff5;font-size:11px;padding:4px 8px;outline:none;font-family:monospace;}.tmit-input-full:focus{border-color:rgba(201,162,39,0.45);}.tmit-btn-calc{margin-top:6px;background:linear-gradient(90deg,#c9a227,#8b6e10);border:none;border-radius:5px;color:#0d0010;font-weight:700;font-size:11px;padding:5px 16px;cursor:pointer;font-family:'Inter',sans-serif;transition:filter 0.15s;}.tmit-btn-calc:hover{filter:brightness(1.2);}.tmit-calc-result{background:rgba(0,0,0,0.35);border:1px solid rgba(201,162,39,0.2);border-radius:6px;padding:10px 12px;margin-top:8px;font-size:11px;line-height:1.8;}.tmit-calc-result .tmit-result-row{display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.04);}.tmit-calc-result .tmit-result-row:last-child{border-bottom:none;}.tmit-result-label{color:#7a6090;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;}.tmit-result-val{color:#e8dff5;font-family:monospace;font-weight:600;}.tmit-result-val.gold{color:#ffe066;}.tmit-result-val.hot{color:#e8621a;}.tmit-result-val.icy{color:#3dd6c8;}.tmit-result-val.green{color:#50dc82;}.tmit-score-bar{display:flex;gap:3px;margin-top:6px;}.tmit-score-segment{height:6px;border-radius:2px;flex:1;background:rgba(255,255,255,0.06);transition:background 0.3s;}.tmit-score-segment.filled-hot{background:#e8621a;box-shadow:0 0 4px rgba(232,98,26,0.5);}.tmit-score-segment.filled-gold{background:#c9a227;box-shadow:0 0 4px rgba(201,162,39,0.4);}.tmit-score-segment.filled-icy{background:#3dd6c8;box-shadow:0 0 4px rgba(61,214,200,0.4);}.tmit-bb-balance-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 10px;background:rgba(201,162,39,0.06);border:1px solid rgba(201,162,39,0.2);border-radius:6px;}.tmit-bb-bignum{font-family:'Share Tech Mono',monospace;font-size:18px;color:#ffe066;font-weight:700;text-shadow:0 0 10px rgba(255,224,102,0.4);}.tmit-war-tracker{margin-top:4px;}.tmit-war-row{display:grid;grid-template-columns:1fr 80px 80px 70px 55px;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.04);align-items:center;font-size:11px;border-radius:3px;margin-bottom:1px;}.tmit-war-row:hover{background:rgba(201,162,39,0.05);}.tmit-travel-row{display:grid;grid-template-columns:24px 1fr 90px 80px 70px;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.04);align-items:center;cursor:pointer;border-radius:3px;transition:background 0.12s;}.tmit-travel-row:hover{background:rgba(201,162,39,0.06);}.tmit-travel-row.rank1{border-left:2px solid #ffe066;background:rgba(201,162,39,0.05);}.tmit-travel-row.rank2{border-left:2px solid #c0c0c0;}.tmit-travel-row.rank3{border-left:2px solid #cd7f32;}.tmit-travel-flag{font-size:14px;}.tmit-travel-dest{font-size:12px;font-weight:500;color:#d8c8f0;}.tmit-travel-sub{font-size:9px;color:#4a3a6a;margin-top:1px;}.tmit-travel-pph{font-family:monospace;font-size:12px;font-weight:700;color:#e8621a;text-align:right;}.tmit-travel-pph.top{color:#ffe066;text-shadow:0 0 8px rgba(255,224,102,0.4);}.tmit-travel-time{font-family:monospace;font-size:10px;color:#6a5a8a;text-align:right;}.tmit-travel-stock{font-size:9px;text-align:right;font-family:monospace;}.tmit-travel-stock.yata{color:#50dc82;}.tmit-travel-stock.assumed{color:#4a3a6a;}.tmit-travel-detail-card{background:rgba(0,0,0,0.3);border:1px solid rgba(201,162,39,0.18);border-radius:6px;padding:10px 12px;}.tmit-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;}.tmit-bar-label{font-size:10px;color:#6a5a8a;font-weight:700;width:56px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.05em;}.tmit-bar-track{flex:1;height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden;}.tmit-bar-fill{height:100%;border-radius:4px;transition:width 0.4s ease;}.tmit-bar-val{font-family:monospace;font-size:10px;color:#9080b0;width:50px;text-align:right;flex-shrink:0;}.tmit-bar-mod{font-size:9px;width:32px;text-align:right;flex-shrink:0;}.teem-stat-badge{display:inline-flex;align-items:center;gap:0;margin-left:5px;padding:0;background:none;border:none;cursor:default;vertical-align:middle;white-space:nowrap;position:relative;z-index:9999;transition:gap 0.15s;}.teem-stat-badge img.teem-icon{width:14px;height:14px;border-radius:50%;opacity:0.55;transition:opacity 0.15s,transform 0.15s;flex-shrink:0;display:block;}.teem-stat-badge:hover img.teem-icon{opacity:1;transform:scale(1.15);}.teem-stat-badge .teem-badge-label{max-width:0;overflow:hidden;opacity:0;font-size:10px;font-family:monospace;font-weight:700;white-space:nowrap;transition:max-width 0.2s ease,opacity 0.15s ease,margin-left 0.15s;margin-left:0;}.teem-stat-badge:hover .teem-badge-label{max-width:80px;opacity:1;margin-left:3px;}.teem-stat-badge.spy-exact .teem-badge-label{color:#50dc82;}.teem-stat-badge.spy-range .teem-badge-label{color:#c9a227;}#teem-global-tip{display:none;position:fixed;background:#1e0f45;border:1px solid rgba(201,162,39,0.4);border-radius:8px;padding:10px 13px;font-size:11px;font-family:'Inter',sans-serif;color:#c8b8e8;white-space:pre-line;max-width:220px;line-height:1.7;z-index:2147483647;box-shadow:0 8px 32px rgba(0,0,0,0.85);pointer-events:none;}#teem-global-tip.visible{display:block;}.tmit-war-row.yellow-item{border-left:2px solid #ffe066;}#tmit-onboard{position:fixed;bottom:28px;left:28px;z-index:9999999;animation:tmit-slidein 0.4s cubic-bezier(0.16,1,0.3,1);}@keyframes tmit-slidein{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}.tmit-onboard-card{background:linear-gradient(160deg,#1e0f45 0%,#0d0520 100%);border:1px solid #c9a227;border-top:3px solid #c9a227;border-radius:12px;width:340px;padding:18px 18px 14px;box-shadow:0 0 40px rgba(201,162,39,0.18),0 16px 48px rgba(0,0,0,0.8);position:relative;}.tmit-onboard-logo{width:56px;height:56px;border-radius:50%;border:2px solid #c9a227;margin:0 auto 14px;display:block;}.tmit-onboard-title{font-family:'Cinzel',serif;font-size:18px;font-weight:700;color:#c9a227;text-align:center;margin-bottom:4px;letter-spacing:0.05em;}.tmit-onboard-subtitle{font-size:11px;color:#5a4a7a;text-align:center;margin-bottom:20px;}.tmit-onboard-step{display:none;}.tmit-onboard-step.active{display:block;}.tmit-onboard-step-title{font-size:13px;font-weight:700;color:#e8dff5;margin-bottom:8px;}.tmit-onboard-step-body{font-size:12px;color:#8a7aaa;line-height:1.7;margin-bottom:16px;}.tmit-onboard-step-body b{color:#c9a227;}.tmit-onboard-step-body code{background:rgba(0,0,0,0.4);border:1px solid rgba(201,162,39,0.2);border-radius:3px;padding:1px 5px;font-family:monospace;font-size:11px;color:#ffe066;}.tmit-onboard-input{width:100%;background:rgba(0,0,0,0.5);border:1px solid rgba(201,162,39,0.3);border-radius:6px;color:#e8dff5;font-family:monospace;font-size:13px;padding:9px 12px;outline:none;margin-bottom:8px;}.tmit-onboard-input:focus{border-color:#c9a227;}.tmit-onboard-validate{font-size:11px;font-family:monospace;min-height:16px;margin-bottom:8px;}.tmit-onboard-validate.ok{color:#50dc82;}.tmit-onboard-validate.err{color:#ff6060;}.tmit-onboard-validate.loading{color:#c9a227;}.tmit-onboard-capacity-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;}.tmit-onboard-cap-val{font-family:'Cinzel',serif;font-size:28px;color:#ffe066;font-weight:700;text-shadow:0 0 16px rgba(255,224,102,0.5);}.tmit-onboard-cap-detail{font-size:10px;color:#5a4a7a;line-height:1.6;}.tmit-onboard-tab-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;}.tmit-onboard-tab-card{background:rgba(0,0,0,0.3);border:1px solid rgba(201,162,39,0.15);border-radius:6px;padding:6px 8px;}.tmit-onboard-tab-card .tab-icon{font-size:16px;}.tmit-onboard-tab-card .tab-name{font-size:11px;font-weight:700;color:#c9a227;margin:3px 0 2px;}.tmit-onboard-tab-card .tab-desc{font-size:10px;color:#5a4a7a;line-height:1.5;}.tmit-onboard-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}.tmit-onboard-dots{display:flex;gap:5px;}.tmit-onboard-dot{width:6px;height:6px;border-radius:50%;background:rgba(201,162,39,0.2);transition:background 0.2s;}.tmit-onboard-dot.active{background:#c9a227;}.tmit-onboard-btn{background:linear-gradient(90deg,#c9a227,#8b6e10);border:none;border-radius:6px;color:#0d0010;font-weight:700;font-size:13px;padding:8px 20px;cursor:pointer;font-family:'Inter',sans-serif;transition:filter 0.15s;}.tmit-onboard-btn:hover{filter:brightness(1.15);}.tmit-onboard-btn:disabled{opacity:0.4;cursor:default;}.tmit-onboard-skip{font-size:11px;color:#3a2a5a;cursor:pointer;text-decoration:underline;background:none;border:none;padding:0;}.tmit-onboard-skip:hover{color:#6a5a8a;}.tmit-help{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:50%;background:rgba(201,162,39,0.12);border:1px solid rgba(201,162,39,0.25);color:#c9a227;font-size:8px;font-weight:700;cursor:help;margin-left:4px;position:relative;vertical-align:middle;flex-shrink:0;}.tmit-help::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);right:0;left:auto;transform:none;background:#1e0f45;border:1px solid rgba(201,162,39,0.3);border-radius:6px;padding:8px 11px;font-size:10px;color:#c8b8e8;white-space:pre-line;width:220px;line-height:1.6;z-index:999999;opacity:0;pointer-events:none;transition:opacity 0.15s;box-shadow:0 6px 24px rgba(0,0,0,0.7);font-family:'Inter',sans-serif;font-weight:400;letter-spacing:0;text-transform:none;}.tmit-help:hover::after{opacity:1;}.tmit-btn-export{background:none;border:1px solid rgba(201,162,39,0.2);color:#6a5a8a;border-radius:4px;padding:3px 8px;font-size:10px;cursor:pointer;transition:all 0.15s;font-family:'Inter',sans-serif;font-weight:600;}.tmit-btn-export:hover{border-color:#c9a227;color:#c9a227;}.tmit-session-bar{padding:4px 12px;background:rgba(0,0,0,0.4);border-bottom:1px solid rgba(201,162,39,0.1);display:flex;gap:12px;align-items:center;font-size:10px;font-family:monospace;flex-shrink:0;}.tmit-session-item{display:flex;align-items:center;gap:4px;color:#4a3a6a;}.tmit-session-val{color:#9080b0;font-weight:600;}.tmit-session-val.positive{color:#50dc82;}.tmit-session-val.hot{color:#e8621a;}.tmit-age-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:3px;}.tmit-age-fresh{background:#50dc82;}.tmit-age-stale{background:#c9a227;}.tmit-age-old{background:#ff6060;}.tmit-btn-retry{display:inline-block;margin-top:8px;background:rgba(201,162,39,0.15);border:1px solid rgba(201,162,39,0.3);border-radius:5px;color:#c9a227;font-size:11px;font-weight:600;padding:5px 14px;cursor:pointer;font-family:'Inter',sans-serif;}.tmit-btn-retry:hover{background:rgba(201,162,39,0.25);}.tmit-skeleton{background:linear-gradient(90deg,rgba(255,255,255,0.03) 0%,rgba(255,255,255,0.07) 50%,rgba(255,255,255,0.03) 100%);background-size:200% 100%;animation:tmit-shimmer 1.4s infinite;border-radius:3px;height:10px;margin:4px 0;}@keyframes tmit-shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}.tmit-war-row.orange-item{border-left:2px solid #e8621a;}.tmit-war-row.red-item{border-left:2px solid #ff4040;}.tmit-war-name{color:#d8c8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.tmit-war-price{color:#9080b0;font-family:monospace;font-size:10px;text-align:right;}.tmit-war-bb{color:#ffe066;font-family:monospace;font-size:10px;text-align:right;}.tmit-war-chg{font-family:monospace;font-size:10px;font-weight:700;text-align:right;}
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap');
+    #tmit-fab{position:fixed;bottom:28px;right:28px;width:52px;height:52px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#320042,#09000d);border:2px solid #c9a227;box-shadow:0 0 14px rgba(151,2,173,0.5),0 4px 24px rgba(0,0,0,0.8);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;z-index:999999;transition:all 0.3s ease;user-select:none;}
+    #tmit-fab:hover{transform:scale(1.1);box-shadow:0 0 26px rgba(151,2,173,0.8),0 4px 28px rgba(0,0,0,0.9);}
+    #tmit-fab.tmit-alert{animation:tmit-pulse 1.4s ease-in-out infinite;border-color:#ffe066;}
+    @keyframes tmit-pulse{0%{box-shadow:0 0 0 0 rgba(255,224,102,0.9),0 4px 20px rgba(0,0,0,0.7);}60%{box-shadow:0 0 0 18px rgba(255,224,102,0),0 4px 20px rgba(0,0,0,0.7);}100%{box-shadow:0 0 0 0 rgba(255,224,102,0),0 4px 20px rgba(0,0,0,0.7);}}
+    #tmit-fab .tmit-alert-dot{display:none;position:absolute;top:2px;right:2px;width:12px;height:12px;background:#ff4d4d;border-radius:50%;border:2px solid #09000d;animation:tmit-dotpop 0.3s ease;}
+    #tmit-fab.tmit-alert .tmit-alert-dot{display:block;}
+    @keyframes tmit-dotpop{from{transform:scale(0);}to{transform:scale(1);}}
+    #tmit-panel{position:fixed;bottom:90px;right:28px;width:520px;max-height:620px;background:linear-gradient(180deg,rgba(50,0,66,0.97) 0%,rgba(18,0,28,0.99) 40%,rgba(7,0,10,1) 100%);border:1px solid #9702ad;border-top:3px solid #c9a227;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,0.8),0 0 50px rgba(151,2,173,0.12),0 24px 80px rgba(0,0,0,0.9),inset 0 1px 0 rgba(201,162,39,0.15);z-index:999998;display:flex;flex-direction:column;overflow:hidden;font-family:'Inter',sans-serif;color:#f0d5f8;transition:opacity 0.2s,transform 0.2s;}
+    #tmit-panel.tmit-hidden{opacity:0;pointer-events:none;transform:translateY(12px);}
+    .tmit-header{background:linear-gradient(90deg,rgba(50,0,66,1) 0%,rgba(18,0,28,1) 60%,rgba(8,0,14,1) 100%);border-bottom:1px solid rgba(151,2,173,0.35);padding:11px 16px;display:flex;align-items:center;justify-content:space-between;cursor:move;flex-shrink:0;position:relative;}
+    .tmit-header::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent 0%,#c9a227 30%,#ffe066 50%,#c9a227 70%,transparent 100%);opacity:0.7;}
+    .tmit-title{font-family:'Cinzel',serif;font-size:14px;font-weight:700;color:#c9a227;letter-spacing:0.06em;display:flex;align-items:center;gap:8px;text-shadow:0 0 12px rgba(201,162,39,0.4);}
+    .tmit-title-icon{font-size:16px;}
+    .tmit-header-right{display:flex;align-items:center;gap:8px;}
+    .tmit-status-pill{font-size:10px;padding:2px 8px;border-radius:20px;background:rgba(151,2,173,0.08);border:1px solid rgba(151,2,173,0.25);color:#c9a227;font-family:monospace;}
+    .tmit-status-pill.tmit-ok{border-color:rgba(80,220,130,0.4);color:#50dc82;background:rgba(80,220,130,0.07);}
+    .tmit-status-pill.tmit-live{border-color:rgba(255,200,50,0.5);color:#ffe066;background:rgba(255,200,50,0.07);}
+    .tmit-status-pill.tmit-err{border-color:rgba(255,80,80,0.4);color:#ff6060;background:rgba(255,80,80,0.07);}
+    .tmit-btn-close,.tmit-btn-settings-toggle,.tmit-btn-refresh{background:rgba(0,0,0,0.3);border:1px solid rgba(151,2,173,0.25);color:#7a2090;border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all 0.15s;padding:0;line-height:1;}
+    .tmit-btn-close:hover,.tmit-btn-settings-toggle:hover,.tmit-btn-refresh:hover{border-color:#9702ad;color:#e040f0;background:rgba(151,2,173,0.12);box-shadow:0 0 8px rgba(151,2,173,0.3);}
+    .tmit-tab-bar{display:flex;border-bottom:1px solid rgba(151,2,173,0.2);flex-shrink:0;background:rgba(0,0,0,0.4);}
+    .tmit-tab{flex:1;padding:7px 0;font-size:11px;font-weight:600;text-align:center;cursor:pointer;color:#5a1068;border-bottom:2px solid transparent;transition:all 0.15s;letter-spacing:0.04em;user-select:none;}
+    .tmit-tab:hover{color:#c9a227;}
+    .tmit-tab.tmit-tab-active{color:#ffe066;border-bottom-color:#c9a227;background:rgba(201,162,39,0.04);}
+    .tmit-tab .tmit-tab-count{display:inline-block;margin-left:4px;font-size:9px;background:rgba(151,2,173,0.15);color:#9702ad;border-radius:8px;padding:0 5px;font-family:monospace;vertical-align:middle;}
+    .tmit-tab.tmit-tab-active .tmit-tab-count{background:rgba(201,162,39,0.3);}
+    .tmit-controls{padding:7px 12px;border-bottom:1px solid rgba(151,2,173,0.1);display:flex;gap:6px;align-items:center;flex-wrap:wrap;flex-shrink:0;background:rgba(0,0,0,0.35);}
+    .tmit-timeframe-group,.tmit-filter-group{display:flex;gap:3px;}
+    .tmit-tf-btn{background:rgba(0,0,0,0.4);border:1px solid rgba(151,2,173,0.15);color:#5a1068;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:monospace;}
+    .tmit-tf-btn:hover{border-color:#9702ad;color:#cc40f0;}
+    .tmit-tf-btn.tmit-active{background:rgba(151,2,173,0.15);border-color:#9702ad;color:#e040f0;box-shadow:0 0 6px rgba(151,2,173,0.25);}
+    .tmit-divider{width:1px;height:20px;background:rgba(151,2,173,0.15);margin:0 2px;}
+    .tmit-select{background:rgba(0,0,0,0.4);border:1px solid rgba(151,2,173,0.18);color:#c9a227;border-radius:4px;padding:3px 6px;font-size:11px;cursor:pointer;outline:none;font-family:'Inter',sans-serif;}
+    .tmit-select option{background:#120010;color:#f0d5f8;}
+    .tmit-search{flex:1;min-width:80px;background:rgba(0,0,0,0.4);border:1px solid rgba(151,2,173,0.18);border-radius:4px;color:#f0d5f8;font-size:11px;padding:3px 8px;outline:none;font-family:'Inter',sans-serif;}
+    .tmit-search::placeholder{color:#3a085a;}
+    .tmit-search:focus{border-color:rgba(151,2,173,0.5);}
+    .tmit-filter-row{padding:5px 12px;border-bottom:1px solid rgba(151,2,173,0.08);display:flex;gap:8px;align-items:center;flex-shrink:0;background:rgba(0,0,0,0.3);}
+    .tmit-filter-label{font-size:10px;color:#5a1068;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;white-space:nowrap;}
+    .tmit-input-sm{background:rgba(0,0,0,0.4);border:1px solid rgba(151,2,173,0.18);border-radius:4px;color:#f0d5f8;font-size:11px;padding:3px 8px;width:100px;outline:none;font-family:monospace;}
+    .tmit-input-sm:focus{border-color:rgba(151,2,173,0.5);}
+    .tmit-col-headers{display:grid;grid-template-columns:1fr 90px 90px 80px 44px;padding:5px 12px;border-bottom:1px solid rgba(151,2,173,0.12);flex-shrink:0;background:rgba(0,0,0,0.5);}
+    .tmit-col-hdr{font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#5a1068;cursor:pointer;user-select:none;transition:color 0.15s;}
+    .tmit-col-hdr:hover{color:#c9a227;}
+    .tmit-col-hdr.tmit-sorted{color:#c9a227;}
+    .tmit-col-hdr:not(:first-child){text-align:right;}
+    .tmit-list{overflow-y:auto;flex:1;scrollbar-width:thin;scrollbar-color:rgba(151,2,173,0.25) transparent;}
+    .tmit-list::-webkit-scrollbar{width:4px;}
+    .tmit-list::-webkit-scrollbar-track{background:transparent;}
+    .tmit-list::-webkit-scrollbar-thumb{background:rgba(151,2,173,0.25);border-radius:2px;}
+    .tmit-tab-panel{scrollbar-width:thin;scrollbar-color:rgba(151,2,173,0.5) rgba(255,255,255,0.04);}
+    .tmit-tab-panel::-webkit-scrollbar{width:5px;}
+    .tmit-tab-panel::-webkit-scrollbar-track{background:rgba(255,255,255,0.04);border-radius:3px;}
+    .tmit-tab-panel::-webkit-scrollbar-thumb{background:rgba(151,2,173,0.5);border-radius:3px;}
+    .tmit-tab-panel::-webkit-scrollbar-thumb:hover{background:rgba(151,2,173,0.8);}
+    .tmit-settings-panel{scrollbar-width:thin;scrollbar-color:rgba(151,2,173,0.5) rgba(255,255,255,0.04);}
+    .tmit-settings-panel::-webkit-scrollbar{width:5px;}
+    .tmit-settings-panel::-webkit-scrollbar-track{background:rgba(255,255,255,0.04);border-radius:3px;}
+    .tmit-settings-panel::-webkit-scrollbar-thumb{background:rgba(151,2,173,0.5);border-radius:3px;}
+    .tmit-settings-panel::-webkit-scrollbar-thumb:hover{background:rgba(151,2,173,0.8);}
+    .tmit-item-row{display:grid;grid-template-columns:1fr 90px 90px 80px 44px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,0.03);align-items:center;transition:background 0.12s;cursor:default;position:relative;}
+    .tmit-item-row:hover{background:rgba(151,2,173,0.05);}
+    .tmit-item-row.tmit-hot{background:linear-gradient(90deg,rgba(232,98,26,0.08) 0%,transparent 100%);border-left:2px solid #e8621a;}
+    .tmit-item-row.tmit-hot::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,#ffe066,#e8621a,#8b2500);box-shadow:0 0 6px rgba(232,98,26,0.6);}
+    .tmit-item-row.tmit-hot:hover{background:linear-gradient(90deg,rgba(232,98,26,0.13) 0%,transparent 100%);}
+    .tmit-item-row.tmit-hot-big{background:linear-gradient(90deg,rgba(232,98,26,0.14) 0%,transparent 70%);border-left:2px solid #ff6a00;animation:tmit-ember 2s ease-in-out infinite alternate;}
+    .tmit-item-row.tmit-hot-big::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,#fff0a0,#ff6a00,#8b2500);box-shadow:0 0 10px rgba(255,106,0,0.8);}
+    @keyframes tmit-ember{from{background:linear-gradient(90deg,rgba(232,98,26,0.10) 0%,transparent 70%);}to{background:linear-gradient(90deg,rgba(232,98,26,0.20) 0%,transparent 70%);}}
+    .tmit-item-row.tmit-icy{background:linear-gradient(90deg,rgba(61,214,200,0.07) 0%,transparent 100%);border-left:2px solid #3dd6c8;}
+    .tmit-item-row.tmit-icy::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,#e0ffff,#3dd6c8,#0a5a54);box-shadow:0 0 6px rgba(61,214,200,0.5);}
+    .tmit-item-row.tmit-icy:hover{background:linear-gradient(90deg,rgba(61,214,200,0.11) 0%,transparent 100%);}
+    .tmit-item-row.tmit-icy-big{background:linear-gradient(90deg,rgba(61,214,200,0.12) 0%,transparent 70%);border-left:2px solid #00e5ff;animation:tmit-frost 2.5s ease-in-out infinite alternate;}
+    .tmit-item-row.tmit-icy-big::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,#ffffff,#00e5ff,#005566);box-shadow:0 0 10px rgba(0,229,255,0.7);}
+    @keyframes tmit-frost{from{background:linear-gradient(90deg,rgba(61,214,200,0.08) 0%,transparent 70%);}to{background:linear-gradient(90deg,rgba(61,214,200,0.16) 0%,transparent 70%);}}
+    .tmit-item-row.tmit-pinned{border-left:2px solid #c9a227;background:rgba(201,162,39,0.04);}
+    .tmit-item-name{font-size:12px;font-weight:500;color:#e8caf5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px;}
+    .tmit-item-name .tmit-spike-icon{font-size:10px;margin-right:4px;}
+    .tmit-item-type{font-size:9px;color:#3a085a;margin-top:1px;}
+    .tmit-price{font-family:monospace;font-size:11px;color:#a840c0;text-align:right;}
+    .tmit-change{font-family:monospace;font-size:12px;font-weight:700;text-align:right;}
+    .tmit-change.up{color:#e8621a;text-shadow:0 0 8px rgba(232,98,26,0.5);}
+    .tmit-change.down{color:#3dd6c8;text-shadow:0 0 8px rgba(61,214,200,0.4);}
+    .tmit-change.flat{color:#3a085a;}
+    .tmit-signal{text-align:right;}
+    .tmit-signal-badge{display:inline-block;font-size:9px;font-weight:700;letter-spacing:0.06em;padding:2px 6px;border-radius:3px;text-transform:uppercase;}
+    .tmit-signal-badge.BUY{background:rgba(232,98,26,0.18);color:#ff8c42;border:1px solid rgba(232,98,26,0.4);text-shadow:0 0 6px rgba(232,98,26,0.4);}
+    .tmit-signal-badge.SELL{background:rgba(61,214,200,0.15);color:#3dd6c8;border:1px solid rgba(61,214,200,0.35);text-shadow:0 0 6px rgba(61,214,200,0.3);}
+    .tmit-signal-badge.HOLD{background:rgba(201,162,39,0.15);color:#c9a227;border:1px solid rgba(201,162,39,0.3);}
+    .tmit-signal-badge.WATCH{background:rgba(151,2,173,0.12);color:#cc40f0;border:1px solid rgba(151,2,173,0.28);cursor:pointer;transition:all 0.2s;}
+    .tmit-signal-badge.WATCH:hover{background:rgba(201,162,39,0.18);color:#ffe066;border-color:rgba(201,162,39,0.5);}
+    .tmit-signal-badge.WATCH.tmit-watched{background:rgba(201,162,39,0.22);color:#ffe066;border-color:#c9a227;box-shadow:0 0 7px rgba(201,162,39,0.45);}
+    .tmit-confidence-bar{display:flex;gap:2px;align-items:center;}
+    .tmit-conf-dot{width:5px;height:5px;border-radius:50%;background:rgba(151,2,173,0.12);}
+    .tmit-conf-dot.filled{background:#9702ad;box-shadow:0 0 3px rgba(151,2,173,0.5);}
+    .tmit-row-btn{background:none;border:none;cursor:pointer;font-size:13px;padding:2px;opacity:0.45;transition:opacity 0.15s;line-height:1;}
+    .tmit-row-btn:hover{opacity:1;}
+    .tmit-state-msg{padding:32px 20px;text-align:center;color:#3a085a;font-size:13px;line-height:1.7;}
+    .tmit-state-msg .tmit-state-icon{font-size:28px;margin-bottom:8px;}
+    .tmit-settings-panel{padding:14px 16px;border-top:1px solid rgba(151,2,173,0.18);background:rgba(0,0,0,0.5);display:none;flex-shrink:0;overflow-y:auto;max-height:320px;}
+    .tmit-settings-panel.tmit-open{display:block;}
+    .tmit-settings-title{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c9a227;margin-bottom:10px;}
+    .tmit-setting-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+    .tmit-setting-row label{font-size:11px;color:#7a2090;width:100px;flex-shrink:0;}
+    .tmit-setting-row input{flex:1;background:rgba(0,0,0,0.5);border:1px solid rgba(151,2,173,0.22);border-radius:4px;color:#f0d5f8;font-size:12px;padding:5px 9px;outline:none;font-family:monospace;}
+    .tmit-setting-row input:focus{border-color:rgba(151,2,173,0.55);}
+    .tmit-btn-save{margin-top:8px;background:linear-gradient(90deg,#c9a227 0%,#8b6e10 50%,#c9a227 100%);background-size:200%;border:none;border-radius:5px;color:#09000d;font-weight:700;font-size:12px;padding:6px 18px;cursor:pointer;font-family:'Inter',sans-serif;transition:background-position 0.4s,filter 0.15s;}
+    .tmit-btn-save:hover{background-position:right;filter:brightness(1.15);}
+    .tmit-footer{padding:5px 12px;border-top:1px solid rgba(151,2,173,0.1);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:rgba(0,0,0,0.6);}
+    .tmit-footer-stat{font-size:9px;color:#3a085a;font-family:monospace;}
+    .tmit-footer-stat span{color:#5a1068;}
+    .tmit-section-title{font-family:'Cinzel',serif;font-size:11px;font-weight:700;color:#c9a227;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid rgba(201,162,39,0.2);}
+    .tmit-war-form{margin-bottom:10px;}
+    .tmit-form-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+    .tmit-form-row label{font-size:10px;color:#5a1068;font-weight:600;width:120px;flex-shrink:0;text-transform:uppercase;letter-spacing:0.05em;}
+    .tmit-form-row2{display:flex;gap:8px;margin-bottom:6px;}
+    .tmit-form-row2 > div{flex:1;display:flex;flex-direction:column;gap:3px;}
+    .tmit-form-row2 label{font-size:9px;color:#5a1068;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;}
+    .tmit-input-full{width:100%;background:rgba(0,0,0,0.4);border:1px solid rgba(151,2,173,0.18);border-radius:4px;color:#f0d5f8;font-size:11px;padding:4px 8px;outline:none;font-family:monospace;}
+    .tmit-input-full:focus{border-color:rgba(151,2,173,0.5);}
+    .tmit-btn-calc{margin-top:6px;background:linear-gradient(90deg,#c9a227,#8b6e10);border:none;border-radius:5px;color:#09000d;font-weight:700;font-size:11px;padding:5px 16px;cursor:pointer;font-family:'Inter',sans-serif;transition:filter 0.15s;}
+    .tmit-btn-calc:hover{filter:brightness(1.2);}
+    .tmit-calc-result{background:rgba(0,0,0,0.35);border:1px solid rgba(151,2,173,0.2);border-radius:6px;padding:10px 12px;margin-top:8px;font-size:11px;line-height:1.8;}
+    .tmit-calc-result .tmit-result-row{display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
+    .tmit-calc-result .tmit-result-row:last-child{border-bottom:none;}
+    .tmit-result-label{color:#7a2090;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;}
+    .tmit-result-val{color:#f0d5f8;font-family:monospace;font-weight:600;}
+    .tmit-result-val.gold{color:#ffe066;}
+    .tmit-result-val.hot{color:#e8621a;}
+    .tmit-result-val.icy{color:#3dd6c8;}
+    .tmit-result-val.green{color:#50dc82;}
+    .tmit-war-tracker{margin-top:4px;}
+    .tmit-war-row{display:grid;grid-template-columns:1fr 80px 80px 70px 55px;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.04);align-items:center;font-size:11px;border-radius:3px;margin-bottom:1px;}
+    .tmit-war-row:hover{background:rgba(151,2,173,0.05);}
+    .tmit-war-row.yellow-item{border-left:2px solid #ffe066;}
+    .tmit-war-row.orange-item{border-left:2px solid #e8621a;}
+    .tmit-war-row.red-item{border-left:2px solid #ff4040;}
+    .tmit-war-name{color:#e8caf5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .tmit-war-price{color:#a840c0;font-family:monospace;font-size:10px;text-align:right;}
+    .tmit-war-bb{color:#ffe066;font-family:monospace;font-size:10px;text-align:right;}
+    .tmit-war-chg{font-family:monospace;font-size:10px;font-weight:700;text-align:right;}
+    .tmit-travel-row{display:grid;grid-template-columns:24px 1fr 90px 80px 70px;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.04);align-items:center;cursor:pointer;border-radius:3px;transition:background 0.12s;}
+    .tmit-travel-row:hover{background:rgba(151,2,173,0.06);}
+    .tmit-travel-row.rank1{border-left:2px solid #ffe066;background:rgba(201,162,39,0.05);}
+    .tmit-travel-row.rank2{border-left:2px solid #c0c0c0;}
+    .tmit-travel-row.rank3{border-left:2px solid #cd7f32;}
+    .tmit-travel-flag{font-size:14px;}
+    .tmit-travel-dest{font-size:12px;font-weight:500;color:#e8caf5;}
+    .tmit-travel-sub{font-size:9px;color:#5a1068;margin-top:1px;}
+    .tmit-travel-pph{font-family:monospace;font-size:12px;font-weight:700;color:#e8621a;text-align:right;}
+    .tmit-travel-pph.top{color:#ffe066;text-shadow:0 0 8px rgba(255,224,102,0.4);}
+    .tmit-travel-time{font-family:monospace;font-size:10px;color:#5a1068;text-align:right;}
+    .tmit-travel-stock{font-size:9px;text-align:right;font-family:monospace;}
+    .tmit-travel-stock.yata{color:#50dc82;}
+    .tmit-travel-stock.assumed{color:#5a1068;}
+    .tmit-travel-detail-card{background:rgba(0,0,0,0.3);border:1px solid rgba(151,2,173,0.18);border-radius:6px;padding:10px 12px;}
+    .tmit-session-bar{padding:4px 12px;background:rgba(0,0,0,0.4);border-bottom:1px solid rgba(151,2,173,0.1);display:flex;gap:12px;align-items:center;font-size:10px;font-family:monospace;flex-shrink:0;}
+    .tmit-session-item{display:flex;align-items:center;gap:4px;color:#5a1068;}
+    .tmit-session-val{color:#a840c0;font-weight:600;}
+    .tmit-session-val.positive{color:#50dc82;}
+    .tmit-session-val.hot{color:#e8621a;}
+    .tmit-age-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:3px;}
+    .tmit-age-fresh{background:#50dc82;}
+    .tmit-age-stale{background:#c9a227;}
+    .tmit-age-old{background:#ff6060;}
+    .tmit-btn-export{background:none;border:1px solid rgba(151,2,173,0.2);color:#5a1068;border-radius:4px;padding:3px 8px;font-size:10px;cursor:pointer;transition:all 0.15s;font-family:'Inter',sans-serif;font-weight:600;}
+    .tmit-btn-export:hover{border-color:#9702ad;color:#cc40f0;}
+    .tmit-btn-retry{display:inline-block;margin-top:8px;background:rgba(151,2,173,0.15);border:1px solid rgba(151,2,173,0.3);border-radius:5px;color:#9702ad;font-size:11px;font-weight:600;padding:5px 14px;cursor:pointer;font-family:'Inter',sans-serif;}
+    .tmit-btn-retry:hover{background:rgba(151,2,173,0.25);}
+    .tmit-skeleton{background:linear-gradient(90deg,rgba(255,255,255,0.03) 0%,rgba(255,255,255,0.07) 50%,rgba(255,255,255,0.03) 100%);background-size:200% 100%;animation:tmit-shimmer 1.4s infinite;border-radius:3px;height:10px;margin:4px 0;}
+    @keyframes tmit-shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+    .tmit-help{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:50%;background:rgba(151,2,173,0.12);border:1px solid rgba(151,2,173,0.25);color:#9702ad;font-size:8px;font-weight:700;cursor:help;margin-left:4px;position:relative;vertical-align:middle;flex-shrink:0;}
+    .tmit-help::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);right:0;left:auto;transform:none;background:#1a0020;border:1px solid rgba(151,2,173,0.3);border-radius:6px;padding:8px 11px;font-size:10px;color:#e8c8f5;white-space:pre-line;width:220px;line-height:1.6;z-index:999999;opacity:0;pointer-events:none;transition:opacity 0.15s;box-shadow:0 6px 24px rgba(0,0,0,0.7);font-family:'Inter',sans-serif;font-weight:400;letter-spacing:0;text-transform:none;}
+    .tmit-help:hover::after{opacity:1;}
+    #tmit-onboard{position:fixed;bottom:28px;left:28px;z-index:9999999;animation:tmit-slidein 0.4s cubic-bezier(0.16,1,0.3,1);}
+    @keyframes tmit-slidein{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+    .tmit-onboard-card{background:linear-gradient(160deg,#1a0020 0%,#09000d 100%);border:1px solid #9702ad;border-top:3px solid #c9a227;border-radius:12px;width:340px;padding:18px 18px 14px;box-shadow:0 0 40px rgba(151,2,173,0.18),0 16px 48px rgba(0,0,0,0.8);position:relative;}
+    .tmit-onboard-logo{width:56px;height:56px;border-radius:50%;border:2px solid #c9a227;margin:0 auto 14px;display:block;}
+    .tmit-onboard-title{font-family:'Cinzel',serif;font-size:18px;font-weight:700;color:#c9a227;text-align:center;margin-bottom:4px;letter-spacing:0.05em;}
+    .tmit-onboard-subtitle{font-size:11px;color:#5a1068;text-align:center;margin-bottom:20px;}
+    .tmit-onboard-step{display:none;}
+    .tmit-onboard-step.active{display:block;}
+    .tmit-onboard-step-title{font-size:13px;font-weight:700;color:#f0d5f8;margin-bottom:8px;}
+    .tmit-onboard-step-body{font-size:12px;color:#7a2090;line-height:1.7;margin-bottom:16px;}
+    .tmit-onboard-step-body b{color:#c9a227;}
+    .tmit-onboard-step-body code{background:rgba(0,0,0,0.4);border:1px solid rgba(151,2,173,0.2);border-radius:3px;padding:1px 5px;font-family:monospace;font-size:11px;color:#ffe066;}
+    .tmit-onboard-input{width:100%;background:rgba(0,0,0,0.5);border:1px solid rgba(151,2,173,0.3);border-radius:6px;color:#f0d5f8;font-family:monospace;font-size:13px;padding:9px 12px;outline:none;margin-bottom:8px;}
+    .tmit-onboard-input:focus{border-color:#9702ad;}
+    .tmit-onboard-validate{font-size:11px;font-family:monospace;min-height:16px;margin-bottom:8px;}
+    .tmit-onboard-validate.ok{color:#50dc82;}
+    .tmit-onboard-validate.err{color:#ff6060;}
+    .tmit-onboard-validate.loading{color:#c9a227;}
+    .tmit-onboard-capacity-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+    .tmit-onboard-cap-val{font-family:'Cinzel',serif;font-size:28px;color:#ffe066;font-weight:700;text-shadow:0 0 16px rgba(255,224,102,0.5);}
+    .tmit-onboard-cap-detail{font-size:10px;color:#5a1068;line-height:1.6;}
+    .tmit-onboard-tab-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;}
+    .tmit-onboard-tab-card{background:rgba(0,0,0,0.3);border:1px solid rgba(151,2,173,0.15);border-radius:6px;padding:6px 8px;}
+    .tmit-onboard-tab-card .tab-icon{font-size:16px;}
+    .tmit-onboard-tab-card .tab-name{font-size:11px;font-weight:700;color:#c9a227;margin:3px 0 2px;}
+    .tmit-onboard-tab-card .tab-desc{font-size:10px;color:#5a1068;line-height:1.5;}
+    .tmit-onboard-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+    .tmit-onboard-dots{display:flex;gap:5px;}
+    .tmit-onboard-dot{width:6px;height:6px;border-radius:50%;background:rgba(151,2,173,0.2);transition:background 0.2s;}
+    .tmit-onboard-dot.active{background:#9702ad;}
+    .tmit-onboard-btn{background:linear-gradient(90deg,#c9a227,#8b6e10);border:none;border-radius:6px;color:#09000d;font-weight:700;font-size:13px;padding:8px 20px;cursor:pointer;font-family:'Inter',sans-serif;transition:filter 0.15s;}
+    .tmit-onboard-btn:hover{filter:brightness(1.15);}
+    .tmit-onboard-btn:disabled{opacity:0.4;cursor:default;}
+    .tmit-onboard-skip{font-size:11px;color:#3a085a;cursor:pointer;text-decoration:underline;background:none;border:none;padding:0;}
+    .tmit-onboard-skip:hover{color:#7a2090;}
   `);
 
-  // ── API calls ─────────────────────────────────────────────────────────────────
+  // â”€â”€ API calls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   // apiGet with a custom timeout
-  // Core HTTP helper — uses Promise.race to guarantee timeout fires
+  // Core HTTP helper â€” uses Promise.race to guarantee timeout fires
   // even if GM_xmlhttpRequest ignores the timeout field (some browsers/versions do)
   function _gmFetch(url) {
     return new Promise((resolve, reject) => {
@@ -738,12 +825,12 @@
     );
   }
 
-  // apiGet — 12s hard timeout via Promise.race
+  // apiGet â€” 12s hard timeout via Promise.race
   function apiGet(url) {
     return Promise.race([_gmFetch(url), _timeout(12000, 'API call')]);
   }
 
-  // apiGetWithTimeout — custom timeout via Promise.race
+  // apiGetWithTimeout â€” custom timeout via Promise.race
   function apiGetWithTimeout(url, timeoutMs) {
     return Promise.race([
       _gmFetch(url).catch(() => ({ _error: 'network' })),
@@ -751,21 +838,21 @@
     ]);
   }
 
-  // ── Price fetching ────────────────────────────────────────────────────────
+  // â”€â”€ Price fetching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   //
   // Each poll:
-  //   1. Fetch torn/items — metadata (name, type) + market_value for all items
+  //   1. Fetch torn/items â€” metadata (name, type) + market_value for all items
   //   2. Fetch YATA prices in parallel
   //   3. Fetch live market listings for up to MAX_LIVE_ITEMS priority items
   //   4. Record snapshot: live price if available, else YATA, else market_value
-  //      BUT only record market_value if it changed — avoids flat history poison
+  //      BUT only record market_value if it changed â€” avoids flat history poison
   //
   const MAX_LIVE_ITEMS   = 15;
   const METADATA_TTL_MS  = 6 * 60 * 60 * 1000
   let   lastMetadataFetch = load('lastMetadataFetch', 0);
 
-  // Fetch all items — metadata + market_value fallback prices
-  // Cached for 6h in GM storage — most page loads skip this entirely
+  // Fetch all items â€” metadata + market_value fallback prices
+  // Cached for 6h in GM storage â€” most page loads skip this entirely
   async function fetchAllItems(apiKey) {
     const now = Date.now();
     const hasMeta = Object.keys(itemMeta).length > 0;
@@ -775,16 +862,16 @@
     if (hasMeta && !isStale) return {};
 
     // If we have stale cached data, try to refresh but don't block the poll
-    // — use a reasonable timeout and fall back gracefully
+    // â€” use a reasonable timeout and fall back gracefully
     try {
       const data = await apiGetWithTimeout(
         `https://api.torn.com/torn/?selections=items&key=${apiKey}&comment=TEEM`,
         20000
       );
       if (data?._error) {
-        // Timeout or network error — use cached data if available
+        // Timeout or network error â€” use cached data if available
         if (hasMeta) return {};
-        throw new Error('Torn API unreachable — check your connection');
+        throw new Error('Torn API unreachable â€” check your connection');
       }
       if (data?.error) {
         if (hasMeta) return {};
@@ -826,7 +913,7 @@
   }
 
   // Build priority list for live fetches
-  // High-traffic items always fetched live — these drive most market signals
+  // High-traffic items always fetched live â€” these drive most market signals
   // IDs verified from torn/items API (May 2026)
   const ALWAYS_LIVE_IDS = new Set([
     206,  // Xanax
@@ -962,13 +1049,13 @@
 
     const changePct = ((effectivePrice - oldestPrice) / oldestPrice) * 100;
 
-    // Volatility — std dev of price changes in window
+    // Volatility â€” std dev of price changes in window
     const prices = effectiveWindow.map(h => h.price || h.yataPrice || 0).filter(Boolean);
     const mean = prices.reduce((a, b) => a + b, 0) / prices.length;
     const variance = prices.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / prices.length;
     const volatility = Math.sqrt(variance) / mean * 100;
 
-    // Trend — simple linear regression slope
+    // Trend â€” simple linear regression slope
     const n = effectiveWindow.length;
     const xs = effectiveWindow.map((_, i) => i);
     const ys = effectiveWindow.map(h => h.price || h.yataPrice || 0);
@@ -1032,7 +1119,7 @@
       if (result) { results.push(result); seen.add(parseInt(idStr)); }
     }
 
-    // Items in itemMeta with no history yet — show with market_value as price
+    // Items in itemMeta with no history yet â€” show with market_value as price
     for (const [idStr, meta] of Object.entries(itemMeta)) {
       const id = parseInt(idStr);
       if (seen.has(id)) continue;
@@ -1092,7 +1179,7 @@
     try {
       // Only show loading spinner if no cached data is displayed yet
       const hasDisplayedData = Object.keys(priceHistory).length > 0;
-      if (!hasDisplayedData) setStatus('loading', 'Fetching…');
+      if (!hasDisplayedData) setStatus('loading', 'Fetchingâ€¦');
 
       // Step 1: Fetch all items + YATA in parallel
       // fetchAllItems returns {} if itemMeta cache is still fresh
@@ -1124,7 +1211,7 @@
       // Always rebuild seenTypes from current itemMeta
       for (const m of Object.values(itemMeta)) { if (m.type) seenTypes.add(m.type); }
 
-      // Step 3: Resolve travel IDs — skip temp seeded entries (no real numeric ID)
+      // Step 3: Resolve travel IDs â€” skip temp seeded entries (no real numeric ID)
       resolveTravelItemIds(
         Object.fromEntries(
           Object.entries(itemMeta)
@@ -1172,7 +1259,7 @@
           const hist = priceHistory[id];
           const lastMv = hist?.length ? hist[hist.length - 1].price : -1;
           if (mv === lastMv) {
-            // mv unchanged — still record yata update if we have one
+            // mv unchanged â€” still record yata update if we have one
             if (yataPrice > 0) appendHistory(id, 0, yataPrice);
             continue;
           }
@@ -1194,8 +1281,8 @@
       saveHistory();
 
       const liveCount = Object.keys(livePrices).length;
-      const srcLabel  = liveCount > 0 ? `⚡ ${liveCount} live` : '~ Avg';
-      setStatus('ok', `${srcLabel} · ${new Date().toLocaleTimeString()}`);
+      const srcLabel  = liveCount > 0 ? `âš¡ ${liveCount} live` : '~ Avg';
+      setStatus('ok', `${srcLabel} Â· ${new Date().toLocaleTimeString()}`);
 
       // Fetch inventory for buy/sell features
       try {
@@ -1214,7 +1301,6 @@
       recomputeTravel();
       renderList();
       if (settings.activeTab === 'travel') renderTravelTab();
-      populateWarItemDropdown();
     } catch(e) { setStatus('err', e.message.slice(0, 50)); }
   }
 
@@ -1222,9 +1308,6 @@
     if (!settings.apiKey) return;
     try {
       await fetchMyBattleStats(settings.apiKey);
-      // Re-render stats tab if active
-      if (settings.activeTab === 'stats') renderStatsTab();
-      // Update session tracker bars
       updateSessionTracker();
     } catch(e) { /* silent */ }
   }
@@ -1249,7 +1332,7 @@
     }, Math.min(statsMs / 2, 15000));
   }
 
-  // ── UI ────────────────────────────────────────────────────────────────────────
+  // â”€â”€ UI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function buildUI() {
     if (uiBuilt) return;
@@ -1258,8 +1341,8 @@
     // FAB
     const fab = document.createElement('div');
     fab.id = 'tmit-fab';
-    fab.innerHTML = `<img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🐘%3C/text%3E%3C/svg%3E" style="width:34px;height:34px;border-radius:50%;pointer-events:none;" draggable="false"><div class="tmit-alert-dot"></div>`;
-    fab.title = "TEEM — Torn's Elephant Economy Manager";
+    fab.innerHTML = `<img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3EðŸ˜%3C/text%3E%3C/svg%3E" style="width:34px;height:34px;border-radius:50%;pointer-events:none;" draggable="false"><div class="tmit-alert-dot"></div>`;
+    fab.title = "TEEM â€” Torn's Elephant Economy Manager";
     document.body.appendChild(fab);
 
     // Panel
@@ -1269,34 +1352,33 @@
     panel.innerHTML = `
       <div class="tmit-header" id="tmit-drag-handle">
         <div class="tmit-title">
-          <img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🐘%3C/text%3E%3C/svg%3E" style="width:22px;height:22px;border-radius:50%;flex-shrink:0;" draggable="false">
+          <img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3EðŸ˜%3C/text%3E%3C/svg%3E" style="width:22px;height:22px;border-radius:50%;flex-shrink:0;" draggable="false">
           Elephant Economy Manager
         </div>
         <div class="tmit-header-right">
-          <span class="tmit-status-pill" id="tmit-status">Loading…</span>
-          <button class="tmit-btn-refresh" id="tmit-btn-refresh" title="Refresh now">↻</button>
-          <button class="tmit-btn-settings-toggle" id="tmit-btn-settings-toggle" title="Settings">⚙</button>
-          <button class="tmit-btn-close" id="tmit-btn-close" title="Close">✕</button>
+          <span class="tmit-status-pill" id="tmit-status">Loadingâ€¦</span>
+          <button class="tmit-btn-refresh" id="tmit-btn-refresh" title="Refresh now">â†»</button>
+          <button class="tmit-btn-settings-toggle" id="tmit-btn-settings-toggle" title="Settings">âš™</button>
+          <button class="tmit-btn-close" id="tmit-btn-close" title="Close">âœ•</button>
         </div>
       </div>
 
       <div class="tmit-session-bar" id="tmit-session-bar">
-        <div class="tmit-session-item">📦 Inventory: <span class="tmit-session-val" id="tmit-sess-inv">—</span></div>
-        <div class="tmit-session-item">💰 Session: <span class="tmit-session-val positive" id="tmit-sess-profit">$0</span></div>
+        <div class="tmit-session-item">ðŸ“¦ Inventory: <span class="tmit-session-val" id="tmit-sess-inv">â€”</span></div>
+        <div class="tmit-session-item">ðŸ’° Session: <span class="tmit-session-val positive" id="tmit-sess-profit">$0</span></div>
         <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
           <span id="tmit-age-dot" class="tmit-age-dot tmit-age-fresh"></span>
-          <span id="tmit-age-text" style="color:#3a2a5a;font-size:9px">—</span>
-          <button class="tmit-btn-export" id="tmit-btn-export" title="Export current view to CSV">⬇ CSV</button>
+          <span id="tmit-age-text" style="color:#3a2a5a;font-size:9px">â€”</span>
+          <button class="tmit-btn-export" id="tmit-btn-export" title="Export current view to CSV">â¬‡ CSV</button>
         </div>
       </div>
 
       <div class="tmit-tab-bar">
         <div class="tmit-tab tmit-tab-active" data-tab="all">Market</div>
-        <div class="tmit-tab" data-tab="watchlist">⭐ Watch <span class="tmit-tab-count" id="tmit-watch-count">0</span></div>
-        <div class="tmit-tab" data-tab="war">⚔ War Gear</div>
-        <div class="tmit-tab" data-tab="travel">✈ Travel</div>
-        <div class="tmit-tab" data-tab="stats">⚔ Stats</div>
-        <div class="tmit-tab" data-tab="quick">⚡ Quick</div>
+        <div class="tmit-tab" data-tab="watchlist">â­ Watch <span class="tmit-tab-count" id="tmit-watch-count">0</span></div>
+        <div class="tmit-tab" data-tab="war">âš” War Gear</div>
+        <div class="tmit-tab" data-tab="travel">âœˆ Travel</div>
+        <div class="tmit-tab" data-tab="quick">âš¡ Quick</div>
       </div>
 
       <div class="tmit-controls">
@@ -1312,15 +1394,15 @@
             `<option value="${c}"${c === settings.selectedCategory ? ' selected' : ''}>${c}</option>`
           ).join('')}
         </select>
-        <input type="text" class="tmit-search" id="tmit-search" placeholder="Search items…">
+        <input type="text" class="tmit-search" id="tmit-search" placeholder="Search itemsâ€¦">
       </div>
 
       <div class="tmit-filter-row">
         <span class="tmit-filter-label">Budget</span>
         <input type="number" class="tmit-input-sm" id="tmit-budget-input"
-          placeholder="Max price…" value="${settings.maxBudget || ''}">
+          placeholder="Max priceâ€¦" value="${settings.maxBudget || ''}">
         <div class="tmit-divider"></div>
-        <span class="tmit-filter-label">Min Δ%</span>
+        <span class="tmit-filter-label">Min Î”%</span>
         <input type="number" class="tmit-input-sm" id="tmit-minpct-input"
           placeholder="e.g. 5" value="${settings.minProfit || ''}">
       </div>
@@ -1330,176 +1412,47 @@
         <div class="tmit-col-hdr${settings.sortBy === 'price' ? ' tmit-sorted' : ''}" data-sort="price">Price</div>
         <div class="tmit-col-hdr${settings.sortBy === 'profit_pct' ? ' tmit-sorted' : ''}" data-sort="profit_pct">Change <span class="tmit-help" data-tip="${TOOLTIPS.change}">?</span></div>
         <div class="tmit-col-hdr${settings.sortBy === 'signal' ? ' tmit-sorted' : ''}" data-sort="signal">Signal <span class="tmit-help" data-tip="${TOOLTIPS.signal}">?</span></div>
+        <div class="tmit-col-hdr"></div>
       </div>
 
       <div class="tmit-list" id="tmit-list">
         <div class="tmit-state-msg">
-          <div class="tmit-state-icon">💎</div>
-          ${settings.apiKey ? 'Fetching market data…' : 'Open ⚙ settings and enter your Torn API key.'}
+          <div class="tmit-state-icon">ðŸ’Ž</div>
+          ${settings.apiKey ? 'Fetching market dataâ€¦' : 'Open âš™ settings and enter your Torn API key.'}
         </div>
       </div>
 
       <!-- War Gear Tab -->
       <div id="tmit-war-panel" class="tmit-tab-panel" style="display:none;flex:1;overflow-y:auto;padding:12px;">
-        <div class="tmit-section-title">⚔ Ranked War Weapon &amp; Armor Calculator</div>
-        <div class="tmit-war-form">
-
-          <!-- Item picker -->
-          <div class="tmit-form-row" style="margin-bottom:3px;">
-            <label>Search</label>
-            <input type="text" id="tmit-war-item-search" placeholder="Type to filter items…"
-              class="tmit-input-full" style="flex:1;">
-          </div>
-          <div class="tmit-form-row" style="margin-bottom:3px;">
-            <label>Item</label>
-            <select id="tmit-war-item-select" class="tmit-select" style="flex:1;">
-              <option value="">— Type above to search —</option>
-            </select>
-          </div>
-          <div style="font-size:9px;color:#3a2a5a;margin-bottom:8px;padding-left:2px;">
-            Search by name to find your weapon or armour. Selecting one auto-fills the type field.
-          </div>
-
-          <!-- Type + Rarity + Bonuses count — all auto-populated where possible -->
-          <div class="tmit-form-row2" style="margin-bottom:6px;">
-            <div>
-              <label>Type <span style="font-size:8px;color:#3a2a5a;">(auto)</span></label>
-              <select id="tmit-war-type" class="tmit-select">
-                <option value="">— Select —</option>
-                <option value="Pistol/SMG">Pistol / SMG</option>
-                <option value="Melee">Melee</option>
-                <option value="Shotgun/Rifle">Shotgun / Rifle</option>
-                <option value="Heavies">Heavies</option>
-                <option value="Armour">Armour</option>
-              </select>
-            </div>
-            <div>
-              <label>Rarity</label>
-              <select id="tmit-war-rarity" class="tmit-select">
-                <option value="">— Select —</option>
-                <option value="yellow">🟡 Yellow</option>
-                <option value="orange">🟠 Orange</option>
-                <option value="red">🔴 Red</option>
-              </select>
-            </div>
-            <div>
-              <label># Bonuses</label>
-              <select id="tmit-war-bonuses" class="tmit-select">
-                <option value="0">0 (Yellow)</option>
-                <option value="1">1</option>
-                <option value="2">2</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Bonus dropdowns — populated from type -->
-          <div class="tmit-form-row2" style="margin-bottom:8px;">
-            <div style="flex:1;">
-              <label>Bonus 1 <span style="font-size:8px;color:#3a2a5a;">(from item)</span></label>
-              <select id="tmit-war-bonus1-sel" class="tmit-select">
-                <option value="">— pick type first —</option>
-              </select>
-            </div>
-            <div style="flex:1;" id="tmit-war-bonus2-wrap" style="display:none;">
-              <label>Bonus 2 <span style="font-size:8px;color:#3a2a5a;">(orange/red)</span></label>
-              <select id="tmit-war-bonus2-sel" class="tmit-select">
-                <option value="">— None —</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Stats from in-game description -->
-          <div style="font-size:9px;font-weight:700;color:#6a5a8a;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:5px;">
-            Stats <span style="font-weight:400;color:#3a2a5a;">— from in-game item description</span>
-          </div>
-          <div class="tmit-form-row2">
-            <div><label>Damage</label><input type="number" id="tmit-war-damage" placeholder="e.g. 52" class="tmit-input-sm"></div>
-            <div><label>Accuracy</label><input type="number" id="tmit-war-accuracy" placeholder="e.g. 68" class="tmit-input-sm"></div>
-            <div><label>Armor</label><input type="number" id="tmit-war-armor" placeholder="0" class="tmit-input-sm"></div>
-          </div>
-          <div class="tmit-form-row2" style="margin-top:4px;">
-            <div><label>Stealth</label><input type="number" id="tmit-war-stealth" placeholder="0-100" class="tmit-input-sm"></div>
-            <div><label>Quality</label><input type="number" id="tmit-war-qual" placeholder="0" class="tmit-input-sm"></div>
-          </div>
-
-          <input type="hidden" id="tmit-war-name" value="">
-          <input type="hidden" id="tmit-war-bonus1" value="">
-          <input type="hidden" id="tmit-war-bonus2" value="">
-          <button class="tmit-btn-calc" style="margin-top:10px;width:100%;" id="tmit-war-calc">⚔ Calculate Score &amp; BB Value</button>
-        </div>
-        <div id="tmit-war-result" class="tmit-calc-result" style="display:none;"></div>
-
-        <div class="tmit-section-title" style="margin-top:14px;">📈 War Gear Price Tracker</div>
+        <div class="tmit-section-title">âš” War Gear Price Tracker</div>
         <div style="display:grid;grid-template-columns:1fr 80px 80px 70px 55px;padding:4px 8px;background:rgba(0,0,0,0.4);border:1px solid rgba(201,162,39,0.12);border-radius:4px 4px 0 0;margin-bottom:1px;">
           <div class="tmit-col-hdr">Item Name</div>
           <div class="tmit-col-hdr" style="text-align:right">Price</div>
           <div class="tmit-col-hdr" style="text-align:right">BB Value</div>
           <div class="tmit-col-hdr" style="text-align:right">$ equiv</div>
-          <div class="tmit-col-hdr" style="text-align:right">Δ%</div>
+          <div class="tmit-col-hdr" style="text-align:right">Î”%</div>
         </div>
         <div id="tmit-war-tracker-list" class="tmit-war-tracker">
           <div class="tmit-state-msg" style="padding:16px 0;">
-            <div class="tmit-state-icon" style="font-size:20px">⚔</div>
+            <div class="tmit-state-icon" style="font-size:20px">âš”</div>
             War gear prices appear here once the market poll detects weapon/armor items.
           </div>
         </div>
       </div>
 
-      <!-- BB Calculator Tab -->
-      <div id="tmit-bb-panel" class="tmit-tab-panel" style="display:none;flex:1;overflow-y:auto;padding:12px;">
-        <div class="tmit-section-title">🪙 Bunker Bucks Calculator</div>
-
-        <div class="tmit-bb-balance-row">
-          <span class="tmit-filter-label">Your BB Balance:</span>
-          <span id="tmit-bb-balance-val" class="tmit-bb-bignum">—</span>
-          <span class="tmit-filter-label" style="margin-left:12px;">$M per BB:</span>
-          <input type="number" id="tmit-bb-rate" class="tmit-input-sm"
-            value="${(bbPerDollar/1000000).toFixed(1)}" step="0.5" min="1" max="50"
-            title="Current market rate of 1 BB in dollars (millions)">
-        </div>
-
-        <div class="tmit-section-title" style="margin-top:10px;">Trade-In Values</div>
-        <div id="tmit-bb-tradein" class="tmit-bb-table"></div>
-
-        <div class="tmit-section-title" style="margin-top:12px;">Cache Costs</div>
-        <div id="tmit-bb-caches" class="tmit-bb-table"></div>
-
-        <div class="tmit-section-title" style="margin-top:12px;">Grind Estimator</div>
-        <div class="tmit-war-form">
-          <div class="tmit-form-row2">
-            <div>
-              <label>Target Item</label>
-              <select id="tmit-bb-target" class="tmit-select" style="width:100%">
-                ${Object.keys(BB_CACHE_COSTS).map(k => `<option value="${k}">${k}</option>`).join('')}
-              </select>
-            </div>
-            <div>
-              <label>Avg BB / War</label>
-              <input type="number" id="tmit-bb-per-war" placeholder="e.g. 30" class="tmit-input-sm" value="30">
-            </div>
-            <div>
-              <label>Wars / Week</label>
-              <input type="number" id="tmit-bb-wars-week" placeholder="e.g. 3" class="tmit-input-sm" value="3">
-            </div>
-          </div>
-          <button class="tmit-btn-calc" id="tmit-bb-calc">Calculate Grind</button>
-        </div>
-        <div id="tmit-bb-grind-result" class="tmit-calc-result" style="display:none;"></div>
-      </div>
-
       <!-- Travel Tab -->
       <div id="tmit-travel-panel" class="tmit-tab-panel" style="display:none;flex:1;overflow-y:auto;padding:12px;">
-        <div class="tmit-section-title">✈ Travel Profit Rankings</div>
+        <div class="tmit-section-title">âœˆ Travel Profit Rankings</div>
 
         <!-- Flight type + carry capacity -->
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:6px;padding:7px 9px;background:rgba(0,0,0,0.25);border-radius:6px;border:1px solid rgba(201,162,39,0.1);">
           <div style="display:flex;align-items:center;gap:5px;">
             <span style="font-size:9px;color:#6a5a8a;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Flight</span>
             <select id="tmit-flight-type" class="tmit-select" style="font-size:10px;">
-              <option value="economy"  ${settings.flightType==='economy'  ?'selected':''}>✈ Economy</option>
-              <option value="airstrip" ${settings.flightType==='airstrip' ?'selected':''}>🛫 Airstrip (−30%)</option>
-              <option value="business" ${settings.flightType==='business' ?'selected':''}>💺 Business (−50%)</option>
-              <option value="wlt"      ${settings.flightType==='wlt'      ?'selected':''}>🌟 WLT (−50%)</option>
+              <option value="economy"  ${settings.flightType==='economy'  ?'selected':''}>âœˆ Economy</option>
+              <option value="airstrip" ${settings.flightType==='airstrip' ?'selected':''}>ðŸ›« Airstrip (âˆ’30%)</option>
+              <option value="business" ${settings.flightType==='business' ?'selected':''}>ðŸ’º Business (âˆ’50%)</option>
+              <option value="wlt"      ${settings.flightType==='wlt'      ?'selected':''}>ðŸŒŸ WLT (âˆ’50%)</option>
             </select>
           </div>
           <div style="display:flex;align-items:center;gap:5px;">
@@ -1508,7 +1461,7 @@
               value="${settings.carryCapacity || 10}" min="1" max="100" style="width:52px;font-size:11px;">
             <span style="font-size:9px;color:#4a3a6a;">items</span>
           </div>
-          <button class="tmit-btn-calc" style="margin:0;margin-left:auto;padding:4px 10px;font-size:10px;" id="tmit-travel-refresh">↻</button>
+          <button class="tmit-btn-calc" style="margin:0;margin-left:auto;padding:4px 10px;font-size:10px;" id="tmit-travel-refresh">â†»</button>
         </div>
 
         <!-- Alert conditions -->
@@ -1538,12 +1491,12 @@
 
         <div id="tmit-travel-list">
           <div class="tmit-state-msg">
-            <div class="tmit-state-icon">✈</div>
+            <div class="tmit-state-icon">âœˆ</div>
             Travel data loads with the next market poll.
           </div>
         </div>
 
-        <div class="tmit-section-title" style="margin-top:14px;">📋 Trip Details</div>
+        <div class="tmit-section-title" style="margin-top:14px;">ðŸ“‹ Trip Details</div>
         <div id="tmit-travel-detail" style="font-size:11px;color:#5a4a7a;padding:6px 0;">
           Click a destination above to see trip details.
         </div>
@@ -1551,12 +1504,12 @@
 
       <!-- Quick Items Tab -->
       <div id="tmit-quick-panel" class="tmit-tab-panel" style="display:none;flex:1;overflow-y:auto;padding:12px;">
-        <div class="tmit-section-title">⚡ Quick Use Items</div>
+        <div class="tmit-section-title">âš¡ Quick Use Items</div>
         <div style="font-size:10px;color:#4a3a6a;margin-bottom:10px;line-height:1.6;">
-          Save items here for one-click use on the
-          <a href="https://www.torn.com/item.php" style="color:#c9a227;text-decoration:none;">Items page</a>.
-          TEEM injects a bar at the top of the items page with your saved items.
-          Clicking one auto-clicks through Torn's use confirmation for you.
+          Pin items here for fast access. TEEM injects a bar at the top of the
+          <a href="https://www.torn.com/item.php" style="color:#c9a227;text-decoration:none;">Items page</a>
+          with your saved items. Clicking one scrolls directly to that item —
+          if you're elsewhere, TEEM navigates there automatically.
         </div>
         <div style="display:flex;gap:6px;margin-bottom:10px;">
           <input type="text" id="tmit-quick-add-name" placeholder="e.g. Xanax"
@@ -1566,119 +1519,33 @@
         <div id="tmit-quick-list" style="display:flex;flex-direction:column;gap:6px;"></div>
       </div>
 
-      <!-- Stats Tab -->
-      <div id="tmit-stats-panel" class="tmit-tab-panel" style="display:none;flex:1;overflow-y:auto;padding:12px;">
-
-        <!-- My Stats -->
-        <div class="tmit-section-title">⚔ My Battle Stats</div>
-        <div style="font-size:10px;color:#4a3a6a;margin-bottom:8px;line-height:1.6;">
-          Your current STR/DEF/SPD/DEX, energy bars, and active cooldowns.
-          Hit <b style="color:#c9a227;">↻ Update</b> to refresh — also saves a snapshot for gain tracking.
-        </div>
-        <div id="tmit-bs-bars" style="margin-bottom:10px;"></div>
-        <div id="tmit-bs-stats" class="tmit-calc-result" style="margin-bottom:10px;"></div>
-
-        <!-- Stat gain tracking -->
-        <div class="tmit-section-title" style="margin-top:12px;">📈 Stat Gain Tracking</div>
-        <div style="font-size:10px;color:#4a3a6a;margin-bottom:8px;line-height:1.6;">
-          Shows how much your STR/DEF/SPD/DEX have grown between updates.
-          Each time you hit <b style="color:#c9a227;">↻ Update</b>, TEEM saves a snapshot.
-          Pick a window below to see your gains across those snapshots.
-        </div>
-        <div class="tmit-filter-row" style="margin-bottom:6px;">
-          <span class="tmit-filter-label">Compare over:</span>
-          <select id="tmit-sg-window" class="tmit-select">
-            <option value="1">Last snapshot</option>
-            <option value="7" selected>Last 7 snapshots</option>
-            <option value="30">Last 30 snapshots</option>
-            <option value="all">All time</option>
-          </select>
-          <button class="tmit-btn-calc" style="margin:0;margin-left:auto;" id="tmit-bs-refresh">↻ Update</button>
-        </div>
-        <div id="tmit-sg-result" class="tmit-calc-result" style="margin-bottom:10px;"></div>
-
-        <!-- Spy lookup -->
-        <div class="tmit-section-title" style="margin-top:12px;">🔍 Spy Lookup</div>
-        <div style="font-size:10px;color:#4a3a6a;margin-bottom:8px;line-height:1.6;">
-          Look up another player's battle stats by their Torn ID (the number in their profile URL).
-          Uses your TornStats or YATA key to fetch real spy data — or falls back to a rough level-based estimate if no spy exists.
-          <br><span style="color:#3a2a5a;">Find someone's ID by visiting their profile: torn.com/profiles.php?<b style="color:#6a5a8a;">XID=1234567</b></span>
-        </div>
-        <div class="tmit-form-row2" style="margin-bottom:6px;">
-          <div>
-            <label>Player ID</label>
-            <input type="number" id="tmit-spy-id" class="tmit-input-sm" placeholder="e.g. 1234567">
-          </div>
-          <div style="justify-content:flex-end;">
-            <label>&nbsp;</label>
-            <button class="tmit-btn-calc" style="margin:0;" id="tmit-spy-lookup">Look Up</button>
-          </div>
-        </div>
-        <div id="tmit-spy-result" class="tmit-calc-result" style="display:none;margin-bottom:10px;"></div>
-
-        <!-- Spy compare -->
-        <div class="tmit-section-title" style="margin-top:12px;">⚖ Compare vs Target</div>
-        <div style="font-size:10px;color:#4a3a6a;margin-bottom:8px;line-height:1.6;">
-          See how you stack up against someone else. Either use the ID lookup above first, or paste a spy report directly.
-          Shows the difference per stat — <span style="color:#50dc82;">green = you're stronger</span>, <span style="color:#ff6060;">red = they're stronger</span>.
-        </div>
-        <textarea id="tmit-spy-paste" placeholder="Paste spy report text here, or enter ID above and click Look Up…"
-          style="width:100%;height:70px;background:rgba(0,0,0,0.4);border:1px solid rgba(201,162,39,0.2);border-radius:5px;color:#e8dff5;font-size:11px;padding:7px;outline:none;font-family:monospace;resize:vertical;"></textarea>
-        <button class="tmit-btn-calc" style="margin-top:6px;" id="tmit-spy-compare">Compare</button>
-        <div id="tmit-compare-result" class="tmit-calc-result" style="display:none;margin-top:8px;"></div>
-
-        <!-- TornStats key setting -->
-        <div class="tmit-section-title" style="margin-top:14px;">🔑 TornStats Integration</div>
-        <div style="font-size:11px;color:#6a5a8a;padding:8px 10px;background:rgba(201,162,39,0.06);border:1px solid rgba(201,162,39,0.15);border-radius:6px;">
-          Add your <b style="color:#c9a227;">TornStats</b> and/or <b style="color:#c9a227;">YATA</b> keys in <b style="color:#ffe066;">⚙ Settings</b> (top right of panel header).<br>
-          <span style="font-size:10px;color:#4a3a6a;">These enable exact spy stats next to player names on every Torn page.</span>
-        </div>
-      </div>
-
       <div class="tmit-settings-panel" id="tmit-settings-panel">
-        <div class="tmit-settings-title">⚙ Settings</div>
+        <div class="tmit-settings-title">âš™ Settings</div>
 
         <div style="font-size:10px;color:#4a3a6a;line-height:1.6;margin-bottom:10px;padding:6px 8px;background:rgba(201,162,39,0.05);border:1px solid rgba(201,162,39,0.12);border-radius:5px;">
-          All keys are stored locally on your device only — never sent anywhere except directly to that service's own API.
+          All keys are stored locally on your device only â€” never sent anywhere except directly to that service's own API.
           <b style="color:#c9a227">Create a separate key per service</b> so you can revoke them individually if needed.
         </div>
 
         <!-- TORN MARKET API KEY -->
         <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c9a227;margin-bottom:4px;">
-          Torn Market API Key <span style="color:#ff6060;font-weight:400;">★ Required</span>
+          Torn Market API Key <span style="color:#ff6060;font-weight:400;">â˜… Required</span>
         </div>
         <div style="font-size:9px;color:#4a3a6a;margin-bottom:5px;line-height:1.5;">
           Used for live item prices, your stats, energy bars &amp; BB balance.
           Get yours at <a href="https://www.torn.com/preferences.php#tab=api" target="_blank" rel="noopener"
-            style="color:#c9a227;text-decoration:none;">torn.com → Preferences → API ↗</a>
-          — a <b style="color:#e8dff5">Limited</b> key is enough.
+            style="color:#c9a227;text-decoration:none;">torn.com â†’ Preferences â†’ API â†—</a>
+          â€” a <b style="color:#e8dff5">Limited</b> key is enough.
         </div>
         <div style="display:flex;gap:4px;margin-bottom:3px;">
-          <input type="password" id="tmit-apikey-input" placeholder="Paste Torn API key here…"
+          <input type="password" id="tmit-apikey-input" placeholder="Paste Torn API key hereâ€¦"
             value="${settings.apiKey}" autocomplete="off"
             style="flex:1;background:rgba(0,0,0,0.5);border:1px solid rgba(201,162,39,0.25);border-radius:4px;color:#e8dff5;font-size:12px;padding:6px 9px;outline:none;font-family:monospace;">
           <button id="tmit-apikey-toggle" title="Show/hide key"
-            style="background:none;border:1px solid rgba(201,162,39,0.2);color:#6a5a8a;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;">👁</button>
+            style="background:none;border:1px solid rgba(201,162,39,0.2);color:#6a5a8a;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;">ðŸ‘</button>
         </div>
         <div id="tmit-apikey-status" style="font-size:10px;min-height:14px;margin-bottom:8px;padding-left:2px;"></div>
 
-        <!-- TORNSTATS API KEY -->
-        <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c9a227;margin-bottom:4px;">
-          TornStats API Key <span style="color:#6a5a8a;font-weight:400;">Optional</span>
-        </div>
-        <div style="font-size:9px;color:#4a3a6a;margin-bottom:5px;line-height:1.5;">
-          Enables <b style="color:#e8dff5">exact spy stats</b> shown next to player names on all Torn pages.
-          Register free at <a href="https://www.tornstats.com" target="_blank" rel="noopener"
-            style="color:#c9a227;text-decoration:none;">tornstats.com ↗</a>
-          using your same Torn API key — then find your TornStats key in your profile there.
-        </div>
-        <div style="display:flex;gap:4px;margin-bottom:3px;">
-          <input type="password" id="tmit-ts-key-input" placeholder="Paste TornStats key here…" autocomplete="off" value="${load('tsKey', '')}"
-            style="flex:1;background:rgba(0,0,0,0.5);border:1px solid rgba(201,162,39,0.25);border-radius:4px;color:#e8dff5;font-size:12px;padding:6px 9px;outline:none;font-family:monospace;">
-          <button id="tmit-tskey-toggle" title="Show/hide key"
-            style="background:none;border:1px solid rgba(201,162,39,0.2);color:#6a5a8a;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;">👁</button>
-        </div>
-        <div id="tmit-ts-key-status" style="font-size:10px;min-height:14px;margin-bottom:8px;padding-left:2px;"></div>
 
         <!-- YATA API KEY -->
         <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c9a227;margin-bottom:4px;">
@@ -1687,24 +1554,24 @@
         <div style="font-size:9px;color:#4a3a6a;margin-bottom:5px;line-height:1.5;">
           Unlocks <b style="color:#e8dff5">YATA spy data</b> for player overlays and more accurate travel stock estimates.
           Log in at <a href="https://yata.life" target="_blank" rel="noopener"
-            style="color:#c9a227;text-decoration:none;">yata.life ↗</a>
-          with your Torn account — your YATA key is in your profile settings there.
+            style="color:#c9a227;text-decoration:none;">yata.life â†—</a>
+          with your Torn account â€” your YATA key is in your profile settings there.
         </div>
         <div style="display:flex;gap:4px;margin-bottom:3px;">
-          <input type="password" id="tmit-yata-key-input" placeholder="Paste YATA key here…" autocomplete="off" value="${load('yataKey', '')}"
+          <input type="password" id="tmit-yata-key-input" placeholder="Paste YATA key hereâ€¦" autocomplete="off" value="${load('yataKey', '')}"
             style="flex:1;background:rgba(0,0,0,0.5);border:1px solid rgba(201,162,39,0.25);border-radius:4px;color:#e8dff5;font-size:12px;padding:6px 9px;outline:none;font-family:monospace;">
           <button id="tmit-yatakey-toggle" title="Show/hide key"
-            style="background:none;border:1px solid rgba(201,162,39,0.2);color:#6a5a8a;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;">👁</button>
+            style="background:none;border:1px solid rgba(201,162,39,0.2);color:#6a5a8a;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;">ðŸ‘</button>
         </div>
         <div id="tmit-yata-key-status" style="font-size:10px;min-height:14px;margin-bottom:10px;padding-left:2px;"></div>
 
-        <button class="tmit-btn-save" id="tmit-btn-save" style="width:100%;">💾 Save All Settings</button>
+        <button class="tmit-btn-save" id="tmit-btn-save" style="width:100%;">ðŸ’¾ Save All Settings</button>
       </div>
 
       <div class="tmit-footer">
         <span class="tmit-footer-stat">Items tracked: <span id="tmit-item-count">0</span></span>
         <span class="tmit-footer-stat">Snapshots: <span id="tmit-snapshot-count">0</span></span>
-        <span class="tmit-footer-stat">Next poll: <span id="tmit-next-poll">—</span></span>
+        <span class="tmit-footer-stat">Next poll: <span id="tmit-next-poll">â€”</span></span>
       </div>
     `;
     document.body.appendChild(panel);
@@ -1721,10 +1588,10 @@
       fab.style.top    = settings.fabY + 'px';
     }
 
-    // Panel starts hidden — position is set when it opens (see openPanel())
+    // Panel starts hidden â€” position is set when it opens (see openPanel())
   }
 
-  // ── Onboarding ────────────────────────────────────────────────────────────
+  // â”€â”€ Onboarding â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function buildOnboarding(iconDataUrl) {
     const el = document.createElement('div');
@@ -1735,14 +1602,14 @@
           <img class="tmit-onboard-logo" src="${iconDataUrl}" alt="TEEM" style="width:36px;height:36px;margin:0;flex-shrink:0;">
           <div>
             <div class="tmit-onboard-title" style="font-size:13px;text-align:left;margin:0;">Welcome to TEEM</div>
-            <div class="tmit-onboard-subtitle" style="text-align:left;margin:0;font-size:10px;">Let's get you set up — Torn stays usable the whole time</div>
+            <div class="tmit-onboard-subtitle" style="text-align:left;margin:0;font-size:10px;">Let's get you set up â€” Torn stays usable the whole time</div>
           </div>
-          <button id="tmit-ob-close-x" style="margin-left:auto;background:none;border:none;color:#3a2a5a;font-size:16px;cursor:pointer;padding:0;line-height:1;" title="Close (set up later via ⚙ in the panel)">✕</button>
+          <button id="tmit-ob-close-x" style="margin-left:auto;background:none;border:none;color:#3a2a5a;font-size:16px;cursor:pointer;padding:0;line-height:1;" title="Close (set up later via âš™ in the panel)">âœ•</button>
         </div>
 
         <!-- Step 1: API Key -->
         <div class="tmit-onboard-step active" id="tmit-ob-step-1">
-          <div class="tmit-onboard-step-title">Step 1 of 4 — Connect to Torn</div>
+          <div class="tmit-onboard-step-title">Step 1 of 4 â€” Connect to Torn</div>
           <div class="tmit-onboard-step-body">
             TEEM needs a <b>Torn API key</b> to fetch live market prices, your carry capacity, and BB balance.<br><br>
             A <b>Limited</b> key is enough - just enable <code>Market</code>, <code>User</code>, and <code>Torn</code> access when creating it.
@@ -1751,26 +1618,26 @@
             style="display:inline-flex;align-items:center;gap:6px;margin-bottom:10px;padding:7px 14px;background:rgba(201,162,39,0.12);border:1px solid rgba(201,162,39,0.3);border-radius:6px;color:#ffe066;font-size:11px;font-weight:700;text-decoration:none;transition:background 0.15s;"
             onmouseover="this.style.background='rgba(201,162,39,0.22)'"
             onmouseout="this.style.background='rgba(201,162,39,0.12)'">
-            🔑 Open Torn API Settings (new tab) ↗
+            ðŸ”‘ Open Torn API Settings (new tab) â†—
           </a>
           <div style="font-size:10px;color:#4a3a6a;margin-bottom:8px;">
-            Come back here and paste your key below once you've created it — this window stays open.
+            Come back here and paste your key below once you've created it â€” this window stays open.
           </div>
-          <input type="password" class="tmit-onboard-input" id="tmit-ob-apikey" placeholder="Paste your API key here…" autocomplete="off">
+          <input type="password" class="tmit-onboard-input" id="tmit-ob-apikey" placeholder="Paste your API key hereâ€¦" autocomplete="off">
           <div class="tmit-onboard-validate" id="tmit-ob-validate"></div>
         </div>
 
         <!-- Step 2: Carry capacity -->
         <div class="tmit-onboard-step" id="tmit-ob-step-2">
-          <div class="tmit-onboard-step-title">Step 2 of 4 — Your Carry Capacity</div>
+          <div class="tmit-onboard-step-title">Step 2 of 4 â€” Your Carry Capacity</div>
           <div class="tmit-onboard-step-body">
             How many items can you carry per trip? Check your <b>Travel page in-game</b> for the exact number.<br><br>
-            Common sources of capacity: base (5) + suitcase (+2/+4) + faction Excursion (+1–10) + property airstrip (+10) + job specials (+2–5).
+            Common sources of capacity: base (5) + suitcase (+2/+4) + faction Excursion (+1â€“10) + property airstrip (+10) + job specials (+2â€“5).
           </div>
           <div class="tmit-onboard-capacity-row" style="align-items:flex-start;flex-direction:column;gap:8px;">
             <div style="display:flex;align-items:center;gap:10px;">
-              <div class="tmit-onboard-cap-val" id="tmit-ob-cap-val">—</div>
-              <div class="tmit-onboard-cap-detail" id="tmit-ob-cap-detail">Detecting from API…</div>
+              <div class="tmit-onboard-cap-val" id="tmit-ob-cap-val">â€”</div>
+              <div class="tmit-onboard-cap-detail" id="tmit-ob-cap-detail">Detecting from APIâ€¦</div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;width:100%;">
               <label style="font-size:11px;color:#6a5a8a;white-space:nowrap;">Adjust if wrong:</label>
@@ -1779,41 +1646,41 @@
                 placeholder="29">
               <span style="font-size:10px;color:#4a3a6a;">items per trip</span>
             </div>
-            <div style="font-size:10px;color:#4a3a6a;">You can always change this in the ✈ Travel tab.</div>
+            <div style="font-size:10px;color:#4a3a6a;">You can always change this in the âœˆ Travel tab.</div>
           </div>
         </div>
 
         <!-- Step 3: Tab tour -->
         <div class="tmit-onboard-step" id="tmit-ob-step-3">
-          <div class="tmit-onboard-step-title">Step 3 of 4 — What's Inside</div>
+          <div class="tmit-onboard-step-title">Step 3 of 4 â€” What's Inside</div>
           <div class="tmit-onboard-tab-grid">
             <div class="tmit-onboard-tab-card">
-              <div class="tab-icon">📈</div>
+              <div class="tab-icon">ðŸ“ˆ</div>
               <div class="tab-name">Market</div>
               <div class="tab-desc">Tracks all item prices. Hot/cold signals show what's rising or falling.</div>
             </div>
             <div class="tmit-onboard-tab-card">
-              <div class="tab-icon">⭐</div>
+              <div class="tab-icon">â­</div>
               <div class="tab-name">Watchlist</div>
               <div class="tab-desc">Pin items to watch. Click any WATCH badge to add it here.</div>
             </div>
             <div class="tmit-onboard-tab-card">
-              <div class="tab-icon">✈</div>
+              <div class="tab-icon">âœˆ</div>
               <div class="tab-name">Travel</div>
               <div class="tab-desc">Ranks all 11 destinations by profit/hr. Click any for full trip details.</div>
             </div>
             <div class="tmit-onboard-tab-card">
-              <div class="tab-icon">⚔</div>
+              <div class="tab-icon">âš”</div>
               <div class="tab-name">War Gear</div>
               <div class="tab-desc">Calculator for ranked war weapons and armor. Score + BB value.</div>
             </div>
             <div class="tmit-onboard-tab-card">
-              <div class="tab-icon">🪙</div>
+              <div class="tab-icon">ðŸª™</div>
               <div class="tab-name">BB Calc</div>
               <div class="tab-desc">Full Bunker Bucks calculator. Grind estimator, trade-in table, cache costs.</div>
             </div>
             <div class="tmit-onboard-tab-card">
-              <div class="tab-icon">💰</div>
+              <div class="tab-icon">ðŸ’°</div>
               <div class="tab-name">Session Bar</div>
               <div class="tab-desc">Live inventory estimate and session profit tracked at the top.</div>
             </div>
@@ -1822,13 +1689,13 @@
 
         <!-- Step 4: You're ready -->
         <div class="tmit-onboard-step" id="tmit-ob-step-4">
-          <div class="tmit-onboard-step-title">Step 4 of 4 — You're Ready 🐘</div>
+          <div class="tmit-onboard-step-title">Step 4 of 4 â€” You're Ready ðŸ˜</div>
           <div class="tmit-onboard-step-body">
             TEEM is now running. A few tips:<br><br>
-            • <b>Drag</b> the 🐘 TEEM button anywhere on screen<br>
-            • <b>Alt+T</b> toggles the panel from anywhere in Torn<br>
-            • Data builds over time — signals get smarter the longer it runs<br>
-            • <b>Prices update every minute</b> using live Torn API data<br><br>
+            â€¢ <b>Drag</b> the ðŸ˜ TEEM button anywhere on screen<br>
+            â€¢ <b>Alt+T</b> toggles the panel from anywhere in Torn<br>
+            â€¢ Data builds over time â€” signals get smarter the longer it runs<br>
+            â€¢ <b>Prices update every minute</b> using live Torn API data<br><br>
             Good luck out there. May the market be ever in your favour.
           </div>
         </div>
@@ -1842,7 +1709,7 @@
           </div>
           <div style="display:flex;gap:10px;align-items:center;">
             <button class="tmit-onboard-skip" id="tmit-ob-skip">Skip setup</button>
-            <button class="tmit-onboard-btn" id="tmit-ob-next" disabled>Next →</button>
+            <button class="tmit-onboard-btn" id="tmit-ob-next" disabled>Next â†’</button>
           </div>
         </div>
       </div>
@@ -1865,7 +1732,7 @@
         el.querySelector(`#tmit-ob-step-${i}`).classList.toggle('active', i === n);
         el.querySelector(`#tmit-ob-dot-${i}`).classList.toggle('active', i === n);
       }
-      nextBtn.textContent = n === totalSteps ? 'Start TEEM →' : 'Next →';
+      nextBtn.textContent = n === totalSteps ? 'Start TEEM â†’' : 'Next â†’';
       nextBtn.disabled = (n === 1 && !validatedKey);
     }
 
@@ -1880,23 +1747,23 @@
       if (val.length < 16) return;
       validateTimer = setTimeout(async () => {
         validateEl.className = 'tmit-onboard-validate loading';
-        validateEl.textContent = 'Checking key…';
+        validateEl.textContent = 'Checking keyâ€¦';
         try {
           const data = await apiGet(
             `https://api.torn.com/user/?selections=basic&key=${val}&comment=TEEM`
           );
           if (data.error) {
             validateEl.className = 'tmit-onboard-validate err';
-            validateEl.textContent = `✗ ${data.error.error}`;
+            validateEl.textContent = `âœ— ${data.error.error}`;
           } else {
             validateEl.className = 'tmit-onboard-validate ok';
-            validateEl.textContent = `✓ Connected as ${data.name}`;
+            validateEl.textContent = `âœ“ Connected as ${data.name}`;
             validatedKey = val;
             nextBtn.disabled = false;
           }
         } catch(e) {
           validateEl.className = 'tmit-onboard-validate err';
-          validateEl.textContent = `✗ ${e.message}`;
+          validateEl.textContent = `âœ— ${e.message}`;
         }
       }, 600);
     });
@@ -1911,16 +1778,16 @@
         const capVal    = el.querySelector('#tmit-ob-cap-val');
         const capDetail  = el.querySelector('#tmit-ob-cap-detail');
         const capInput   = el.querySelector('#tmit-ob-cap-input');
-        capVal.textContent = '…';
-        capDetail.textContent = 'Checking API…';
+        capVal.textContent = 'â€¦';
+        capDetail.textContent = 'Checking APIâ€¦';
         const cap = await detectCarryCapacity(validatedKey);
         detectedCapacity = cap ?? 10;
         capVal.textContent = detectedCapacity;
         capInput.value = detectedCapacity;
         const isGuess = !cap || cap === 10;
         capDetail.textContent = isGuess
-          ? '⚠ Could not auto-detect — please enter your actual number above'
-          : '✓ Detected from your API data — adjust if needed';
+          ? 'âš  Could not auto-detect â€” please enter your actual number above'
+          : 'âœ“ Detected from your API data â€” adjust if needed';
         capDetail.style.color = isGuess ? '#e8621a' : '#50dc82';
 
         // Keep settings in sync when user edits the input
@@ -1941,7 +1808,7 @@
 
     skipBtn.addEventListener('click', finishOnboarding);
 
-    // X button in top-right — same as skip
+    // X button in top-right â€” same as skip
     el.querySelector('#tmit-ob-close-x')?.addEventListener('click', finishOnboarding);
 
     function finishOnboarding() {
@@ -1972,7 +1839,7 @@
       panel.style.left   = settings.posX + 'px';
       panel.style.top    = settings.posY + 'px';
     } else {
-      // First open — position relative to FAB
+      // First open â€” position relative to FAB
       const fabRect    = fab.getBoundingClientRect();
       const panelW     = 480;
       const panelH     = 600;
@@ -1992,7 +1859,7 @@
   }
 
   function bindEvents(fab, panel) {
-    // FAB — simple click to open/close, drag to reposition
+    // FAB â€” simple click to open/close, drag to reposition
     let fabDragging = false;
     let fabStartX = 0, fabStartY = 0, fabOx = 0, fabOy = 0;
 
@@ -2026,7 +1893,7 @@
           settings.posX = null; settings.posY = null;
           saveSettings();
         } else {
-          // Simple click — toggle panel
+          // Simple click â€” toggle panel
           if (panel.classList.contains('tmit-hidden')) openPanel(fab, panel);
           else panel.classList.add('tmit-hidden');
         }
@@ -2042,11 +1909,10 @@
     // Refresh
     panel.querySelector('#tmit-btn-refresh').addEventListener('click', () => poll(true));
 
-    // Eye toggle buttons — show/hide API key fields
+    // Eye toggle buttons â€” show/hide API key fields
     panel.addEventListener('click', (e) => {
       const toggleMap = {
         'tmit-apikey-toggle':  '#tmit-apikey-input',
-        'tmit-tskey-toggle':   '#tmit-ts-key-input',
         'tmit-yatakey-toggle': '#tmit-yata-key-input',
       };
       const selector = toggleMap[e.target.id];
@@ -2054,30 +1920,25 @@
       const inp = panel.querySelector(selector);
       if (!inp) return;
       inp.type = inp.type === 'password' ? 'text' : 'password';
-      e.target.textContent = inp.type === 'password' ? '👁' : '🙈';
+      e.target.textContent = inp.type === 'password' ? 'ðŸ‘' : 'ðŸ™ˆ';
     });
 
     // Settings toggle
     panel.querySelector('#tmit-btn-settings-toggle').addEventListener('click', () => {
       panel.querySelector('#tmit-settings-panel').classList.toggle('tmit-open');
-      // Ensure key fields are populated (safety net — should already be set from build)
-      const tsInput   = panel.querySelector('#tmit-ts-key-input');
+      // Ensure key fields are populated (safety net â€” should already be set from build)
       const yataInput = panel.querySelector('#tmit-yata-key-input');
-      if (tsInput   && !tsInput.value)   tsInput.value   = load('tsKey',   '');
       if (yataInput && !yataInput.value) yataInput.value = load('yataKey', '');
     });
 
     // Save settings
     panel.querySelector('#tmit-btn-save').addEventListener('click', () => {
       const key        = panel.querySelector('#tmit-apikey-input')?.value.trim()    || '';
-      const tsKey      = panel.querySelector('#tmit-ts-key-input')?.value.trim()   || '';
       const yataKey    = panel.querySelector('#tmit-yata-key-input')?.value.trim() || '';
       const marketPoll = parseInt(panel.querySelector('#tmit-market-poll')?.value) || 60;
       const statsPoll  = parseInt(panel.querySelector('#tmit-stats-poll')?.value)  || 30;
 
-      // Only save non-empty values — never overwrite a saved key with blank
       if (key)     { settings.apiKey = key; }
-      if (tsKey)   store('tsKey',   tsKey);
       if (yataKey) store('yataKey', yataKey);
 
       // Always save poll intervals and restart timers if changed
@@ -2089,9 +1950,9 @@
       if (intervalsChanged && settings.apiKey) startPolling();
 
       // Feedback
-      const saved = [key && 'Torn', tsKey && 'TornStats', yataKey && 'YATA'].filter(Boolean);
+      const saved = [key && 'Torn', yataKey && 'YATA'].filter(Boolean);
       if (saved.length) {
-        const statusEl = document.getElementById('tmit-ts-key-status');
+        const statusEl = document.getElementById('tmit-apikey-status');
         if (statusEl) {
           statusEl.textContent = '✓ ' + saved.join(', ') + ' key' + (saved.length > 1 ? 's' : '') + ' saved';
           statusEl.style.color = '#50dc82';
@@ -2175,172 +2036,7 @@
       }
     });
 
-    // War item search — filter dropdown as user types
-    panel.addEventListener('input', (e) => {
-      if (e.target.id === 'tmit-war-item-search') { populateWarItemDropdown(e.target.value); }
-    });
-
-    // War calculator — item select, type, rarity, bonus dropdowns
-    function updateWarBonusDropdowns() {
-      const typeVal   = (document.getElementById('tmit-war-type')?.value    || '').toLowerCase();
-      const rarityVal =  document.getElementById('tmit-war-rarity')?.value  || '';
-      const countVal  = parseInt(document.getElementById('tmit-war-bonuses')?.value ?? 0);
-      const b1sel     = document.getElementById('tmit-war-bonus1-sel');
-      const b2sel     = document.getElementById('tmit-war-bonus2-sel');
-      const b2wrap    = document.getElementById('tmit-war-bonus2-wrap');
-      const b1hidden  = document.getElementById('tmit-war-bonus1');
-      const b2hidden  = document.getElementById('tmit-war-bonus2');
-      if (!b1sel) return;
-
-      const bonuses = getBonusesForType(typeVal);
-
-      // Populate bonus 1
-      const prev1 = b1sel.value;
-      b1sel.innerHTML = '<option value="">— None —</option>'
-        + bonuses.map(b => `<option value="${b}"${b === prev1 ? ' selected' : ''}>${b}</option>`).join('');
-      if (b1hidden) b1hidden.value = b1sel.value;
-
-      // Show bonus 2 when rarity is orange/red or count >= 2
-      const show2 = rarityVal === 'orange' || rarityVal === 'red' || countVal >= 2;
-      if (b2wrap) b2wrap.style.display = show2 ? '' : 'none';
-
-      // Populate bonus 2, excluding whatever is in bonus 1
-      if (b2sel) {
-        const prev2 = b2sel.value;
-        b2sel.innerHTML = '<option value="">— None —</option>'
-          + bonuses.filter(b => b !== b1sel.value)
-              .map(b => `<option value="${b}"${b === prev2 ? ' selected' : ''}>${b}</option>`).join('');
-        if (b2hidden) b2hidden.value = b2sel.value;
-      }
-    }
-
-    panel.addEventListener('change', (e) => {
-      const id = e.target.id;
-
-      // Item picked — auto-fill type field, saved stats, and update bonuses
-      if (id === 'tmit-war-item-select') {
-        const opt = e.target.selectedOptions[0];
-        if (!opt?.value) return;
-        const typeSelect = document.getElementById('tmit-war-type');
-        if (typeSelect && opt.dataset.type) typeSelect.value = opt.dataset.type;
-        const nameHidden = document.getElementById('tmit-war-name');
-        if (nameHidden) nameHidden.value = opt.value;
-
-        // Pre-fill saved stats if we have them
-        const saved = warItemStats[opt.value];
-        if (saved) {
-          const fields = ['damage','accuracy','armor','stealth','exp'];
-          fields.forEach(f => {
-            const el = document.getElementById('tmit-war-' + f);
-            if (el && saved[f] !== undefined) el.value = saved[f];
-          });
-        } else {
-          // Clear stat fields so user doesn't see stale values from last item
-          ['damage','accuracy','armor','stealth','exp'].forEach(f => {
-            const el = document.getElementById('tmit-war-' + f);
-            if (el) el.value = '';
-          });
-        }
-        updateWarBonusDropdowns();
-      }
-
-      // Type changed — repopulate bonuses for new type
-      if (id === 'tmit-war-type') updateWarBonusDropdowns();
-
-      // Rarity changed — show/hide bonus 2
-      if (id === 'tmit-war-rarity') updateWarBonusDropdowns();
-
-      // Bonus count changed
-      if (id === 'tmit-war-bonuses') updateWarBonusDropdowns();
-
-      // Bonus 1 selected — sync hidden input, refresh bonus 2 to exclude it
-      if (id === 'tmit-war-bonus1-sel') {
-        const h = document.getElementById('tmit-war-bonus1');
-        if (h) h.value = e.target.value;
-        updateWarBonusDropdowns();
-      }
-
-      // Bonus 2 selected — sync hidden input
-      if (id === 'tmit-war-bonus2-sel') {
-        const h = document.getElementById('tmit-war-bonus2');
-        if (h) h.value = e.target.value;
-      }
-    });
-
-    // War gear calculator
-    panel.addEventListener('click', (e) => {
-      if (e.target.id === 'tmit-war-calc') {
-        const name     = document.getElementById('tmit-war-name').value.trim();
-        const damage   = parseFloat(document.getElementById('tmit-war-damage').value) || 0;
-        const accuracy = parseFloat(document.getElementById('tmit-war-accuracy').value) || 0;
-        const armor    = parseFloat(document.getElementById('tmit-war-armor').value) || 0;
-        const stealth  = parseFloat(document.getElementById('tmit-war-stealth').value) || 0;
-        const exp      = parseFloat(document.getElementById('tmit-war-qual').value) || 0;
-        const rarity   = document.getElementById('tmit-war-rarity').value;
-        const bonuses  = document.getElementById('tmit-war-bonuses').value;
-        const wtype    = document.getElementById('tmit-war-type').value;
-        const bonus1   = document.getElementById('tmit-war-bonus1').value.trim();
-        const bonus2   = document.getElementById('tmit-war-bonus2').value.trim();
-
-        const bbVal    = getBBValue(rarity, bonuses, wtype);
-        const bbDollar = bbVal > 0 ? Math.round(bbVal * bbPerDollar) : 0;
-
-        // Score: weighted combo of damage*accuracy (DPS proxy) + armor
-        const dpsScore    = damage && accuracy ? Math.round(damage * accuracy / 100) : 0;
-        const overallScore = Math.min(100, Math.round(
-          (damage / 100 * 35) + (accuracy / 100 * 35) + (armor / 100 * 20) + (stealth / 100 * 10)
-        ));
-
-        // Score bar color based on overall
-        const barColor = overallScore >= 70 ? 'hot' : overallScore >= 40 ? 'gold' : 'icy';
-        const bars = Array.from({length:10}, (_,i) =>
-          `<div class="tmit-score-segment ${i < Math.round(overallScore/10) ? 'filled-'+barColor : ''}"></div>`
-        ).join('');
-
-        const resultEl = document.getElementById('tmit-war-result');
-        resultEl.style.display = 'block';
-        resultEl.innerHTML = `
-          <div class="tmit-result-row"><span class="tmit-result-label">Item</span><span class="tmit-result-val gold">${name || '—'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Damage</span><span class="tmit-result-val hot">${damage || '—'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Accuracy</span><span class="tmit-result-val hot">${accuracy || '—'}%</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Armor Rating</span><span class="tmit-result-val icy">${armor || '—'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Stealth</span><span class="tmit-result-val">${stealth || '—'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Quality</span><span class="tmit-result-val">${exp || '—'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">DPS Score</span><span class="tmit-result-val ${dpsScore>50?'hot':'icy'}">${dpsScore || '—'}</span></div>
-          ${bonus1 ? `<div class="tmit-result-row"><span class="tmit-result-label">Bonus 1</span><span class="tmit-result-val gold">${bonus1}</span></div>` : ''}
-          ${bonus2 ? `<div class="tmit-result-row"><span class="tmit-result-label">Bonus 2</span><span class="tmit-result-val gold">${bonus2}</span></div>` : ''}
-          <div class="tmit-result-row"><span class="tmit-result-label">BB Value</span><span class="tmit-result-val gold">${bbVal ? bbVal+' BB' : '—'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">BB in $</span><span class="tmit-result-val green">${bbDollar ? '$'+bbDollar.toLocaleString() : '—'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Overall Score</span><span class="tmit-result-val ${barColor==='hot'?'hot':barColor==='gold'?'gold':'icy'}">${overallScore}/100</span></div>
-          <div class="tmit-score-bar">${bars}</div>
-          ${name ? `
-          <button id="tmit-war-save-stats" data-name="${name}"
-            style="margin-top:8px;width:100%;background:rgba(80,180,100,0.15);border:1px solid rgba(80,180,100,0.3);
-                   border-radius:5px;color:#50dc82;font-size:10px;padding:5px 0;cursor:pointer;font-family:monospace;">
-            💾 Save stats for "${name}"
-          </button>` : ''}
-        `;
-      }
-
-      // Save war item stats
-      if (e.target.id === 'tmit-war-save-stats') {
-        const name = e.target.dataset.name;
-        if (!name) return;
-        warItemStats[name] = {
-          damage:   parseFloat(document.getElementById('tmit-war-damage')?.value)   || 0,
-          accuracy: parseFloat(document.getElementById('tmit-war-accuracy')?.value) || 0,
-          armor:    parseFloat(document.getElementById('tmit-war-armor')?.value)    || 0,
-          stealth:  parseFloat(document.getElementById('tmit-war-stealth')?.value)  || 0,
-          exp:      parseFloat(document.getElementById('tmit-war-qual')?.value)      || 0,
-        };
-        store('warItemStats', warItemStats);
-        e.target.textContent = '✓ Saved — will auto-fill next time';
-        e.target.style.color = '#c9a227';
-        e.target.disabled = true;
-      }
-      });
-
-    // Quick items tab — add/remove
+    // Quick items tab â€” add/remove
     panel.addEventListener('click', (e) => {
       if (e.target.id === 'tmit-quick-add-btn') {
         const input = document.getElementById('tmit-quick-add-name');
@@ -2363,43 +2059,6 @@
 
     panel.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && e.target.id === 'tmit-quick-add-name') { document.getElementById('tmit-quick-add-btn')?.click(); }
-    });
-
-    // Stats tab events
-    panel.addEventListener('click', async (e) => {
-      if (e.target.id === 'tmit-bs-refresh') {
-        e.target.textContent = '…';
-        await fetchMyBattleStats(settings.apiKey);
-        renderStatsTab();
-        e.target.textContent = '↻ Update';
-      }
-      if (e.target.id === 'tmit-spy-lookup') {
-        const id = document.getElementById('tmit-spy-id')?.value.trim();
-        if (id) await doSpyLookup(id);
-      }
-      if (e.target.id === 'tmit-spy-compare') {
-        const pasteText = document.getElementById('tmit-spy-paste')?.value.trim();
-        const idInput   = document.getElementById('tmit-spy-id')?.value.trim();
-        let   spy       = null;
-        if (idInput && playerCache[idInput]?.spy) { spy = playerCache[idInput].spy; } else if (pasteText) {
-          spy = parseSpyText(pasteText);
-          if (!spy.str && !spy.def && !spy.spd && !spy.dex) {
-            const r = document.getElementById('tmit-compare-result');
-            if (r) { r.style.display = 'block'; r.innerHTML = '<div style="color:#ff6060;font-size:11px;">Could not parse spy report. Try a different format or use ID lookup above.</div>'; }
-            return;
-          }
-        }
-        if (spy && myBattleStats) doSpyCompare(spy);
-        else if (!myBattleStats) {
-          const r = document.getElementById('tmit-compare-result');
-          if (r) { r.style.display = 'block'; r.innerHTML = '<div style="color:#ff6060;font-size:11px;">Fetch your own stats first (↻ Update).</div>'; }
-        }
-      }
-      // TornStats key is now saved via main settings panel
-    });
-
-    panel.addEventListener('change', (e) => {
-      if (e.target.id === 'tmit-sg-window') { renderStatGains(e.target.value); }
     });
 
     // Export button
@@ -2475,7 +2134,7 @@
     makeDraggable(panel, panel.querySelector('#tmit-drag-handle'));
   }
 
-  // ── Stats Tab ─────────────────────────────────────────────────────────────
+  // â”€â”€ Stats Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function switchTab(tab) {
     settings.activeTab = tab;
@@ -2485,10 +2144,8 @@
     const filterRow  = document.querySelector('.tmit-filter-row');
     const colHeaders = document.querySelector('.tmit-col-headers');
     const listEl     = document.getElementById('tmit-list');
-    const warPanel   = document.getElementById('tmit-war-panel');
-    const bbPanel    = document.getElementById('tmit-bb-panel');
+    const warPanel    = document.getElementById('tmit-war-panel');
     const travelPanel = document.getElementById('tmit-travel-panel');
-    const statsPanel  = document.getElementById('tmit-stats-panel');
     const quickPanel  = document.getElementById('tmit-quick-panel');
 
     const isMarket = tab === 'all' || tab === 'watchlist';
@@ -2497,9 +2154,7 @@
     if (colHeaders)   colHeaders.style.display  = isMarket ? '' : 'none';
     if (listEl)       listEl.style.display      = isMarket ? '' : 'none';
     if (warPanel)     warPanel.style.display    = tab === 'war'    ? 'flex' : 'none';
-    if (bbPanel)      bbPanel.style.display     = tab === 'bb'     ? 'flex' : 'none';
     if (travelPanel)  travelPanel.style.display = tab === 'travel' ? 'flex' : 'none';
-    if (statsPanel)   statsPanel.style.display  = tab === 'stats'  ? 'flex' : 'none';
     if (quickPanel)   quickPanel.style.display  = tab === 'quick'  ? 'flex' : 'none';
 
     // Update active tab highlight
@@ -2508,277 +2163,12 @@
     );
 
     if (isMarket)           renderList();
-    else if (tab === 'war')    { renderWarTab(); populateWarItemDropdown(); }
+    else if (tab === 'war')    renderWarTab();
     else if (tab === 'quick')  renderQuickTab();
     else if (tab === 'travel') renderTravelTab();
-    else if (tab === 'stats')  renderStatsTab();
   }
 
-  function renderStatsTab() {
-    renderMyBattleStats();
-    renderStatGains('7');
-    // Load TornStats key if saved
-    const tsKey = load('tsKey', '');
-    const tsInput = document.getElementById('tmit-ts-key-input');
-    if (tsInput && tsKey) tsInput.value = tsKey;
-  }
-
-  function renderMyBattleStats() {
-    const barsEl  = document.getElementById('tmit-bs-bars');
-    const statsEl = document.getElementById('tmit-bs-stats');
-    if (!barsEl || !statsEl) return;
-
-    if (!myBattleStats) {
-      barsEl.innerHTML  = '';
-      statsEl.innerHTML = '<div style="color:#4a3a6a;font-size:11px;">No data yet — click ↻ Update to fetch your stats.</div>';
-      statsEl.style.display = 'block';
-      return;
-    }
-
-    const bs = myBattleStats;
-
-    // Energy / nerve / happy / life bars
-    const bars = [
-      { label: 'Energy', cur: bs.energy,  max: bs.energyMax,  color: '#e8621a' },
-      { label: 'Nerve',  cur: bs.nerve,   max: bs.nerveMax,   color: '#c9a227' },
-      { label: 'Happy',  cur: bs.happy,   max: bs.happyMax,   color: '#50dc82' },
-      { label: 'Life',   cur: bs.life,    max: bs.lifeMax,    color: '#3dd6c8' },
-    ];
-
-    barsEl.innerHTML = bars.map(b => {
-      const pct = b.max > 0 ? Math.round((b.cur / b.max) * 100) : 0;
-      return `<div class="tmit-bar-row">
-        <span class="tmit-bar-label">${b.label}</span>
-        <div class="tmit-bar-track">
-          <div class="tmit-bar-fill" style="width:${pct}%;background:${b.color};"></div>
-        </div>
-        <span class="tmit-bar-val">${b.cur}/${b.max}</span>
-      </div>`;
-    }).join('');
-
-    // Battle stats
-    const maxStat = Math.max(bs.str, bs.def, bs.spd, bs.dex, 1);
-    const statColors = { STR:'#e8621a', DEF:'#3dd6c8', SPD:'#c9a227', DEX:'#b080ff' };
-    const stats = [
-      { key:'STR', val: bs.str, mod: bs.strMod },
-      { key:'DEF', val: bs.def, mod: bs.defMod },
-      { key:'SPD', val: bs.spd, mod: bs.spdMod },
-      { key:'DEX', val: bs.dex, mod: bs.dexMod },
-    ];
-
-    const statRows = stats.map(s => {
-      const pct = Math.round((s.val / maxStat) * 100);
-      const modColor = s.mod > 100 ? '#50dc82' : s.mod < 100 ? '#ff6060' : '#5a4a7a';
-      const modStr = s.mod !== 100 ? `<span class="tmit-bar-mod" style="color:${modColor}">${s.mod}%</span>` : '<span class="tmit-bar-mod"></span>';
-      return `<div class="tmit-bar-row">
-        <span class="tmit-bar-label">${s.key}</span>
-        <div class="tmit-bar-track">
-          <div class="tmit-bar-fill" style="width:${pct}%;background:${statColors[s.key]};"></div>
-        </div>
-        <span class="tmit-bar-val">${formatStatShort(s.val)}</span>
-        ${modStr}
-      </div>`;
-    }).join('');
-
-    // Cooldowns
-    const drugCd    = formatCooldown(bs.drugCd);
-    const boosterCd = formatCooldown(bs.boosterCd);
-    const medCd     = formatCooldown(bs.medicalCd);
-    const cdRows = [
-      drugCd    ? `<div class="tmit-result-row"><span class="tmit-result-label">Drug CD</span><span class="tmit-result-val hot">${drugCd}</span></div>` : '',
-      boosterCd ? `<div class="tmit-result-row"><span class="tmit-result-label">Booster CD</span><span class="tmit-result-val hot">${boosterCd}</span></div>` : '',
-      medCd     ? `<div class="tmit-result-row"><span class="tmit-result-label">Medical CD</span><span class="tmit-result-val hot">${medCd}</span></div>` : '',
-    ].filter(Boolean).join('') || '<div class="tmit-result-row"><span class="tmit-result-label">Cooldowns</span><span class="tmit-result-val" style="color:#50dc82">None active ✓</span></div>';
-
-    statsEl.style.display = 'block';
-    statsEl.innerHTML = `
-      ${statRows}
-      <div style="height:6px;"></div>
-      <div class="tmit-result-row">
-        <span class="tmit-result-label">Total BS</span>
-        <span class="tmit-result-val gold">${formatStatShort(bs.total)}</span>
-      </div>
-      <div class="tmit-result-row">
-        <span class="tmit-result-label">Level</span>
-        <span class="tmit-result-val">${bs.level}</span>
-      </div>
-      ${cdRows}
-      <div class="tmit-result-row" style="margin-top:4px;">
-        <span class="tmit-result-label" style="color:#3a2a5a;">Updated</span>
-        <span style="font-size:9px;color:#3a2a5a;font-family:monospace;">${bs.timestamp ? new Date(bs.timestamp).toLocaleTimeString() : '—'}</span>
-      </div>
-    `;
-  }
-
-  function renderStatGains(window) {
-    const el = document.getElementById('tmit-sg-result');
-    if (!el) return;
-
-    if (statHistory.length < 2) {
-      el.style.display = 'block';
-      el.innerHTML = '<div style="color:#4a3a6a;font-size:11px;">Need at least 2 stat snapshots. Stats are recorded each time you click ↻ Update.</div>';
-      return;
-    }
-
-    const count = window === 'all' ? statHistory.length : Math.min(parseInt(window) + 1, statHistory.length);
-    const recent = statHistory.slice(-count);
-    const first  = recent[0];
-    const last   = recent[recent.length - 1];
-    const days   = (last.ts - first.ts) / (1000 * 60 * 60 * 24);
-    const daysStr = days < 1 ? `${Math.round(days * 24)}h` : `${days.toFixed(1)} days`;
-
-    const gains = {
-      str:   last.str   - first.str,
-      def:   last.def   - first.def,
-      spd:   last.spd   - first.spd,
-      dex:   last.dex   - first.dex,
-      total: last.total - first.total,
-    };
-
-    const perDay = days > 0 ? {
-      str:   gains.str   / days,
-      def:   gains.def   / days,
-      spd:   gains.spd   / days,
-      dex:   gains.dex   / days,
-      total: gains.total / days,
-    } : null;
-
-    el.style.display = 'block';
-    el.innerHTML = `
-      <div class="tmit-result-row"><span class="tmit-result-label">Period</span><span class="tmit-result-val">${daysStr} (${recent.length - 1} snapshots)</span></div>
-      <div class="tmit-result-row"><span class="tmit-result-label">STR gain</span><span class="tmit-result-val hot">${gains.str >= 0 ? '+' : ''}${formatStatShort(gains.str)}</span></div>
-      <div class="tmit-result-row"><span class="tmit-result-label">DEF gain</span><span class="tmit-result-val icy">${gains.def >= 0 ? '+' : ''}${formatStatShort(gains.def)}</span></div>
-      <div class="tmit-result-row"><span class="tmit-result-label">SPD gain</span><span class="tmit-result-val gold">${gains.spd >= 0 ? '+' : ''}${formatStatShort(gains.spd)}</span></div>
-      <div class="tmit-result-row"><span class="tmit-result-label">DEX gain</span><span class="tmit-result-val" style="color:#b080ff">${gains.dex >= 0 ? '+' : ''}${formatStatShort(gains.dex)}</span></div>
-      <div class="tmit-result-row"><span class="tmit-result-label">Total gain</span><span class="tmit-result-val green">${gains.total >= 0 ? '+' : ''}${formatStatShort(gains.total)}</span></div>
-      ${perDay ? `<div class="tmit-result-row"><span class="tmit-result-label">Per day</span><span class="tmit-result-val">${formatStatShort(perDay.total)}/day</span></div>` : ''}
-    `;
-  }
-
-  async function doSpyLookup(playerId) {
-    const resultEl = document.getElementById('tmit-spy-result');
-    if (!resultEl) return null;
-    resultEl.style.display = 'block';
-    resultEl.innerHTML = '<div style="color:#c9a227;font-family:monospace;font-size:11px;">Looking up…</div>';
-
-    const tsKey  = load('tsKey', '');
-    let   spy    = null;
-
-    // Try TornStats first
-    if (tsKey) spy = await fetchTornStatsSpy(tsKey, playerId);
-    // Then YATA
-    if (!spy)  spy = await fetchYataSpy(playerId);
-
-    if (spy) {
-      playerCache[playerId] = { spy, level: null, name: spy.name, cachedAt: Date.now() };
-      savePlayerCache();
-      const age = spy.timestamp ? Math.round((Date.now() - spy.timestamp * 1000) / (1000 * 60 * 60 * 24)) : null;
-      resultEl.innerHTML = `
-        <div class="tmit-result-row"><span class="tmit-result-label">Source</span><span class="tmit-result-val green">${spy.source} ✓</span></div>
-        <div class="tmit-result-row"><span class="tmit-result-label">Player</span><span class="tmit-result-val gold">${spy.name || playerId}</span></div>
-        <div class="tmit-result-row"><span class="tmit-result-label">STR</span><span class="tmit-result-val hot">${formatStatShort(spy.str)}</span></div>
-        <div class="tmit-result-row"><span class="tmit-result-label">DEF</span><span class="tmit-result-val icy">${formatStatShort(spy.def)}</span></div>
-        <div class="tmit-result-row"><span class="tmit-result-label">SPD</span><span class="tmit-result-val gold">${formatStatShort(spy.spd)}</span></div>
-        <div class="tmit-result-row"><span class="tmit-result-label">DEX</span><span class="tmit-result-val" style="color:#b080ff">${formatStatShort(spy.dex)}</span></div>
-        <div class="tmit-result-row"><span class="tmit-result-label">Total</span><span class="tmit-result-val green">${formatStatShort(spy.total)}</span></div>
-        ${age !== null ? `<div class="tmit-result-row"><span class="tmit-result-label">Spy age</span><span class="tmit-result-val">${age} days old</span></div>` : ''}
-      `;
-      return spy;
-    } else {
-      // No spy — show level-based estimate
-      try {
-        const profileData = await apiGet(
-          `https://api.torn.com/user/${playerId}?selections=profile&key=${settings.apiKey}&comment=TEEM`
-        );
-        const level = profileData?.level ?? 0;
-        const est   = estimateFromLevel(level);
-        playerCache[playerId] = { spy: null, estimate: est, level, name: profileData?.name ?? '', cachedAt: Date.now() };
-        savePlayerCache();
-        resultEl.innerHTML = `
-          <div class="tmit-result-row"><span class="tmit-result-label">Player</span><span class="tmit-result-val gold">${profileData?.name ?? playerId}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Level</span><span class="tmit-result-val">${level}</span></div>
-          <div class="tmit-result-row" style="margin-top:4px;"><span class="tmit-result-label">No spy</span><span class="tmit-result-val" style="color:#4a3a6a">Estimated range:</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Total BS</span><span class="tmit-result-val" style="color:#b080ff">${formatStatShort(est.low)} – ${formatStatShort(est.high)}</span></div>
-          <div style="font-size:9px;color:#3a2a5a;margin-top:4px;">Range is a rough estimate based on level only. Add a TornStats key for accurate spy data.</div>
-        `;
-      } catch(e) {
-        resultEl.innerHTML = '<div style="color:#ff6060;font-size:11px;">Could not fetch player data.</div>';
-      }
-      return null;
-    }
-  }
-
-  function doSpyCompare(spy) {
-    const resultEl = document.getElementById('tmit-compare-result');
-    if (!resultEl || !myBattleStats) return;
-    resultEl.style.display = 'block';
-
-    const me = myBattleStats;
-    const stats = ['str','def','spd','dex'];
-    const labels = { str:'STR', def:'DEF', spd:'SPD', dex:'DEX' };
-    const colors = { str:'#e8621a', def:'#3dd6c8', spd:'#c9a227', dex:'#b080ff' };
-
-    const rows = stats.map(s => {
-      const diff = me[s] - spy[s];
-      const pct  = spy[s] > 0 ? Math.round((diff / spy[s]) * 100) : 0;
-      const sign = diff >= 0 ? '+' : '';
-      const col  = diff >= 0 ? '#50dc82' : '#ff6060';
-      return `<div class="tmit-result-row">
-        <span class="tmit-result-label">${labels[s]}</span>
-        <span class="tmit-result-val" style="color:${colors[s]}">${formatStatShort(me[s])}</span>
-        <span style="font-size:9px;color:${col};font-family:monospace;margin-left:4px;">${sign}${formatStatShort(diff)} (${sign}${pct}%)</span>
-      </div>`;
-    }).join('');
-
-    const totalDiff = me.total - spy.total;
-    const totalSign = totalDiff >= 0 ? '+' : '';
-    const totalCol  = totalDiff >= 0 ? '#50dc82' : '#ff6060';
-
-    resultEl.innerHTML = `
-      <div class="tmit-result-row"><span class="tmit-result-label">vs</span><span class="tmit-result-val gold">${spy.name || 'Target'}</span></div>
-      ${rows}
-      <div class="tmit-result-row" style="margin-top:4px;border-top:1px solid rgba(201,162,39,0.15);padding-top:4px;">
-        <span class="tmit-result-label">Total</span>
-        <span class="tmit-result-val">${formatStatShort(me.total)}</span>
-        <span style="font-size:9px;color:${totalCol};font-family:monospace;margin-left:4px;">${totalSign}${formatStatShort(totalDiff)}</span>
-      </div>
-      <div style="font-size:9px;color:#3a2a5a;margin-top:4px;">Positive = you are stronger. Negative = they are stronger.</div>
-    `;
-  }
-
-  // Parse pasted spy report text
-  function parseSpyText(text) {
-    const extract = (label) => {
-      const p1 = new RegExp(label + '[:\\s]+([0-9,.]+[BMKTbmkt]?)', 'i');
-      const p2 = new RegExp(label + '[^0-9]*([0-9,]+)', 'i');
-      for (const pat of [p1, p2]) {
-        const m = text.match(pat);
-        if (m) {
-          const raw = m[1].replace(/,/g, '');
-          const n = parseFloat(raw);
-          if (/t/i.test(raw)) return n * 1e12;
-          if (/b/i.test(raw)) return n * 1e9;
-          if (/m/i.test(raw)) return n * 1e6;
-          if (/k/i.test(raw)) return n * 1e3;
-          return n;
-        }
-      }
-      return 0;
-    };
-    const nameMatch = text.match(/(?:name|player)[^a-z]*([^\n\r]+)/i);
-    return {
-      source:    'Pasted',
-      name:      nameMatch ? nameMatch[1].trim() : 'Target',
-      str:       extract('strength') || extract('str'),
-      def:       extract('defense')  || extract('def'),
-      spd:       extract('speed')    || extract('spd'),
-      dex:       extract('dexterity')|| extract('dex'),
-      get total() { return this.str + this.def + this.spd + this.dex; },
-      timestamp: 0,
-    };
-  }
-
-  // ── Travel Tab ────────────────────────────────────────────────────────────
+  // â”€â”€ Travel Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function renderTravelTab() {
     const listEl = document.getElementById('tmit-travel-list');
@@ -2786,8 +2176,8 @@
 
     if (!travelRanking.length) {
       listEl.innerHTML = `<div class="tmit-state-msg">
-        <div class="tmit-state-icon">✈</div>
-        Waiting for market data. Hit ↻ to force a refresh.
+        <div class="tmit-state-icon">âœˆ</div>
+        Waiting for market data. Hit â†» to force a refresh.
       </div>`;
       return;
     }
@@ -2797,13 +2187,13 @@
       const pphClass  = i === 0 ? 'tmit-travel-pph top' : 'tmit-travel-pph';
       const stockPct  = r.bestItem ? Math.round(r.bestItem.stockLevel * 100) : 100;
       const stockConf = r.bestItem?.stockConf ?? 'assumed';
-      const stockTxt  = stockConf === 'yata' ? `${stockPct}% ✓` : '~stock';
+      const stockTxt  = stockConf === 'yata' ? `${stockPct}% âœ“` : '~stock';
 
       return `<div class="tmit-travel-row ${rankClass}" data-code="${r.code}">
         <div class="tmit-travel-flag">${r.flagEmoji}</div>
         <div>
           <div class="tmit-travel-dest">${r.country}</div>
-          <div class="tmit-travel-sub">${r.bestItem?.name ?? '—'}</div>
+          <div class="tmit-travel-sub">${r.bestItem?.name ?? 'â€”'}</div>
         </div>
         <div class="${pphClass}">${formatPPH(r.profitPerHour)}</div>
         <div class="tmit-travel-time">${getAdjustedTravelTime(r.travelTime)}m ea</div>
@@ -2824,58 +2214,24 @@
         const item = r.bestItem;
         detailEl.innerHTML = `<div class="tmit-travel-detail-card">
           <div class="tmit-result-row"><span class="tmit-result-label">${r.flagEmoji} Destination</span><span class="tmit-result-val gold">${r.country}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Best Item</span><span class="tmit-result-val">${item?.name ?? '—'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Buy Price (abroad)</span><span class="tmit-result-val icy">$${item?.buyPrice?.toLocaleString() ?? '—'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Market Price</span><span class="tmit-result-val hot">$${item?.sellPrice?.toLocaleString() ?? '—'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">After 5% Tax</span><span class="tmit-result-val hot">$${item?.netSellPrice?.toLocaleString() ?? '—'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Profit / Item</span><span class="tmit-result-val green">$${item?.profitPerItem?.toLocaleString() ?? '—'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Carry (effective)</span><span class="tmit-result-val">${item?.actualCap ?? '—'} items</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Total Profit</span><span class="tmit-result-val green">$${item ? Math.round(item.profitPerItem * item.actualCap).toLocaleString() : '—'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Best Item</span><span class="tmit-result-val">${item?.name ?? 'â€”'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Buy Price (abroad)</span><span class="tmit-result-val icy">$${item?.buyPrice?.toLocaleString() ?? 'â€”'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Market Price</span><span class="tmit-result-val hot">$${item?.sellPrice?.toLocaleString() ?? 'â€”'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">After 5% Tax</span><span class="tmit-result-val hot">$${item?.netSellPrice?.toLocaleString() ?? 'â€”'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Profit / Item</span><span class="tmit-result-val green">$${item?.profitPerItem?.toLocaleString() ?? 'â€”'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Carry (effective)</span><span class="tmit-result-val">${item?.actualCap ?? 'â€”'} items</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Total Profit</span><span class="tmit-result-val green">$${item ? Math.round(item.profitPerItem * item.actualCap).toLocaleString() : 'â€”'}</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Flight Type</span><span class="tmit-result-val gold">${({'economy':'Economy','airstrip':'Airstrip -30%','business':'Business -50%','wlt':'WLT -50%'})[settings.flightType] ?? 'Economy'}</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">One-way time</span><span class="tmit-result-val">${getAdjustedTravelTime(r.travelTime)} min</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Round Trip</span><span class="tmit-result-val">${r.roundTripHours.toFixed(1)} hrs</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Profit / Hour</span><span class="tmit-result-val gold">${formatPPH(r.profitPerHour)}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Stock Data</span><span class="tmit-result-val ${item?.stockConf === 'yata' ? 'green' : ''}">${item?.stockConf === 'yata' ? 'YATA ✓' : 'Assumed full'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Stock Data</span><span class="tmit-result-val ${item?.stockConf === 'yata' ? 'green' : ''}">${item?.stockConf === 'yata' ? 'YATA âœ“' : 'Assumed full'}</span></div>
         </div>`;
       });
     });
   }
 
-  // ── War Gear Tab ──────────────────────────────────────────────────────────
-
-  function populateWarItemDropdown(filter = '') {
-    const sel = document.getElementById('tmit-war-item-select');
-    if (!sel) return;
-
-    // Use isRWItem and RW_KNOWN_WEAPONS — the single source of truth
-    // These correctly handle all Torn API type string variations
-    let warItems = Object.values(itemMeta)
-      .filter(m => m.name && isRWItem(m.name, m.type))
-      .sort((a, b) => a.name.localeCompare(b.name));
-
-    // Apply search filter if provided
-    if (filter) {
-      warItems = warItems.filter(m =>
-        m.name.toLowerCase().includes(filter.toLowerCase())
-      );
-    }
-
-    if (!warItems.length) {
-      sel.innerHTML = filter
-        ? `<option value="">— No match for "${filter}" —</option>`
-        : '<option value="">— No data yet — wait for first poll —</option>';
-      return;
-    }
-
-    const currentVal = sel.value;
-    sel.innerHTML = '<option value="">— Pick an item —</option>'
-      + warItems.map(m => {
-          const wt = classifyWeaponType(m.name, m.type) ?? m.type;
-          return `<option value="${m.name}" data-type="${wt ?? ''}">${m.name} (${m.type})</option>`;
-        }).join('');
-
-    if (currentVal) sel.value = currentVal;
-  }
+  // â”€â”€ War Gear Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function renderQuickTab() {
     const listEl = document.getElementById('tmit-quick-list');
@@ -2890,7 +2246,7 @@
         <span style="flex:1;font-size:11px;color:#d8c8f0;">${item.name}</span>
         <button data-quick-remove="${idx}"
           style="font-size:10px;color:#ff6060;background:none;border:none;cursor:pointer;
-                 padding:2px 6px;opacity:0.7;">✕ Remove</button>
+                 padding:2px 6px;opacity:0.7;">âœ• Remove</button>
       </div>
     `).join('');
   }
@@ -2899,10 +2255,13 @@
     const listEl = document.getElementById('tmit-war-tracker-list');
     if (!listEl) return;
 
-    // Build war item list from itemMeta (all known items) merged with
-    // analysisCache prices where available — so guns without price history still show
-    const priceMap = {};
-    for (const r of analysisCache) priceMap[r.name] = r.currentPrice;
+    // Build war item list from itemMeta merged with analysisCache for price + changePct
+    const priceMap     = {};
+    const changePctMap = {};
+    for (const r of analysisCache) {
+      priceMap[r.name]     = r.currentPrice;
+      changePctMap[r.name] = r.changePct ?? 0;
+    }
 
     const warItems = Object.values(itemMeta)
       .filter(m => isRWItem(m.name, m.type))
@@ -2910,11 +2269,12 @@
         name:         m.name,
         type:         m.type,
         currentPrice: priceMap[m.name] ?? m.market_value ?? 0,
+        changePct:    changePctMap[m.name] ?? 0,
       }));
 
     if (warItems.length === 0) {
       listEl.innerHTML = `<div class="tmit-state-msg" style="padding:16px 0;">
-        <div class="tmit-state-icon" style="font-size:20px">⚔</div>
+        <div class="tmit-state-icon" style="font-size:20px">âš”</div>
         No war gear detected yet in market data.<br>
         <span style="font-size:10px;color:#3a2a5a">War weapons and armor will appear here as price history accumulates.</span>
       </div>`;
@@ -2926,7 +2286,7 @@
 
     const rows = sorted.map(r => {
       // Determine rarity from market price ranges (rough heuristic)
-      // Yellow < ~50M, Orange 50M–500M, Red > 500M
+      // Yellow < ~50M, Orange 50Mâ€“500M, Red > 500M
       const price = r.currentPrice;
       const rarity = price > 500_000_000 ? 'red'
                    : price > 50_000_000  ? 'orange'
@@ -2938,32 +2298,32 @@
 
       const weapType = classifyWeaponType(r.name, r.type);
       const bbVal    = rarity ? getBBValue(rarity, 1, weapType) : 0;
-      const bbDollar = bbVal > 0 ? `$${Math.round(bbVal * bbPerDollar / 1_000_000)}M` : '—';
+      const bbDollar = bbVal > 0 ? `$${Math.round(bbVal * bbPerDollar / 1_000_000)}M` : 'â€”';
 
       // Rarity dot indicator
-      const rarityDot = rarity === 'red'    ? '<span style="color:#ff4040;font-size:8px">●</span> '
-                      : rarity === 'orange' ? '<span style="color:#e8621a;font-size:8px">●</span> '
-                      : rarity === 'yellow' ? '<span style="color:#ffe066;font-size:8px">●</span> '
+      const rarityDot = rarity === 'red'    ? '<span style="color:#ff4040;font-size:8px">â—</span> '
+                      : rarity === 'orange' ? '<span style="color:#e8621a;font-size:8px">â—</span> '
+                      : rarity === 'yellow' ? '<span style="color:#ffe066;font-size:8px">â—</span> '
                       : '';
 
       return `<div class="tmit-war-row ${rarity ? rarity+'-item' : ''}">
         <div>
           <div class="tmit-war-name" title="${r.name}">${rarityDot}${r.name}</div>
-          <div style="font-size:9px;color:#3a2a5a">${r.type}${weapType ? ' · '+weapType : ''}</div>
+          <div style="font-size:9px;color:#3a2a5a">${r.type}${weapType ? ' Â· '+weapType : ''}</div>
         </div>
         <div class="tmit-war-price" style="text-align:right">$${r.currentPrice >= 1_000_000
           ? (r.currentPrice/1_000_000).toFixed(1)+'M'
           : r.currentPrice.toLocaleString()}</div>
-        <div class="tmit-war-bb" style="text-align:right">${bbVal ? bbVal+' BB' : '—'}</div>
+        <div class="tmit-war-bb" style="text-align:right">${bbVal ? bbVal+' BB' : 'â€”'}</div>
         <div style="text-align:right;font-size:10px;color:#50dc82">${bbDollar}</div>
-        <div class="${changeClass}" style="text-align:right">${changeSign}${r.changePct}%</div>
+        <div class="${changeClass}" style="text-align:right">${changeSign}${Number(r.changePct).toFixed(1)}%</div>
       </div>`;
     });
 
     listEl.innerHTML = rows.join('');
   }
 
-  // ── BB Calculator Tab ──────────────────────────────────────────────────────
+  // â”€â”€ BB Calculator Tab â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function renderList() {
     const listEl = document.getElementById('tmit-list');
@@ -2993,11 +2353,11 @@
     if (filtered.length === 0) {
       let msg;
       if (isWatchTab) {
-        msg = `<div class="tmit-state-msg"><div class="tmit-state-icon">⭐</div>Your watchlist is empty.<br><span style="font-size:11px">Click any <b style="color:#80b0ff">WATCH</b> badge on the All Items tab to pin it here.</span></div>`;
+        msg = `<div class="tmit-state-msg"><div class="tmit-state-icon">â­</div>Your watchlist is empty.<br><span style="font-size:11px">Click any <b style="color:#80b0ff">WATCH</b> badge on the All Items tab to pin it here.</span></div>`;
       } else if (Object.keys(priceHistory).length === 0) {
-        msg = `<div class="tmit-state-msg"><div class="tmit-state-icon">⏳</div>Collecting data… check back after the first poll completes.</div>`;
+        msg = `<div class="tmit-state-msg"><div class="tmit-state-icon">â³</div>Collecting dataâ€¦ check back after the first poll completes.</div>`;
       } else {
-        msg = `<div class="tmit-state-msg"><div class="tmit-state-icon">🔍</div>No items match your filters.</div>`;
+        msg = `<div class="tmit-state-msg"><div class="tmit-state-icon">ðŸ”</div>No items match your filters.</div>`;
       }
       listEl.innerHTML = msg;
       document.getElementById('tmit-item-count').textContent = 0;
@@ -3010,11 +2370,11 @@
       // Hot/icy row classes based on direction of change
       let rowClass = 'tmit-item-row';
       let spikeIcon = '';
-      if (r.changePct >= 30)       { rowClass = 'tmit-item-row tmit-hot-big'; spikeIcon = '🔥'; }
-      else if (r.changePct >= 15)  { rowClass = 'tmit-item-row tmit-hot';     spikeIcon = '🔥'; }
+      if (r.changePct >= 30)       { rowClass = 'tmit-item-row tmit-hot-big'; spikeIcon = 'ðŸ”¥'; }
+      else if (r.changePct >= 15)  { rowClass = 'tmit-item-row tmit-hot';     spikeIcon = 'ðŸ”¥'; }
       else if (r.changePct > 0)    { rowClass = 'tmit-item-row tmit-hot'; }
-      else if (r.changePct <= -30) { rowClass = 'tmit-item-row tmit-icy-big'; spikeIcon = '🧊'; }
-      else if (r.changePct <= -15) { rowClass = 'tmit-item-row tmit-icy';     spikeIcon = '🧊'; }
+      else if (r.changePct <= -30) { rowClass = 'tmit-item-row tmit-icy-big'; spikeIcon = 'ðŸ§Š'; }
+      else if (r.changePct <= -15) { rowClass = 'tmit-item-row tmit-icy';     spikeIcon = 'ðŸ§Š'; }
       else if (r.changePct < 0)    { rowClass = 'tmit-item-row tmit-icy'; }
       const confDots    = [1,2,3].map(i =>
         `<div class="tmit-conf-dot${i <= r.confidence ? ' filled' : ''}"></div>`
@@ -3041,9 +2401,9 @@
           <div style="display:flex;gap:3px;align-items:center;">
             <button class="tmit-row-btn tmit-pin-row" data-id="${r.itemId}"
               title="${isPinned ? 'Remove from watchlist' : 'Add to watchlist'}"
-              style="color:${isPinned ? '#c9a227' : 'rgba(201,162,39,0.3)'};">★</button>
+              style="color:${isPinned ? '#c9a227' : 'rgba(201,162,39,0.3)'};">â˜…</button>
             <button class="tmit-row-btn tmit-buy-btn" data-id="${r.itemId}" data-name="${r.name}" data-cat="${r.type}"
-              title="Buy on market">🛒</button>
+              title="Buy on market">ðŸ›’</button>
           </div>
         </div>`;
     });
@@ -3073,17 +2433,17 @@
     const lastAlertWindow = load('lastTravelAlertWindow', '');
     if (windowKey === lastAlertWindow) return;
 
-    // ── Cooldown checks ──────────────────────────────────────────────────
+    // â”€â”€ Cooldown checks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (settings.alertOnDrugClear && myBattleStats?.drugCd > 0) return;
     if (settings.alertOnBoosterClear && myBattleStats?.boosterCd > 0) return;
 
-    // ── Stock check ──────────────────────────────────────────────────────
+    // â”€â”€ Stock check â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (settings.alertRequireStock && top.bestItem) {
       const stockLevel = top.bestItem.stockLevel ?? 1;
       if (stockLevel < 0.1) return
     }
 
-    // ── Build notification body ──────────────────────────────────────────
+    // â”€â”€ Build notification body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const mult     = getFlightMultiplier();
     const oneWay   = getAdjustedTravelTime(top.travelTime);
     const flightLabel = {
@@ -3092,7 +2452,7 @@
     }[settings.flightType] ?? 'Economy';
 
     const stockStr = top.bestItem?.stockConf === 'yata'
-      ? ` · Stock: ${Math.round((top.bestItem.stockLevel ?? 1) * 100)}%`
+      ? ` Â· Stock: ${Math.round((top.bestItem.stockLevel ?? 1) * 100)}%`
       : '';
 
     const cdStr = [];
@@ -3100,9 +2460,9 @@
     if (myBattleStats?.boosterCd > 0) cdStr.push('Booster CD: ' + formatCooldown(myBattleStats.boosterCd));
 
     const body = [
-      `${top.flagEmoji} ${top.country} — ${formatPPH(top.profitPerHour)}`,
-      `${top.bestItem?.itemName ?? ''} · ${flightLabel} · ${oneWay}min each way${stockStr}`,
-      cdStr.length ? cdStr.join(' · ') : 'No active cooldowns ✓',
+      `${top.flagEmoji} ${top.country} â€” ${formatPPH(top.profitPerHour)}`,
+      `${top.bestItem?.itemName ?? ''} Â· ${flightLabel} Â· ${oneWay}min each way${stockStr}`,
+      cdStr.length ? cdStr.join(' Â· ') : 'No active cooldowns âœ“',
     ].join('\n');
 
     lastTopTravelCode = top.code;
@@ -3112,7 +2472,7 @@
     store('lastTravelAlertWindow', windowKey);
 
     try {
-      new Notification('TEEM ✈ Good Time to Fly!', { body, icon: '', silent: false });
+      new Notification('TEEM âœˆ Good Time to Fly!', { body, icon: '', silent: false });
     } catch(e) {}
   }
 
@@ -3152,16 +2512,11 @@
     } else if (tab === 'travel') {
       headers = ['Rank','Country','Item','Buy Price','Sell Price','Profit/Item','Carry','Total Profit','Round Trip hrs','Profit/Hr','Stock Confidence'];
       rows = travelRanking.map((r,i) => [
-        i+1, r.country, r.bestItem?.itemName ?? '—',
+        i+1, r.country, r.bestItem?.itemName ?? 'â€”',
         r.bestItem?.buyPrice ?? 0, r.bestItem?.netSellPrice ?? 0,
         r.bestItem?.profitPerItem ?? 0, r.bestItem?.actualCap ?? 0,
         r.bestItem ? Math.round(r.bestItem.profitPerItem * r.bestItem.actualCap) : 0,
-        r.roundTripHours.toFixed(1), r.profitPerHour, r.bestItem?.stockConf ?? '—'
-      ]);
-    } else if (tab === 'bb') {
-      headers = ['Cache','BB Cost','Dollar Value'];
-      rows = Object.entries(BB_CACHE_COSTS).map(([name, cost]) => [
-        name, cost, Math.round(cost * bbPerDollar)
+        r.roundTripHours.toFixed(1), r.profitPerHour, r.bestItem?.stockConf ?? 'â€”'
       ]);
     } else if (tab === 'war') {
       headers = ['Item','Type','Price','BB Value','Dollar Equiv','Change%'];
@@ -3180,7 +2535,7 @@
     if (!rows.length) {
       // Show brief feedback
       const btn = document.getElementById('tmit-btn-export');
-      if (btn) { btn.textContent = '✗ No data'; setTimeout(() => btn.textContent = '⬇ CSV', 1500); }
+      if (btn) { btn.textContent = 'âœ— No data'; setTimeout(() => btn.textContent = 'â¬‡ CSV', 1500); }
       return;
     }
 
@@ -3191,7 +2546,7 @@
     try {
       navigator.clipboard.writeText(csv).then(() => {
         const btn = document.getElementById('tmit-btn-export');
-        if (btn) { btn.textContent = '✓ Copied!'; setTimeout(() => btn.textContent = '⬇ CSV', 2000); }
+        if (btn) { btn.textContent = 'âœ“ Copied!'; setTimeout(() => btn.textContent = 'â¬‡ CSV', 2000); }
       });
     } catch(e) {
       // Fallback: create download
@@ -3209,18 +2564,18 @@
     const ageDotEl = document.getElementById('tmit-age-dot');
     const ageTextEl = document.getElementById('tmit-age-text');
 
-    // Inventory value estimate from price history
-    let invVal = 0;
+    // Recompute session profit fresh on each call — (current - session-start) per item
+    let computedProfit = 0;
     for (const [idStr, hist] of Object.entries(priceHistory)) {
       if (!hist.length) continue;
       const latest = hist[hist.length - 1];
       const price = latest.price || latest.yataPrice || 0;
       if (price > 0) {
-        const startPrice = sessionStartPrices[idStr] ?? price;
         if (!sessionStartPrices[idStr]) sessionStartPrices[idStr] = price;
-        sessionProfit += (price - startPrice);
+        computedProfit += (price - sessionStartPrices[idStr]);
       }
     }
+    sessionProfit = computedProfit;
 
     // Rough inventory value = sum of latest prices of watched items
     let watchedVal = 0;
@@ -3233,7 +2588,7 @@
     }
 
     if (invEl) invEl.textContent = watchedVal > 0
-      ? `$${(watchedVal/1_000_000).toFixed(1)}M` : '—';
+      ? `$${(watchedVal/1_000_000).toFixed(1)}M` : 'â€”';
 
     if (profitEl) {
       const sign = sessionProfit >= 0 ? '+' : '';
@@ -3279,7 +2634,7 @@
     if (nextEl) nextEl.textContent = '~1m';
   }
 
-  // ── Drag ──────────────────────────────────────────────────────────────────────
+  // â”€â”€ Drag â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function makeDraggable(el, handle) {
     let ox = 0, oy = 0, startX = 0, startY = 0;
@@ -3314,7 +2669,7 @@
     });
   }
 
-  // ── Init ──────────────────────────────────────────────────────────────────────
+  // â”€â”€ Init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function init() {
     buildUI();
@@ -3340,7 +2695,7 @@
       const iconSrc = fabImg ? fabImg.src : '';
       buildOnboarding(iconSrc);
     } else {
-      // ── Instant render from cache ──────────────────────────────────────
+      // â”€â”€ Instant render from cache â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       // Render immediately from whatever is in memory (loaded from GM storage
       // at script start) so the market list appears instantly on page load.
       // The background poll will update prices and show a fresh timestamp.
@@ -3369,192 +2724,20 @@
             `<option value="${c}"${c === currentVal ? ' selected' : ''}>${c}</option>`
           ).join('');
         }
-        setStatus('ok', `Cached · ${new Date().toLocaleTimeString()}`);
+        setStatus('ok', `Cached Â· ${new Date().toLocaleTimeString()}`);
       }
-      // Start polling in background — updates prices without blocking UI
+      // Start polling in background â€” updates prices without blocking UI
       startPolling();
     }
 
     // Session tracker update loop
     setInterval(updateSessionTracker, 15000);
 
-    // Start page injector for stat badges
-    startInjector();
-
     // Fetch my own battlestats on startup (silently)
     if (settings.apiKey) { setTimeout(() => fetchMyBattleStats(settings.apiKey), 3000); }
   }
 
-  // ── Page injector — stat badges next to player names ─────────────────────
-
-  // Rate-limit concurrent API calls for badge injection
-  const _badgeQueue = { pending: new Set(), inFlight: 0, maxFlight: 3 };
-
-  async function _processBadgeQueue() {
-    if (_badgeQueue.inFlight >= _badgeQueue.maxFlight) return;
-    for (const fn of _badgeQueue.pending) {
-      if (_badgeQueue.inFlight >= _badgeQueue.maxFlight) break;
-      _badgeQueue.pending.delete(fn);
-      _badgeQueue.inFlight++;
-      fn().finally(() => { _badgeQueue.inFlight--;
-        _processBadgeQueue(); });
-    }
-  }
-
-  function injectStatBadges() {
-    if (!settings.apiKey) return;
-
-    // Match both formats Torn uses: profiles.php?XID= and profiles.php#XID=
-    const links = document.querySelectorAll(
-      'a[href*="profiles.php?XID="], a[href*="profiles.php#XID="]'
-    );
-
-    links.forEach((link) => {
-      // Extract player ID from href
-      const match = (link.href || '').match(/XID=(\d+)/i);
-      if (!match) return;
-      const playerId = match[1];
-
-      // Skip own profile or NPCs
-      if (myBattleStats?.playerId && playerId === String(myBattleStats.playerId)) return;
-      if (parseInt(playerId) < 1) return;
-
-      // Check if badge actually exists in DOM (SPA may have re-rendered it away)
-      const existingBadge = link.parentNode?.querySelector('.teem-stat-badge[data-pid="' + playerId + '"]');
-      if (existingBadge) return
-
-      link.dataset.teemBadged = '1';
-
-      // If already cached, attach immediately without API call
-      if (playerCache[playerId]) { attachBadge(link, playerId);
-        return; }
-
-      // Queue fetch
-      _badgeQueue.pending.add(async () => {
-        try {
-          const tsKey   = load('tsKey',   '');
-          const yataKey = load('yataKey', '');
-          let spy = null;
-
-          if (tsKey)   spy = await fetchTornStatsSpy(tsKey, playerId);
-          if (!spy && yataKey) spy = await fetchYataSpy(playerId);
-          if (!spy)    spy = await fetchYataSpy(playerId)
-
-          if (spy && spy.total > 0) {
-            playerCache[playerId] = { spy, level: null, name: spy.name, cachedAt: Date.now() };
-            savePlayerCache();
-          } else {
-            // Level-based estimate
-            const pd = await apiGet(
-              `https://api.torn.com/user/${playerId}?selections=profile&key=${settings.apiKey}&comment=TEEM`
-            );
-            if (pd && !pd.error) {
-              const level = pd.level ?? 0;
-              playerCache[playerId] = {
-                spy: null,
-                estimate: estimateFromLevel(level),
-                level,
-                name: pd.name ?? '',
-                cachedAt: Date.now(),
-              };
-              savePlayerCache();
-            }
-          }
-          // Re-find the link (DOM may have changed) and attach
-          const freshLink = document.querySelector(`a[href*="XID=${playerId}"]`);
-          if (freshLink) attachBadge(freshLink, playerId);
-        } catch(e) { /* silent fail */ }
-      });
-      _processBadgeQueue();
-    });
-  }
-
-  function attachBadge(link, playerId) {
-    const cached = playerCache[playerId];
-    if (!cached) return;
-
-    // Don't double-badge — check all siblings not just nextSibling
-    const parent = link.parentNode;
-    if (!parent) return;
-    if (parent.querySelector('.teem-stat-badge[data-pid="' + playerId + '"]')) return;
-
-    const badge = document.createElement('span');
-    badge.dataset.pid = playerId;
-
-    if (cached.spy && cached.spy.total > 0) {
-      badge.className = 'teem-stat-badge spy-exact';
-      const ageStr = cached.spy.timestamp
-        ? '\nAge: ' + Math.round((Date.now() - cached.spy.timestamp * 1000) / 86400000) + ' days old'
-        : '';
-      const tip = 'Source: ' + cached.spy.source
-        + '\nSTR: ' + formatStatShort(cached.spy.str)
-        + '\nDEF: ' + formatStatShort(cached.spy.def)
-        + '\nSPD: ' + formatStatShort(cached.spy.spd)
-        + '\nDEX: ' + formatStatShort(cached.spy.dex)
-        + '\nTotal: ' + formatStatShort(cached.spy.total)
-        + ageStr;
-      badge.dataset.tip = tip;
-      badge.innerHTML = '<img class="teem-icon" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🐘%3C/text%3E%3C/svg%3E" alt="🐘" draggable="false"><span class="teem-badge-label">' + formatStatShort(cached.spy.total) + '</span>';
-    } else if (cached.estimate) {
-      badge.className = 'teem-stat-badge spy-range';
-      const tip = 'Lv.' + cached.level + ' — no spy data'
-        + '\nVery rough range: ' + formatStatShort(cached.estimate.low)
-        + ' – ' + formatStatShort(cached.estimate.high)
-        + '\n\u26a0 No spy report found for this player.'
-        + '\nSpy coverage depends on your faction\'s history.';
-      badge.dataset.tip = tip;
-      badge.innerHTML = '<img class="teem-icon" src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🐘%3C/text%3E%3C/svg%3E" alt="🐘" draggable="false"><span class="teem-badge-label">?</span>';
-    } else { return; }
-
-    // Insert right after the link element
-    if (link.nextSibling) { parent.insertBefore(badge, link.nextSibling); } else { parent.appendChild(badge); }
-  }
-
-  // Global tooltip — single div on body, never clipped by ancestors
-  (function() {
-    const globalTip = document.createElement('div');
-    globalTip.id = 'teem-global-tip';
-    document.body.appendChild(globalTip);
-
-    document.addEventListener('mouseover', (e) => {
-      const badge = e.target.closest('.teem-stat-badge');
-      if (!badge || !badge.dataset.tip) return;
-
-      globalTip.textContent = badge.dataset.tip;
-      // Show off-screen first to measure real dimensions
-      globalTip.style.left = '-9999px';
-      globalTip.style.top  = '-9999px';
-      globalTip.classList.add('visible');
-
-      const rect   = badge.getBoundingClientRect();
-      const tipW   = globalTip.offsetWidth;
-      const tipH   = globalTip.offsetHeight;
-      const margin = 10;
-      const vw     = window.innerWidth;
-      const vh     = window.innerHeight;
-
-      // Default: below and left-aligned to badge
-      let top  = rect.bottom + margin;
-      let left = rect.left;
-
-      // Flip above if not enough room below
-      if (top + tipH + margin > vh) top = rect.top - tipH - margin;
-      // Ensure top is never negative
-      if (top < margin) top = margin;
-      // Clamp right overflow
-      if (left + tipW + margin > vw) left = vw - tipW - margin;
-      // Clamp left overflow
-      if (left < margin) left = margin;
-
-      globalTip.style.left = left + 'px';
-      globalTip.style.top  = top  + 'px';
-    });
-
-    document.addEventListener('mouseout', (e) => {
-      if (!e.target.closest('.teem-stat-badge')) return;
-      globalTip.classList.remove('visible');
-    });
-  })();
+  // â”€â”€ Page injector â€” quick bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   // Run injector on page load and on DOM changes (Torn is a SPA)
   function injectQuickBar() {
@@ -3571,7 +2754,7 @@
       + 'max-width:90vw;flex-wrap:wrap;';
 
     bar.innerHTML = '<span style="font-size:9px;color:#6a5a8a;font-weight:700;'
-      + 'text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;">⚡ Quick Use</span>'
+      + 'text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;">âš¡ Quick Use</span>'
       + quickItems.map(item =>
           '<button class="teem-quick-btn" data-item="' + item.name + '" '
           + 'style="background:rgba(201,162,39,0.12);border:1px solid rgba(201,162,39,0.25);'
@@ -3579,70 +2762,50 @@
           + 'font-family:monospace;white-space:nowrap;">' + item.name + '</button>'
         ).join('')
       + '<button id="teem-quick-bar-close" style="background:none;border:none;color:#4a3a6a;'
-      + 'cursor:pointer;font-size:14px;padding:0 3px;margin-left:4px;">✕</button>';
+      + 'cursor:pointer;font-size:14px;padding:0 3px;margin-left:4px;">âœ•</button>';
 
     document.body.appendChild(bar);
 
     bar.querySelector('#teem-quick-bar-close')?.addEventListener('click', () => bar.remove());
 
-    bar.addEventListener('click', async (e) => {
+    // Check sessionStorage for item navigated from another page
+    const pendingItem = sessionStorage.getItem('teem_quick_item');
+    if (pendingItem) {
+      sessionStorage.removeItem('teem_quick_item');
+      setTimeout(() => attemptQuickUse(pendingItem), 800);
+    }
+
+    bar.addEventListener('click', (e) => {
       const btn = e.target.closest('.teem-quick-btn');
       if (!btn) return;
       const itemName = btn.dataset.item;
-      const orig = btn.textContent;
-      btn.textContent = '...';
-      btn.style.color = '#c9a227';
-
-      const used = await attemptQuickUse(itemName);
-      if (used) {
-        btn.textContent = '✓ ' + itemName;
-        btn.style.background = 'rgba(80,180,100,0.2)';
-        btn.style.borderColor = 'rgba(80,180,100,0.4)';
-        btn.style.color = '#50dc82';
-      } else {
-        btn.textContent = itemName + ' (not found)';
-        btn.style.color = '#ff6060';
-        setTimeout(() => {
-          btn.textContent = orig;
-          btn.style.color = '#e8dff5';
-          btn.style.background = 'rgba(201,162,39,0.12)';
-        }, 2500);
+      const found = attemptQuickUse(itemName);
+      if (found) {
+        btn.style.borderColor = 'rgba(201,162,39,0.6)';
+        setTimeout(() => { btn.style.borderColor = ''; }, 3000);
       }
     });
   }
 
-  async function attemptQuickUse(itemName) {
-    // Find item row by name text
-    const nameEls = document.querySelectorAll('.name-wrap .name, .name.bold.t-overflow, [class*="name"]');
-    let itemRow = null;
+  function attemptQuickUse(itemName) {
+    if (!window.location.href.includes('item.php')) {
+      sessionStorage.setItem('teem_quick_item', itemName);
+      window.location.href = 'https://www.torn.com/item.php';
+      return false;
+    }
+    const nameEls = document.querySelectorAll('[class*="name"], .t-overflow');
     for (const el of nameEls) {
       if (el.textContent.trim().toLowerCase() === itemName.toLowerCase()) {
-        itemRow = el.closest('li, .item-info-wrap, [class*="item"]');
-        break;
+        const row = el.closest('li, [class*="item"]');
+        if (!row) continue;
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const prev = row.style.outline;
+        row.style.outline = '2px solid #c9a227';
+        setTimeout(() => { row.style.outline = prev; }, 3000);
+        return true;
       }
     }
-    if (!itemRow) return false;
-
-    // Scroll to item and click it to open use menu
-    itemRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    await new Promise(r => setTimeout(r, 400));
-    itemRow.click();
-    await new Promise(r => setTimeout(r, 600));
-
-    // Click Use button
-    const useBtn = document.querySelector(
-      'button.use-link, a.use-link, [data-action="use"], li.use a, .item-use-btn'
-    );
-    if (!useBtn) return false;
-    useBtn.click();
-    await new Promise(r => setTimeout(r, 400));
-
-    // Click Confirm if present
-    const confirmBtn = document.querySelector(
-      'button.btn-confirm, a.btn-confirm, [data-action="confirm"], .confirm-use'
-    );
-    if (confirmBtn) confirmBtn.click();
-    return true;
+    return false;
   }
 
   // Navigate to item market page and auto-click the cheapest listing
@@ -3654,7 +2817,7 @@
         : 'https://www.torn.com/page.php?sid=ItemMarket';
       return;
     }
-    // Already on market page — find and click the item
+    // Already on market page â€” find and click the item
     await waitForElement('.item-info-wrap, .item-market-wrap', 3000);
     const nameEls = document.querySelectorAll('.t-overflow, .bold.name, [class*="name"]');
     for (const el of nameEls) {
@@ -3723,7 +2886,7 @@
           const priceInput = document.querySelector('input[name="price"], input[class*="price"]');
           if (priceInput) { priceInput.value = price; priceInput.dispatchEvent(new Event('input', { bubbles: true })); }
 
-          // Show confirmation overlay instead of auto-submitting — user confirms final price
+          // Show confirmation overlay instead of auto-submitting â€” user confirms final price
           showSellConfirm(itemName, quantity, price);
         }
         return;
@@ -3742,18 +2905,18 @@
       + 'border-radius:10px;padding:20px 24px;font-family:monospace;min-width:280px;'
       + 'box-shadow:0 8px 32px rgba(0,0,0,0.8);text-align:center;';
     box.innerHTML = `
-      <div style="font-size:13px;color:#c9a227;font-weight:700;margin-bottom:8px;">⚡ TEEM Sell</div>
+      <div style="font-size:13px;color:#c9a227;font-weight:700;margin-bottom:8px;">âš¡ TEEM Sell</div>
       <div style="font-size:11px;color:#d8c8f0;margin-bottom:4px;">${name}</div>
       <div style="font-size:11px;color:#8a7aaa;margin-bottom:12px;">${qty}x @ $${price.toLocaleString()}</div>
       <div style="font-size:10px;color:#4a3a6a;margin-bottom:14px;">Price fields have been auto-filled.<br>Click Confirm to submit the listing.</div>
       <div style="display:flex;gap:8px;justify-content:center;">
         <button id="teem-sell-ok" style="background:rgba(80,180,100,0.2);border:1px solid rgba(80,180,100,0.4);
           border-radius:5px;color:#50dc82;padding:6px 16px;cursor:pointer;font-family:monospace;font-size:11px;">
-          ✓ Confirm
+          âœ“ Confirm
         </button>
         <button id="teem-sell-cancel" style="background:rgba(255,96,96,0.1);border:1px solid rgba(255,96,96,0.3);
           border-radius:5px;color:#ff6060;padding:6px 16px;cursor:pointer;font-family:monospace;font-size:11px;">
-          ✕ Cancel
+          âœ• Cancel
         </button>
       </div>
     `;
@@ -3790,43 +2953,13 @@
     });
   }
 
-  function startInjector() {
-    if (!settings.apiKey) return;
-
-    // Initial runs — Torn's SPA often loads content after initial paint
-    setTimeout(injectStatBadges, 1000);
-    setTimeout(injectStatBadges, 3000);
-    setTimeout(injectStatBadges, 6000);
-
-    // Periodic sweep — catches anything the observer misses, and re-badges
-    // links whose parent nodes were re-rendered by Torn's SPA
-    setInterval(injectStatBadges, 8000);
-
-    // Watch for DOM mutations — but only outside TEEM's own panel
-    // so TEEM's internal re-renders don't constantly debounce the injector
-    const observer = new MutationObserver((mutations) => {
-      // Ignore mutations that only touch TEEM elements
-      const teemOnly = mutations.every(m =>
-        [...m.addedNodes].every(n =>
-          n.nodeType !== 1 ||
-          (n.id && (n.id.startsWith('tmit-') || n.id.startsWith('teem-'))) ||
-          (n.closest && (n.closest('#tmit-panel') || n.closest('#teem-global-tip')))
-        )
-      );
-      if (teemOnly) return;
-      clearTimeout(observer._timer);
-      observer._timer = setTimeout(injectStatBadges, 400);
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-  }
-
   function safeInit() {
     try { init(); } catch(e) {
       // If init crashes, at minimum show the FAB so user knows TEEM is there
       const f = document.createElement('div');
       f.id = 'tmit-fab';
       f.style.cssText = 'position:fixed;bottom:28px;right:28px;width:52px;height:52px;border-radius:50%;background:#2d1b69;border:2px solid #c9a227;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;z-index:2147483646;';
-      f.textContent = '🐘';
+      f.textContent = 'ðŸ˜';
       f.title = 'TEEM error: ' + e.message;
       f.onclick = () => alert('TEEM init error: ' + e.message + '\n\nTry clearing TEEM storage in Tampermonkey dashboard.');
       document.body.appendChild(f);
@@ -3843,12 +2976,12 @@
 
 
   } catch(e) {
-    // Fatal error — show minimal FAB with error info
+    // Fatal error â€” show minimal FAB with error info
     function showError(msg) {
       if (document.body) {
         const f = document.createElement('div');
         f.style.cssText = 'position:fixed;bottom:28px;right:28px;width:52px;height:52px;border-radius:50%;background:#8b0000;border:2px solid #ff4040;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;z-index:2147483647;';
-        f.textContent = '🐘';
+        f.textContent = 'ðŸ˜';
         f.onclick = () => {
           alert('TEEM Error: ' + msg + '\n\nPlease report this to the developer.');
         };
