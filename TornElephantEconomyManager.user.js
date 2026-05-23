@@ -2057,8 +2057,12 @@
       renderList();
     });
 
-    // Search
-    panel.querySelector('#tmit-search').addEventListener('input', () => renderList());
+    // Search — debounced so a full re-render doesn't fire on every keystroke
+    let searchDebounce;
+    panel.querySelector('#tmit-search').addEventListener('input', () => {
+      clearTimeout(searchDebounce);
+      searchDebounce = setTimeout(renderList, 200);
+    });
 
     // Budget / min pct filters
     panel.querySelector('#tmit-budget-input').addEventListener('change', (e) => {
@@ -2429,6 +2433,14 @@
       return true;
     });
 
+    // Cap rendered rows so the periodic DOM rebuild can't freeze the tab.
+    // Beyond ~200 items a human can't visually scan anyway; sorted by
+    // absolute change %, the top slice is also the most actionable.
+    const MAX_RENDERED_ROWS = 200;
+    const totalMatched = filtered.length;
+    const truncated = totalMatched > MAX_RENDERED_ROWS;
+    if (truncated) filtered = filtered.slice(0, MAX_RENDERED_ROWS);
+
     // Remember which items are on screen so the next poll fetches live prices
     // for exactly the view the user is looking at
     lastRenderedIds = filtered.map(r => r.itemId).filter(Number.isFinite);
@@ -2493,8 +2505,16 @@
         </div>`;
     });
 
-    listEl.innerHTML = rows.join('');
-    document.getElementById('tmit-item-count').textContent = filtered.length;
+    const overflowMsg = truncated
+      ? `<div style="padding:14px 16px;text-align:center;font-size:11px;color:#a08fc0;border-top:1px solid rgba(151,2,173,0.18);background:rgba(0,0,0,0.25);">
+           Showing top <b style="color:#c9a227">${MAX_RENDERED_ROWS}</b> of <b style="color:#c9a227">${totalMatched.toLocaleString()}</b> items
+           — narrow down with search, category or filters to see more.
+         </div>`
+      : '';
+    listEl.innerHTML = rows.join('') + overflowMsg;
+    document.getElementById('tmit-item-count').textContent = truncated
+      ? `${MAX_RENDERED_ROWS}/${totalMatched.toLocaleString()}`
+      : filtered.length;
     updateWatchCount();
   }
 
