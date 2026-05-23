@@ -517,6 +517,45 @@
     change:     'Price change % over your selected timeframe.\nOrange = price rising (hot). Teal = falling (cold).',
     dataAge:    'How long ago prices were last fetched. Green = fresh. Yellow = >5min old. Red = >15min.',
   };
+  // ── Brand mark ─────────────────────────────────────────────────────────────
+  // Custom logo: an anthropomorphic elephant with a magenta flame mohawk,
+  // lavender body, big confident eyes, smirk, and trunk curled around a
+  // gold coin (the literal "Elephant Economy Manager" thesis). Replaces
+  // the OS-rendered 🐘 emoji so the brand looks the same on every device.
+  // Used in the FAB, the panel title, and onboarding.
+  const TEEM_ELEPHANT_SVG = (
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
+    // Purple flame mohawk
+    + "<path d='M36 26 Q39 6 43 20 Q46 2 50 18 Q54 2 57 20 Q61 6 64 26 Z' fill='#e040f0' stroke='#5a0070' stroke-width='2.5' stroke-linejoin='round'/>"
+    // Floppy ears
+    + "<path d='M30 40 Q12 44 14 64 Q18 80 36 72 Z' fill='#a890c0' stroke='#1a0020' stroke-width='3.5' stroke-linejoin='round'/>"
+    + "<path d='M70 40 Q88 44 86 64 Q82 80 64 72 Z' fill='#a890c0' stroke='#1a0020' stroke-width='3.5' stroke-linejoin='round'/>"
+    // Head
+    + "<ellipse cx='50' cy='52' rx='22' ry='24' fill='#d0bce0' stroke='#1a0020' stroke-width='3.5'/>"
+    // Pink cheek blush
+    + "<ellipse cx='38' cy='60' rx='4' ry='2.5' fill='#e090c8' opacity='0.7'/>"
+    + "<ellipse cx='62' cy='60' rx='4' ry='2.5' fill='#e090c8' opacity='0.7'/>"
+    // Confident eyes (sclera + pupil + highlight)
+    + "<ellipse cx='42' cy='49' rx='4.5' ry='5.5' fill='#fff' stroke='#1a0020' stroke-width='2'/>"
+    + "<ellipse cx='58' cy='49' rx='4.5' ry='5.5' fill='#fff' stroke='#1a0020' stroke-width='2'/>"
+    + "<circle cx='43' cy='50' r='3' fill='#1a0020'/>"
+    + "<circle cx='59' cy='50' r='3' fill='#1a0020'/>"
+    + "<circle cx='44' cy='49' r='1' fill='#fff'/>"
+    + "<circle cx='60' cy='49' r='1' fill='#fff'/>"
+    // Smirk
+    + "<path d='M43 64 Q50 68 57 64' fill='none' stroke='#1a0020' stroke-width='3' stroke-linecap='round'/>"
+    // Trunk curling around a coin
+    + "<path d='M50 68 Q44 78 52 84 Q64 88 68 78 Q68 70 60 72' fill='#d0bce0' stroke='#1a0020' stroke-width='3.5' stroke-linejoin='round' stroke-linecap='round'/>"
+    // Gold coin held in trunk's curl
+    + "<circle cx='62' cy='78' r='5' fill='#ffe066' stroke='#7a5d10' stroke-width='2'/>"
+    + "<circle cx='62' cy='78' r='2.5' fill='none' stroke='#c9a227' stroke-width='1'/>"
+    // Gold tusks
+    + "<path d='M43 66 L41 74 L46 73 Z' fill='#ffe066' stroke='#7a5d10' stroke-width='1.5'/>"
+    + "<path d='M57 66 L59 74 L54 73 Z' fill='#ffe066' stroke='#7a5d10' stroke-width='1.5'/>"
+    + "</svg>"
+  );
+  const TEEM_ELEPHANT_DATAURL = "data:image/svg+xml," + encodeURIComponent(TEEM_ELEPHANT_SVG);
+
   let alertActive = false, pollingTimer = null, statsTimer = null, uiBuilt = false;
   let sessionTimer = null, footerTimer = null;
   let backgroundSuspended = true;  // start suspended — only run when panel is open
@@ -1562,7 +1601,7 @@
       + 'border:2px solid #c9a227;cursor:pointer;display:flex;align-items:center;'
       + 'justify-content:center;z-index:2147483000;box-shadow:0 0 14px rgba(151,2,173,0.6),'
       + '0 4px 24px rgba(0,0,0,0.8);';
-    fab.innerHTML = `<img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🐘%3C/text%3E%3C/svg%3E" style="width:34px;height:34px;border-radius:50%;pointer-events:none;" draggable="false"><div class="tmit-alert-badge" id="tmit-alert-badge">💰</div>`;
+    fab.innerHTML = `<img src="${TEEM_ELEPHANT_DATAURL}" style="width:38px;height:38px;border-radius:50%;pointer-events:none;" draggable="false"><div class="tmit-alert-badge" id="tmit-alert-badge">💰</div>`;
     fab.title = "TEEM — Torn's Elephant Economy Manager";
     document.body.appendChild(fab);
 
@@ -1573,7 +1612,7 @@
     panel.innerHTML = `
       <div class="tmit-header" id="tmit-drag-handle">
         <div class="tmit-title">
-          <img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🐘%3C/text%3E%3C/svg%3E" style="width:22px;height:22px;border-radius:50%;flex-shrink:0;" draggable="false">
+          <img src="${TEEM_ELEPHANT_DATAURL}" style="width:24px;height:24px;border-radius:50%;flex-shrink:0;" draggable="false">
           Elephant Economy Manager
         </div>
         <div class="tmit-header-right">
