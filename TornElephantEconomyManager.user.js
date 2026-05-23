@@ -896,26 +896,29 @@
   // Cached for 6h in GM storage — most page loads skip this entirely
   async function fetchAllItems(apiKey) {
     const now = Date.now();
-    const hasMeta = Object.keys(itemMeta).length > 0;
+    // The RW temp seed (rw_* keys with market_value:0) only exists so the
+    // War Gear tab has names to show before the first real poll. It must
+    // NOT count as "we have a cached catalog" — if it did, we'd silently
+    // suppress real torn/items errors on a fresh install and the snapshot
+    // loop would iterate temp seeds with no prices and write nothing.
+    // lastMetadataFetch is set only after a successful real fetch, so it
+    // is the authoritative "do we have real items cached" signal.
+    const hasRealMeta = lastMetadataFetch > 0;
     const isStale = (now - lastMetadataFetch) > METADATA_TTL_MS;
 
-    // Skip fetch entirely if cached data is still fresh
-    if (hasMeta && !isStale) return {};
+    if (hasRealMeta && !isStale) return {};
 
-    // If we have stale cached data, try to refresh but don't block the poll
-    // — use a reasonable timeout and fall back gracefully
     try {
       const data = await apiGetWithTimeout(
         `https://api.torn.com/torn/?selections=items&key=${apiKey}&comment=TEEM`,
         20000
       );
       if (data?._error) {
-        // Timeout or network error — use cached data if available
-        if (hasMeta) return {};
+        if (hasRealMeta) return {};
         throw new Error('Torn API unreachable — check your connection');
       }
       if (data?.error) {
-        if (hasMeta) return {};
+        if (hasRealMeta) return {};
         throw new Error(`Torn API error ${data.error.code}: ${data.error.error}`);
       }
       const items = data?.items ?? {};
@@ -924,10 +927,10 @@
         store('lastMetadataFetch', now);
         return items;
       }
-      if (hasMeta) return {};
+      if (hasRealMeta) return {};
       throw new Error('Torn API returned no items');
     } catch(e) {
-      if (hasMeta) return {}
+      if (hasRealMeta) return {}
       throw e
     }
   }
@@ -1324,26 +1327,49 @@
         }
       } catch(e) { /* silent fail */ }
 
-      // Record price snapshots
+      // Record price snapshots.
+      // Iterate the union of itemMeta + livePrices + yataPrices keys so we
+      // record snapshots even when torn/items has failed and itemMeta is
+      // missing/only-temp-seeded. Without this, fetching live prices for
+      // the 14 hardcoded ALWAYS_LIVE_IDS would still record zero snapshots
+      // because the meta loop skipped all temp-seeded entries.
       // Priority: live listing > YATA > market_value
-      // market_value is recorded only if it changed since last snapshot
-      // (avoids flat unchanging history lines for rarely-traded items)
-      for (const [idStr, meta] of Object.entries(itemMeta)) {
-        const id        = parseInt(idStr);
-        const livePrice = livePrices?.[id]   ?? 0;
-        const yataPrice = yataPrices[id]      ?? 0;
-        const mv        = meta.market_value   ?? 0;
+      // market_value is recorded only if it changed since last snapshot.
+      const recordIds = new Set();
+      for (const k of Object.keys(itemMeta)) {
+        if (String(k).startsWith('rw_')) continue;
+        const n = parseInt(k);
+        if (Number.isFinite(n)) recordIds.add(n);
+      }
+      for (const k of Object.keys(livePrices)) {
+        const n = parseInt(k);
+        if (Number.isFinite(n)) recordIds.add(n);
+      }
+      for (const k of Object.keys(yataPrices)) {
+        const n = parseInt(k);
+        if (Number.isFinite(n)) recordIds.add(n);
+      }
+
+      for (const id of recordIds) {
+        const meta      = itemMeta[id];
+        const livePrice = livePrices?.[id] ?? 0;
+        const yataPrice = yataPrices[id]   ?? 0;
+        const mv        = meta?.market_value ?? 0;
 
         const tornPrice = livePrice || mv;
         if (tornPrice <= 0 && yataPrice <= 0) continue;
 
-        // For market_value: only record if it changed from last snapshot
-        // to avoid flooding history with identical values
+        // Lazy meta backfill: if we have a price for an ID with no metadata
+        // (because torn/items failed), at least create a placeholder so it
+        // shows up in the panel instead of vanishing.
+        if (!itemMeta[id]) {
+          itemMeta[id] = { name: `Item #${id}`, type: 'Unknown', market_value: mv };
+        }
+
         if (!livePrice && mv > 0) {
           const hist = priceHistory[id];
           const lastMv = hist?.length ? hist[hist.length - 1].price : -1;
           if (mv === lastMv) {
-            // mv unchanged — still record yata update if we have one
             if (yataPrice > 0) appendHistory(id, 0, yataPrice);
             continue;
           }
