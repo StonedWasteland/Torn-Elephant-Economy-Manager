@@ -632,7 +632,7 @@
        detected. Toggling the .tmit-alert class is a single display swap,
        no per-frame work. Background color reflects the item-type of the
        biggest spike (set via .type-* class on the badge). */
-    #tmit-fab .tmit-alert-badge{display:none;position:absolute;top:-4px;right:-4px;width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ffe680 0%,#c9a227 55%,#7a5d10 100%);border:2px solid #09000d;box-shadow:0 0 8px rgba(255,224,102,0.7),inset 0 1px 1px rgba(255,255,255,0.4);align-items:center;justify-content:center;font-size:11px;line-height:1;pointer-events:none;}
+    #tmit-fab .tmit-alert-badge{display:none;position:absolute;top:-5px;right:-5px;width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ffe680 0%,#c9a227 55%,#7a5d10 100%);border:2px solid #09000d;box-shadow:0 0 8px rgba(255,224,102,0.7),inset 0 1px 1px rgba(255,255,255,0.4);align-items:center;justify-content:center;font-size:13px;line-height:1;pointer-events:none;}
     #tmit-fab.tmit-alert .tmit-alert-badge{display:flex;}
     /* Badge type colors — keyed to common Torn item categories. */
     .tmit-alert-badge.type-drug{background:radial-gradient(circle at 35% 35%,#d680f0 0%,#9702ad 55%,#5a106a 100%);box-shadow:0 0 8px rgba(151,2,173,0.7),inset 0 1px 1px rgba(255,255,255,0.4);}
@@ -1281,6 +1281,7 @@
         // Replace any previous type-* class without touching unrelated ones.
         badge.className = 'tmit-alert-badge' + (typeClass ? ' ' + typeClass : '');
         badge.dataset.typeClass = typeClass;
+        badge.textContent = badgeIconForType(top.type);
         badge.title = `${top.name} ${top.changePct > 0 ? '+' : ''}${top.changePct}%`;
       }
     } else if (alertActive) {
@@ -1307,6 +1308,26 @@
     if (RW_ARMOR_TYPE_LOWER.has(t) || t === 'defensive')              return 'type-armor';
     if (RW_WEAPON_TYPE_LOWER.has(t) || t === 'temporary')             return 'type-weapon';
     return '';
+  }
+
+  // Pick a micro-icon for the badge based on item type. Pairs with the
+  // colored background to give the user both a category color AND a
+  // recognizable symbol at a glance — no need to open the panel to know
+  // whether it's drugs, weapons, plushies, etc.
+  function badgeIconForType(type) {
+    if (!type) return '💰';
+    const t = String(type).toLowerCase();
+    if (t === 'drug')                                                 return '💊';
+    if (t === 'medical')                                              return '🩹';
+    if (t === 'plushie')                                              return '🧸';
+    if (t === 'flower')                                               return '🌸';
+    if (t === 'booster')                                              return '🍫';
+    if (t === 'energy drink')                                         return '⚡';
+    if (t === 'alcohol')                                              return '🍺';
+    if (t === 'special')                                              return '✨';
+    if (RW_ARMOR_TYPE_LOWER.has(t) || t === 'defensive')              return '🛡';
+    if (RW_WEAPON_TYPE_LOWER.has(t) || t === 'temporary')             return '⚔';
+    return '💰';
   }
 
   async function poll(force = false) {
@@ -1541,7 +1562,7 @@
       + 'border:2px solid #c9a227;cursor:pointer;display:flex;align-items:center;'
       + 'justify-content:center;z-index:2147483000;box-shadow:0 0 14px rgba(151,2,173,0.6),'
       + '0 4px 24px rgba(0,0,0,0.8);';
-    fab.innerHTML = `<img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🐘%3C/text%3E%3C/svg%3E" style="width:34px;height:34px;border-radius:50%;pointer-events:none;" draggable="false"><div class="tmit-alert-badge" id="tmit-alert-badge">🐘</div>`;
+    fab.innerHTML = `<img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🐘%3C/text%3E%3C/svg%3E" style="width:34px;height:34px;border-radius:50%;pointer-events:none;" draggable="false"><div class="tmit-alert-badge" id="tmit-alert-badge">💰</div>`;
     fab.title = "TEEM — Torn's Elephant Economy Manager";
     document.body.appendChild(fab);
 
