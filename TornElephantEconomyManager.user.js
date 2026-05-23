@@ -518,6 +518,8 @@
     dataAge:    'How long ago prices were last fetched. Green = fresh. Yellow = >5min old. Red = >15min.',
   };
   let alertActive = false, pollingTimer = null, statsTimer = null, uiBuilt = false;
+  let sessionTimer = null, footerTimer = null;
+  let backgroundSuspended = true;  // start suspended — only run when panel is open
   let pollCounter = 0;  // increments each poll; drives adaptive cadence in buildPriorityList
 
   async function fetchMyBattleStats(apiKey) {
@@ -634,7 +636,7 @@
     #tmit-fab.tmit-alert .tmit-alert-dot{display:block;}
     @keyframes tmit-dotpop{from{transform:scale(0);}to{transform:scale(1);}}
     #tmit-panel{position:fixed;bottom:90px;right:28px;width:520px;max-height:620px;background:linear-gradient(180deg,rgba(50,0,66,0.97) 0%,rgba(18,0,28,0.99) 40%,rgba(7,0,10,1) 100%);border:1px solid #9702ad;border-top:3px solid #c9a227;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,0.8),0 0 50px rgba(151,2,173,0.12),0 24px 80px rgba(0,0,0,0.9),inset 0 1px 0 rgba(201,162,39,0.15);z-index:999998;display:flex;flex-direction:column;overflow:hidden;font-family:'Inter',sans-serif;color:#f0d5f8;transition:opacity 0.2s,transform 0.2s;}
-    #tmit-panel.tmit-hidden{opacity:0;pointer-events:none;transform:translateY(12px);}
+    #tmit-panel.tmit-hidden{display:none !important;}
     .tmit-header{background:linear-gradient(90deg,rgba(50,0,66,1) 0%,rgba(18,0,28,1) 60%,rgba(8,0,14,1) 100%);border-bottom:1px solid rgba(151,2,173,0.35);padding:11px 16px;display:flex;align-items:center;justify-content:space-between;cursor:move;flex-shrink:0;position:relative;}
     .tmit-header::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent 0%,#c9a227 30%,#ffe066 50%,#c9a227 70%,transparent 100%);opacity:0.7;}
     .tmit-title{font-family:'Cinzel',serif;font-size:14px;font-weight:700;color:#c9a227;letter-spacing:0.06em;display:flex;align-items:center;gap:8px;text-shadow:0 0 12px rgba(201,162,39,0.4);}
@@ -692,13 +694,13 @@
     .tmit-item-row.tmit-hot{background:linear-gradient(90deg,rgba(232,98,26,0.08) 0%,transparent 100%);border-left:2px solid #e8621a;}
     .tmit-item-row.tmit-hot::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,#ffe066,#e8621a,#8b2500);box-shadow:0 0 6px rgba(232,98,26,0.6);}
     .tmit-item-row.tmit-hot:hover{background:linear-gradient(90deg,rgba(232,98,26,0.13) 0%,transparent 100%);}
-    .tmit-item-row.tmit-hot-big{background:linear-gradient(90deg,rgba(232,98,26,0.14) 0%,transparent 70%);border-left:2px solid #ff6a00;animation:tmit-ember 2s ease-in-out infinite alternate;}
+    .tmit-item-row.tmit-hot-big{background:linear-gradient(90deg,rgba(232,98,26,0.16) 0%,transparent 70%);border-left:2px solid #ff6a00;}
     .tmit-item-row.tmit-hot-big::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,#fff0a0,#ff6a00,#8b2500);box-shadow:0 0 10px rgba(255,106,0,0.8);}
     @keyframes tmit-ember{from{background:linear-gradient(90deg,rgba(232,98,26,0.10) 0%,transparent 70%);}to{background:linear-gradient(90deg,rgba(232,98,26,0.20) 0%,transparent 70%);}}
     .tmit-item-row.tmit-icy{background:linear-gradient(90deg,rgba(61,214,200,0.07) 0%,transparent 100%);border-left:2px solid #3dd6c8;}
     .tmit-item-row.tmit-icy::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,#e0ffff,#3dd6c8,#0a5a54);box-shadow:0 0 6px rgba(61,214,200,0.5);}
     .tmit-item-row.tmit-icy:hover{background:linear-gradient(90deg,rgba(61,214,200,0.11) 0%,transparent 100%);}
-    .tmit-item-row.tmit-icy-big{background:linear-gradient(90deg,rgba(61,214,200,0.12) 0%,transparent 70%);border-left:2px solid #00e5ff;animation:tmit-frost 2.5s ease-in-out infinite alternate;}
+    .tmit-item-row.tmit-icy-big{background:linear-gradient(90deg,rgba(61,214,200,0.14) 0%,transparent 70%);border-left:2px solid #00e5ff;}
     .tmit-item-row.tmit-icy-big::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,#ffffff,#00e5ff,#005566);box-shadow:0 0 10px rgba(0,229,255,0.7);}
     @keyframes tmit-frost{from{background:linear-gradient(90deg,rgba(61,214,200,0.08) 0%,transparent 70%);}to{background:linear-gradient(90deg,rgba(61,214,200,0.16) 0%,transparent 70%);}}
     .tmit-item-row.tmit-pinned{border-left:2px solid #c9a227;background:rgba(201,162,39,0.04);}
@@ -1422,6 +1424,31 @@
     }, Math.min(statsMs / 2, 15000));
   }
 
+  // ── Sleep mode ──────────────────────────────────────────────────────────────
+  // When the panel is hidden, TEEM does zero background work — no polls, no
+  // session/footer ticks. This is the only reliable way to guarantee the
+  // script can't be the source of CPU drag while the user isn't looking at it.
+  // Background work resumes when the panel is opened (and an apiKey exists).
+
+  function suspendBackgroundWork() {
+    if (backgroundSuspended) return;
+    backgroundSuspended = true;
+    if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
+    if (statsTimer)   { clearInterval(statsTimer);   statsTimer   = null; }
+    if (sessionTimer) { clearInterval(sessionTimer); sessionTimer = null; }
+    if (footerTimer)  { clearInterval(footerTimer);  footerTimer  = null; }
+    try { saveHistoryNow(); } catch(e) {}
+  }
+
+  function resumeBackgroundWork() {
+    if (!backgroundSuspended) return;
+    if (!settings.apiKey) return;  // nothing to poll without a key
+    backgroundSuspended = false;
+    startPolling();
+    if (!sessionTimer) sessionTimer = setInterval(updateSessionTracker, 15000);
+    if (!footerTimer)  footerTimer  = setInterval(updateFooter, 30000);
+  }
+
   // ── UI ────────────────────────────────────────────────────────────────────────
 
   function buildUI() {
@@ -1685,7 +1712,7 @@
 
     bindEvents(fab, panel);
     updateFooter();
-    setInterval(updateFooter, 30000);
+    // footerTimer is started by resumeBackgroundWork() when the panel opens
 
     // Restore FAB position
     if (settings.fabX !== null) {
@@ -1962,8 +1989,10 @@
     }
 
     switchTab(settings.activeTab || 'all');
-    // The session bar and footer skip their work while the panel is hidden,
-    // so refresh them on open to avoid showing stale numbers.
+    // Resume background polling + session/footer timers. If they were already
+    // running this is a no-op. If we were suspended (panel was hidden), this
+    // also kicks off an immediate poll so the user sees fresh data.
+    resumeBackgroundWork();
     updateSessionTracker();
     updateFooter();
   }
@@ -2004,8 +2033,12 @@
           saveSettings();
         } else {
           // Simple click — toggle panel
-          if (panel.classList.contains('tmit-hidden')) openPanel(fab, panel);
-          else panel.classList.add('tmit-hidden');
+          if (panel.classList.contains('tmit-hidden')) {
+            openPanel(fab, panel);
+          } else {
+            panel.classList.add('tmit-hidden');
+            suspendBackgroundWork();
+          }
         }
         fabDragging = false;
       };
@@ -2014,7 +2047,10 @@
       document.addEventListener('mouseup',   onUp);
     });
 
-    panel.querySelector('#tmit-btn-close').addEventListener('click', () => { panel.classList.add('tmit-hidden'); });
+    panel.querySelector('#tmit-btn-close').addEventListener('click', () => {
+      panel.classList.add('tmit-hidden');
+      suspendBackgroundWork();
+    });
 
     // Refresh
     panel.querySelector('#tmit-btn-refresh').addEventListener('click', () => poll(true));
@@ -2839,8 +2875,12 @@
         const panel = document.getElementById('tmit-panel');
         const fab   = document.getElementById('tmit-fab');
         if (panel && fab) {
-          if (panel.classList.contains('tmit-hidden')) openPanel(fab, panel);
-          else panel.classList.add('tmit-hidden');
+          if (panel.classList.contains('tmit-hidden')) {
+            openPanel(fab, panel);
+          } else {
+            panel.classList.add('tmit-hidden');
+            suspendBackgroundWork();
+          }
         }
       }
     });
@@ -2862,6 +2902,7 @@
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'visible') return;
       if (!settings.apiKey) return;
+      if (backgroundSuspended) return;  // panel is closed — stay asleep
       if (Date.now() - lastVisPoll < 30000) return;
       lastVisPoll = Date.now();
       poll();
@@ -2904,12 +2945,11 @@
         }
         setStatus('ok', `Cached · ${new Date().toLocaleTimeString()}`);
       }
-      // Start polling in background — updates prices without blocking UI
-      startPolling();
+      // Panel starts hidden — defer polling and session/footer timers until
+      // the user opens the panel. This is the core of sleep mode: when nobody
+      // is looking at TEEM, TEEM does literally nothing in the background.
+      // resumeBackgroundWork() is called from openPanel().
     }
-
-    // Session tracker update loop
-    setInterval(updateSessionTracker, 15000);
 
     // Fetch my own battlestats on startup (silently)
     if (settings.apiKey) { setTimeout(() => fetchMyBattleStats(settings.apiKey), 3000); }
