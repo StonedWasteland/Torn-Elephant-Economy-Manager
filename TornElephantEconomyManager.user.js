@@ -375,6 +375,7 @@
     alertOnDrugClear: false,    // only alert when drug cooldown is clear
     alertOnBoosterClear: false, // only alert when booster cooldown is clear
     alertRequireStock: false,   // only alert when YATA confirms stock
+    spikeAlertEnabled: true,    // pulse the FAB on 30%+ price spikes
     minimized: false,
     posX: null,
     posY: null,
@@ -1203,12 +1204,14 @@
 
     analysisCache = results;
 
-    // Alert if any big spikes
+    // Alert if any big spikes — gated by the spikeAlertEnabled setting
+    // (treat undefined as enabled so existing users keep the default).
     const bigSpikes = results.filter(r => r.isBigSpike);
-    if (bigSpikes.length > 0 && !alertActive) {
+    const wantAlert = settings.spikeAlertEnabled !== false && bigSpikes.length > 0;
+    if (wantAlert && !alertActive) {
       alertActive = true;
       document.getElementById('tmit-fab')?.classList.add('tmit-alert');
-    } else if (bigSpikes.length === 0 && alertActive) {
+    } else if (!wantAlert && alertActive) {
       alertActive = false;
       document.getElementById('tmit-fab')?.classList.remove('tmit-alert');
     }
@@ -1615,6 +1618,16 @@
             style="background:none;border:1px solid rgba(201,162,39,0.2);color:#a294c0;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;">👁</button>
         </div>
         <div id="tmit-yata-key-status" style="font-size:10px;min-height:14px;margin-bottom:10px;padding-left:2px;"></div>
+
+        <!-- ALERTS -->
+        <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c9a227;margin-bottom:6px;margin-top:4px;">
+          Alerts
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:11px;color:#d8c8f0;cursor:pointer;margin-bottom:10px;padding:6px 8px;background:rgba(0,0,0,0.25);border:1px solid rgba(151,2,173,0.15);border-radius:5px;">
+          <input type="checkbox" id="tmit-spike-alert" ${settings.spikeAlertEnabled !== false ? 'checked' : ''}
+            style="accent-color:#c9a227;cursor:pointer;">
+          <span style="flex:1;">Pulse the elephant on big spikes <span style="color:#a08fc0;font-size:10px;">(30%+ price moves)</span></span>
+        </label>
 
         <button class="tmit-btn-save" id="tmit-btn-save" style="width:100%;">💾 Save All Settings</button>
       </div>
@@ -2137,6 +2150,16 @@
       if (e.target.id === 'tmit-alert-stock') {
         settings.alertRequireStock = e.target.checked;
         saveSettings();
+      }
+      if (e.target.id === 'tmit-spike-alert') {
+        settings.spikeAlertEnabled = e.target.checked;
+        saveSettings();
+        // If disabling while currently pulsing, stop immediately —
+        // don't wait for the next poll to clear the animation.
+        if (!e.target.checked && alertActive) {
+          alertActive = false;
+          document.getElementById('tmit-fab')?.classList.remove('tmit-alert');
+        }
       }
     });
 
