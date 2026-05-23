@@ -523,35 +523,57 @@
   // gold coin (the literal "Elephant Economy Manager" thesis). Replaces
   // the OS-rendered 🐘 emoji so the brand looks the same on every device.
   // Used in the FAB, the panel title, and onboarding.
+  // Esports-mascot style: front-facing elephant on a purple-outlined shield.
+  // Magenta flame mohawk (TEEM signature) + iconic pixel "deal-with-it"
+  // sunglasses (cool factor, reads at small sizes) + trunk hanging from the
+  // face center with a gold coin in its curl (the brand thesis: elephant
+  // managing the economy). Gritty gray palette and bold black outlines
+  // match the badass esports-mascot aesthetic.
   const TEEM_ELEPHANT_SVG = (
     "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>"
-    // Purple flame mohawk
-    + "<path d='M36 26 Q39 6 43 20 Q46 2 50 18 Q54 2 57 20 Q61 6 64 26 Z' fill='#e040f0' stroke='#5a0070' stroke-width='2.5' stroke-linejoin='round'/>"
-    // Floppy ears
-    + "<path d='M30 40 Q12 44 14 64 Q18 80 36 72 Z' fill='#a890c0' stroke='#1a0020' stroke-width='3.5' stroke-linejoin='round'/>"
-    + "<path d='M70 40 Q88 44 86 64 Q82 80 64 72 Z' fill='#a890c0' stroke='#1a0020' stroke-width='3.5' stroke-linejoin='round'/>"
-    // Head
-    + "<ellipse cx='50' cy='52' rx='22' ry='24' fill='#d0bce0' stroke='#1a0020' stroke-width='3.5'/>"
-    // Pink cheek blush
-    + "<ellipse cx='38' cy='60' rx='4' ry='2.5' fill='#e090c8' opacity='0.7'/>"
-    + "<ellipse cx='62' cy='60' rx='4' ry='2.5' fill='#e090c8' opacity='0.7'/>"
-    // Confident eyes (sclera + pupil + highlight)
-    + "<ellipse cx='42' cy='49' rx='4.5' ry='5.5' fill='#fff' stroke='#1a0020' stroke-width='2'/>"
-    + "<ellipse cx='58' cy='49' rx='4.5' ry='5.5' fill='#fff' stroke='#1a0020' stroke-width='2'/>"
-    + "<circle cx='43' cy='50' r='3' fill='#1a0020'/>"
-    + "<circle cx='59' cy='50' r='3' fill='#1a0020'/>"
-    + "<circle cx='44' cy='49' r='1' fill='#fff'/>"
-    + "<circle cx='60' cy='49' r='1' fill='#fff'/>"
-    // Smirk
-    + "<path d='M43 64 Q50 68 57 64' fill='none' stroke='#1a0020' stroke-width='3' stroke-linecap='round'/>"
-    // Trunk curling around a coin
-    + "<path d='M50 68 Q44 78 52 84 Q64 88 68 78 Q68 70 60 72' fill='#d0bce0' stroke='#1a0020' stroke-width='3.5' stroke-linejoin='round' stroke-linecap='round'/>"
+    // Shield background (dark navy fill, purple outline)
+    + "<path d='M50 4 L88 16 L88 58 Q88 78 50 96 Q12 78 12 58 L12 16 Z' fill='#120020' stroke='#c040f0' stroke-width='3' stroke-linejoin='round'/>"
+    // Inner border accent
+    + "<path d='M50 10 L82 20 L82 58 Q82 74 50 88 Q18 74 18 58 L18 20 Z' fill='none' stroke='#7020a0' stroke-width='1' opacity='0.7'/>"
+    // Magenta flame mohawk (TEEM signature)
+    + "<path d='M36 28 Q39 14 43 25 Q46 12 50 23 Q54 12 57 25 Q61 14 64 28 Z' fill='#e040f0' stroke='#000' stroke-width='2' stroke-linejoin='round'/>"
+    // Floppy ears (gritty gray)
+    + "<path d='M28 42 Q14 46 16 62 Q20 76 34 70 Z' fill='#9a909c' stroke='#000' stroke-width='2.5' stroke-linejoin='round'/>"
+    + "<path d='M72 42 Q86 46 84 62 Q80 76 66 70 Z' fill='#9a909c' stroke='#000' stroke-width='2.5' stroke-linejoin='round'/>"
+    // Inner ear shadow
+    + "<path d='M24 50 Q22 60 26 68' fill='none' stroke='#000' stroke-width='1.5' opacity='0.5'/>"
+    + "<path d='M76 50 Q78 60 74 68' fill='none' stroke='#000' stroke-width='1.5' opacity='0.5'/>"
+    // Head (front-facing)
+    + "<ellipse cx='50' cy='50' rx='20' ry='22' fill='#bcb4c4' stroke='#000' stroke-width='3'/>"
+    // Head shadow on right side (for dimension)
+    + "<path d='M50 28 Q68 32 68 50 Q68 65 60 70 L50 50 Z' fill='#000' opacity='0.18'/>"
+    // Pixel deal-with-it sunglasses (iconic — reads even at small sizes)
+    + "<rect x='30' y='42' width='40' height='9' fill='#000'/>"
+    + "<rect x='48' y='44' width='4' height='3' fill='#000'/>"
+    // White lens pixels (left lens)
+    + "<rect x='34' y='44' width='2' height='2' fill='#fff'/>"
+    + "<rect x='38' y='44' width='2' height='2' fill='#fff'/>"
+    + "<rect x='42' y='44' width='2' height='2' fill='#fff'/>"
+    + "<rect x='38' y='47' width='2' height='2' fill='#fff'/>"
+    + "<rect x='42' y='47' width='2' height='2' fill='#fff'/>"
+    // White lens pixels (right lens)
+    + "<rect x='54' y='44' width='2' height='2' fill='#fff'/>"
+    + "<rect x='58' y='44' width='2' height='2' fill='#fff'/>"
+    + "<rect x='62' y='44' width='2' height='2' fill='#fff'/>"
+    + "<rect x='58' y='47' width='2' height='2' fill='#fff'/>"
+    + "<rect x='62' y='47' width='2' height='2' fill='#fff'/>"
+    // Trunk — open path so the top blends seamlessly into the head.
+    // Hangs straight down from below the sunglasses, curls right around coin.
+    + "<path d='M44 56 L44 66 Q44 77 50 82 Q60 87 69 81 Q73 74 66 72 Q60 73 58 70 Q54 60 54 56' fill='#bcb4c4' stroke='#000' stroke-width='2.5' stroke-linejoin='round' stroke-linecap='round'/>"
+    // Trunk wrinkles
+    + "<path d='M46 63 Q49 64 52 63' fill='none' stroke='#000' stroke-width='1.2' opacity='0.6' stroke-linecap='round'/>"
+    + "<path d='M46 70 Q49 71 52 69' fill='none' stroke='#000' stroke-width='1.2' opacity='0.6' stroke-linecap='round'/>"
+    // Gold tusks flanking trunk base
+    + "<path d='M40 60 L36 70 L42 68 Z' fill='#ffe066' stroke='#000' stroke-width='1.5' stroke-linejoin='round'/>"
+    + "<path d='M60 60 L64 70 L58 68 Z' fill='#ffe066' stroke='#000' stroke-width='1.5' stroke-linejoin='round'/>"
     // Gold coin held in trunk's curl
-    + "<circle cx='62' cy='78' r='5' fill='#ffe066' stroke='#7a5d10' stroke-width='2'/>"
-    + "<circle cx='62' cy='78' r='2.5' fill='none' stroke='#c9a227' stroke-width='1'/>"
-    // Gold tusks
-    + "<path d='M43 66 L41 74 L46 73 Z' fill='#ffe066' stroke='#7a5d10' stroke-width='1.5'/>"
-    + "<path d='M57 66 L59 74 L54 73 Z' fill='#ffe066' stroke='#7a5d10' stroke-width='1.5'/>"
+    + "<circle cx='64' cy='77' r='4.5' fill='#ffe066' stroke='#000' stroke-width='1.8'/>"
+    + "<circle cx='64' cy='77' r='2.2' fill='none' stroke='#7a5d10' stroke-width='1'/>"
     + "</svg>"
   );
   const TEEM_ELEPHANT_DATAURL = "data:image/svg+xml," + encodeURIComponent(TEEM_ELEPHANT_SVG);
@@ -671,7 +693,7 @@
        detected. Toggling the .tmit-alert class is a single display swap,
        no per-frame work. Background color reflects the item-type of the
        biggest spike (set via .type-* class on the badge). */
-    #tmit-fab .tmit-alert-badge{display:none;position:absolute;top:-5px;right:-5px;width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ffe680 0%,#c9a227 55%,#7a5d10 100%);border:2px solid #09000d;box-shadow:0 0 8px rgba(255,224,102,0.7),inset 0 1px 1px rgba(255,255,255,0.4);align-items:center;justify-content:center;font-size:13px;line-height:1;pointer-events:none;}
+    #tmit-fab .tmit-alert-badge{display:none;position:absolute;top:-5px;right:-5px;width:24px;height:24px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ffe680 0%,#c9a227 55%,#7a5d10 100%);border:2px solid #09000d;box-shadow:0 0 8px rgba(255,224,102,0.7),inset 0 1px 1px rgba(255,255,255,0.4);align-items:center;justify-content:center;font-size:13px;line-height:1;pointer-events:none;color:#000;font-weight:900;font-family:'Inter',sans-serif;}
     #tmit-fab.tmit-alert .tmit-alert-badge{display:flex;}
     /* Badge type colors — keyed to common Torn item categories. */
     .tmit-alert-badge.type-drug{background:radial-gradient(circle at 35% 35%,#d680f0 0%,#9702ad 55%,#5a106a 100%);box-shadow:0 0 8px rgba(151,2,173,0.7),inset 0 1px 1px rgba(255,255,255,0.4);}
@@ -1353,20 +1375,25 @@
   // colored background to give the user both a category color AND a
   // recognizable symbol at a glance — no need to open the panel to know
   // whether it's drugs, weapons, plushies, etc.
+  //
+  // These are monochrome Unicode glyphs (not emoji) so they render in the
+  // badge's CSS `color` (black) instead of full-color emoji. The "︎"
+  // suffix on ⚡ and ⚔ forces the text presentation in fonts that would
+  // otherwise render them as colored emoji.
   function badgeIconForType(type) {
-    if (!type) return '💰';
+    if (!type) return '$';
     const t = String(type).toLowerCase();
-    if (t === 'drug')                                                 return '💊';
-    if (t === 'medical')                                              return '🩹';
-    if (t === 'plushie')                                              return '🧸';
-    if (t === 'flower')                                               return '🌸';
-    if (t === 'booster')                                              return '🍫';
-    if (t === 'energy drink')                                         return '⚡';
-    if (t === 'alcohol')                                              return '🍺';
-    if (t === 'special')                                              return '✨';
-    if (RW_ARMOR_TYPE_LOWER.has(t) || t === 'defensive')              return '🛡';
-    if (RW_WEAPON_TYPE_LOWER.has(t) || t === 'temporary')             return '⚔';
-    return '💰';
+    if (t === 'drug')                                                 return '℞';     // ℞ prescription
+    if (t === 'medical')                                              return '✚';     // ✚ heavy cross
+    if (t === 'plushie')                                              return '♥';     // ♥ heart
+    if (t === 'flower')                                               return '✿';     // ✿ florette
+    if (t === 'booster')                                              return '★';     // ★ star
+    if (t === 'energy drink')                                         return '⚡︎'; // ⚡ lightning (text)
+    if (t === 'alcohol')                                              return '⚜';     // ⚜ fleur-de-lis
+    if (t === 'special')                                              return '✦';     // ✦ four-pointed star
+    if (RW_ARMOR_TYPE_LOWER.has(t) || t === 'defensive')              return '⛨';     // ⛨ heraldic shield
+    if (RW_WEAPON_TYPE_LOWER.has(t) || t === 'temporary')             return '⚔︎'; // ⚔ crossed swords (text)
+    return '$';
   }
 
   async function poll(force = false) {
@@ -1601,7 +1628,7 @@
       + 'border:2px solid #c9a227;cursor:pointer;display:flex;align-items:center;'
       + 'justify-content:center;z-index:2147483000;box-shadow:0 0 14px rgba(151,2,173,0.6),'
       + '0 4px 24px rgba(0,0,0,0.8);';
-    fab.innerHTML = `<img src="${TEEM_ELEPHANT_DATAURL}" style="width:38px;height:38px;border-radius:50%;pointer-events:none;" draggable="false"><div class="tmit-alert-badge" id="tmit-alert-badge">💰</div>`;
+    fab.innerHTML = `<img src="${TEEM_ELEPHANT_DATAURL}" style="width:38px;height:38px;border-radius:50%;pointer-events:none;" draggable="false"><div class="tmit-alert-badge" id="tmit-alert-badge">$</div>`;
     fab.title = "TEEM — Torn's Elephant Economy Manager";
     document.body.appendChild(fab);
 
