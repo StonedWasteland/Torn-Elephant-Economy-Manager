@@ -392,7 +392,12 @@
     if (!priceHistory[itemId]) priceHistory[itemId] = [];
     const now = Date.now();
     priceHistory[itemId].push({ ts: now, price: tornPrice, yataPrice });
-    priceHistory[itemId] = thinHistory(priceHistory[itemId], now);
+    // Only thin when the array gets large — the tiered scheme caps at ~2069
+    // snapshots per item, but most items have <60. Thinning on every append
+    // costs O(snapshots) × per call which adds up to 50-100ms a poll.
+    if (priceHistory[itemId].length > 300) {
+      priceHistory[itemId] = thinHistory(priceHistory[itemId], now);
+    }
   }
 
   function thinHistory(snapshots, now) {
@@ -434,7 +439,34 @@
     if (changed) saveHistory();
   }
 
-  function saveHistory() { store('priceHistory', priceHistory); }
+  // Throttled + deferred history save. The priceHistory object grows to
+  // several MB after a few hours of running, and JSON.stringify + storage
+  // write on the main thread can block for 100-500ms per poll. Instead:
+  //   - throttle to every 5 polls (~5 min)
+  //   - defer via requestIdleCallback so the write runs during idle time
+  //   - flush on beforeunload as a safety net (see init)
+  let _pollsSinceSave = 0;
+  let _saveScheduled  = false;
+  function saveHistory() {
+    if (++_pollsSinceSave < 5) return;
+    if (_saveScheduled) return;
+    _saveScheduled = true;
+    const doSave = () => {
+      _saveScheduled = false;
+      _pollsSinceSave = 0;
+      try { store('priceHistory', priceHistory); } catch(e) {}
+    };
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(doSave, { timeout: 10000 });
+    } else {
+      setTimeout(doSave, 100);
+    }
+  }
+  function saveHistoryNow() {
+    // Synchronous flush — only call on beforeunload
+    _saveScheduled = false; _pollsSinceSave = 0;
+    try { store('priceHistory', priceHistory); } catch(e) {}
+  }
 
   let itemMeta = load('itemMeta', {}); // { id: { name, type, image } }
 
@@ -1349,8 +1381,16 @@
       } catch(e) { /* optional */ }
 
       recomputeTravel();
-      renderList();
-      if (settings.activeTab === 'travel') renderTravelTab();
+      // Always refresh analysisCache so the next poll's priority list and
+      // spike alerts stay accurate. But skip the expensive DOM render and
+      // travel-tab render unless the panel is actually visible — that's
+      // what was making the script periodically hammer the main thread.
+      runAnalysis();
+      const panelEl = document.getElementById('tmit-panel');
+      if (panelEl && !panelEl.classList.contains('tmit-hidden')) {
+        renderList();
+        if (settings.activeTab === 'travel') renderTravelTab();
+      }
     } catch(e) { setStatus('err', e.message.slice(0, 50)); }
   }
 
@@ -1922,6 +1962,10 @@
     }
 
     switchTab(settings.activeTab || 'all');
+    // The session bar and footer skip their work while the panel is hidden,
+    // so refresh them on open to avoid showing stale numbers.
+    updateSessionTracker();
+    updateFooter();
   }
 
   function bindEvents(fab, panel) {
@@ -2664,6 +2708,12 @@
   }
 
   function updateSessionTracker() {
+    // Skip work when the panel is hidden — the session bar isn't visible
+    // and iterating the full priceHistory every 15s on a backgrounded
+    // panel is what was causing the periodic freezing.
+    const panelEl = document.getElementById('tmit-panel');
+    if (!panelEl || panelEl.classList.contains('tmit-hidden')) return;
+
     const invEl    = document.getElementById('tmit-sess-inv');
     const profitEl = document.getElementById('tmit-sess-profit');
     const ageDotEl = document.getElementById('tmit-age-dot');
@@ -2730,6 +2780,10 @@
   }
 
   function updateFooter() {
+    // Skip when the panel is hidden — nothing the user can see.
+    const panelEl = document.getElementById('tmit-panel');
+    if (!panelEl || panelEl.classList.contains('tmit-hidden')) return;
+
     updateSessionTracker();
     const snapshots = Object.values(priceHistory).reduce((a, v) => a + v.length, 0);
     const itemCount = document.getElementById('tmit-item-count');
@@ -2793,6 +2847,12 @@
 
     // Notification permission request (needed for travel + spike alerts)
     if (Notification.permission === 'default') { Notification.requestPermission(); }
+
+    // Flush throttled history save on tab close so we don't lose snapshots
+    // accumulated since the last idle save.
+    window.addEventListener('beforeunload', () => {
+      try { saveHistoryNow(); } catch(e) {}
+    });
 
     // Catch-up poll when the tab regains focus. Browsers throttle and
     // sometimes freeze setInterval in backgrounded tabs, which would leave
