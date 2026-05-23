@@ -1399,6 +1399,13 @@
   async function poll(force = false) {
     if (!settings.apiKey) return;
     pollCounter++;
+    const _pollStart = performance.now();
+    const _sections = {};
+    const _sec = (label) => {
+      const now = performance.now();
+      _sections[label] = now;
+      return now;
+    };
 
     try {
       // Only show loading spinner if no cached data is displayed yet
@@ -1464,6 +1471,7 @@
         }
       } catch(e) { /* silent fail */ }
 
+      _sec('beforeSnapshots');
       // Record price snapshots.
       // Iterate the union of itemMeta + livePrices + yataPrices keys so we
       // record snapshots even when torn/items has failed and itemMeta is
@@ -1545,16 +1553,33 @@
         }
       } catch(e) { /* optional */ }
 
+      _sec('beforeAnalyze');
       recomputeTravel();
       // Always refresh analysisCache so the next poll's priority list and
       // spike alerts stay accurate. But skip the expensive DOM render and
       // travel-tab render unless the panel is actually visible — that's
       // what was making the script periodically hammer the main thread.
       runAnalysis();
+      _sec('afterAnalyze');
       const panelEl = document.getElementById('tmit-panel');
       if (panelEl && !panelEl.classList.contains('tmit-hidden')) {
         renderList();
         if (settings.activeTab === 'travel') renderTravelTab();
+      }
+      _sec('end');
+
+      // Log per-section timings only if poll took noticeable time. Tags
+      // each section so we can see WHERE the time went, not just that the
+      // poll was slow overall.
+      const totalDur = performance.now() - _pollStart;
+      if (totalDur > 200) {
+        const parts = [];
+        let prev = _pollStart;
+        for (const [k, t] of Object.entries(_sections)) {
+          parts.push(`${k}=${Math.round(t - prev)}ms`);
+          prev = t;
+        }
+        console.warn(`[TEEM poll] ${Math.round(totalDur)}ms total — ${parts.join(', ')}`);
       }
     } catch(e) { setStatus('err', e.message.slice(0, 50)); }
   }
@@ -3031,6 +3056,33 @@
 
   function init() {
     buildUI();
+
+    // ── Diagnostics ─────────────────────────────────────────────────────
+    // These help isolate the source of any periodic UI freezes. They log
+    // to the browser console (F12 → Console), tagged with [TEEM …] so
+    // they're easy to spot.
+    try {
+      // 1) One-shot startup: how much data have we accumulated?
+      const itemCount = Object.keys(priceHistory).length;
+      const snapCount = Object.values(priceHistory).reduce((a, h) => a + h.length, 0);
+      const approxKB  = Math.round(JSON.stringify(priceHistory).length / 1024);
+      console.warn(`[TEEM] priceHistory: ${itemCount} items, ${snapCount} snapshots, ~${approxKB}KB`);
+      console.warn(`[TEEM] itemMeta: ${Object.keys(itemMeta).length} entries`);
+    } catch(e) {}
+
+    // 2) Watchdog: detects main-thread freezes from any source. Ticks
+    //    every 250ms; if more than 750ms passed since last tick, the
+    //    main thread was blocked for at least 500ms. Logs the gap and
+    //    a timestamp so we can correlate with the poll cadence.
+    let _watchdogLast = Date.now();
+    setInterval(() => {
+      const now = Date.now();
+      const gap = now - _watchdogLast;
+      _watchdogLast = now;
+      if (gap > 750) {
+        console.warn(`[TEEM watchdog] Main thread blocked ~${gap - 250}ms at ${new Date().toLocaleTimeString()}`);
+      }
+    }, 250);
 
     // Keyboard shortcut Alt+T to toggle panel
     document.addEventListener('keydown', (e) => {
