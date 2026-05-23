@@ -1424,27 +1424,25 @@
     }, Math.min(statsMs / 2, 15000));
   }
 
-  // ── Sleep mode ──────────────────────────────────────────────────────────────
-  // When the panel is hidden, TEEM does zero background work — no polls, no
-  // session/footer ticks. This is the only reliable way to guarantee the
-  // script can't be the source of CPU drag while the user isn't looking at it.
-  // Background work resumes when the panel is opened (and an apiKey exists).
+  // ── DOM timer gating ────────────────────────────────────────────────────────
+  // Polling and stats run continuously so the FAB spike-alert pulse still
+  // fires when the panel is closed. The session bar and footer timers only
+  // tick while the panel is open — they do nothing but update hidden DOM
+  // when it's closed. The freeze that motivated sleep mode was actually
+  // caused by infinite CSS animations on an opacity:0 panel, not by the
+  // polling cadence itself.
 
   function suspendBackgroundWork() {
     if (backgroundSuspended) return;
     backgroundSuspended = true;
-    if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
-    if (statsTimer)   { clearInterval(statsTimer);   statsTimer   = null; }
     if (sessionTimer) { clearInterval(sessionTimer); sessionTimer = null; }
     if (footerTimer)  { clearInterval(footerTimer);  footerTimer  = null; }
-    try { saveHistoryNow(); } catch(e) {}
   }
 
   function resumeBackgroundWork() {
     if (!backgroundSuspended) return;
-    if (!settings.apiKey) return;  // nothing to poll without a key
+    if (!settings.apiKey) return;
     backgroundSuspended = false;
-    startPolling();
     if (!sessionTimer) sessionTimer = setInterval(updateSessionTracker, 15000);
     if (!footerTimer)  footerTimer  = setInterval(updateFooter, 30000);
   }
@@ -2902,7 +2900,6 @@
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'visible') return;
       if (!settings.apiKey) return;
-      if (backgroundSuspended) return;  // panel is closed — stay asleep
       if (Date.now() - lastVisPoll < 30000) return;
       lastVisPoll = Date.now();
       poll();
@@ -2945,10 +2942,10 @@
         }
         setStatus('ok', `Cached · ${new Date().toLocaleTimeString()}`);
       }
-      // Panel starts hidden — defer polling and session/footer timers until
-      // the user opens the panel. This is the core of sleep mode: when nobody
-      // is looking at TEEM, TEEM does literally nothing in the background.
-      // resumeBackgroundWork() is called from openPanel().
+      // Polling runs from script load so the FAB spike-alert can pulse
+      // even when the panel is closed. Session/footer DOM timers stay
+      // gated to panel-open via resumeBackgroundWork() in openPanel().
+      startPolling();
     }
 
     // Fetch my own battlestats on startup (silently)
