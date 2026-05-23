@@ -370,7 +370,7 @@
     activeTab: 'all',
     carryCapacity: 10,
     flightType: 'economy',      // economy | airstrip | business | wlt
-    marketPollSec: 60,          // how often to fetch item prices (seconds)
+    marketPollSec: 120,         // how often to fetch item prices (seconds) — floored at 60 in startPolling
     statsPollSec:  30,          // how often to fetch bars/cooldowns (seconds)
     alertOnDrugClear: false,    // only alert when drug cooldown is clear
     alertOnBoosterClear: false, // only alert when booster cooldown is clear
@@ -627,15 +627,24 @@
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap');
     #tmit-fab{position:fixed;bottom:28px;right:28px;width:52px;height:52px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#320042,#09000d);border:2px solid #c9a227;box-shadow:0 0 14px rgba(151,2,173,0.5),0 4px 24px rgba(0,0,0,0.8);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;z-index:999999;transition:all 0.3s ease;user-select:none;}
     #tmit-fab:hover{transform:scale(1.1);box-shadow:0 0 26px rgba(151,2,173,0.8),0 4px 28px rgba(0,0,0,0.9);}
-    #tmit-fab.tmit-alert{animation:tmit-pulse 1.4s ease-in-out infinite;will-change:transform;}
-    /* Transform-only — fully GPU-composited, zero paint cost.
-       Animating border-color (or box-shadow) would force re-rasterization of
-       the FAB layer, including its radial-gradient background, every frame.
-       The .tmit-alert-dot in the corner already provides the visual signal. */
-    @keyframes tmit-pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.10);}}
-    #tmit-fab .tmit-alert-dot{display:none;position:absolute;top:2px;right:2px;width:12px;height:12px;background:#ff4d4d;border-radius:50%;border:2px solid #09000d;animation:tmit-dotpop 0.3s ease;}
-    #tmit-fab.tmit-alert .tmit-alert-dot{display:block;}
-    @keyframes tmit-dotpop{from{transform:scale(0);}to{transform:scale(1);}}
+    /* Big-hit indicator: a static coin badge with the elephant on it.
+       No animation, no transitions — just appears when a huge spike is
+       detected. Toggling the .tmit-alert class is a single display swap,
+       no per-frame work. Background color reflects the item-type of the
+       biggest spike (set via .type-* class on the badge). */
+    #tmit-fab .tmit-alert-badge{display:none;position:absolute;top:-4px;right:-4px;width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ffe680 0%,#c9a227 55%,#7a5d10 100%);border:2px solid #09000d;box-shadow:0 0 8px rgba(255,224,102,0.7),inset 0 1px 1px rgba(255,255,255,0.4);align-items:center;justify-content:center;font-size:11px;line-height:1;pointer-events:none;}
+    #tmit-fab.tmit-alert .tmit-alert-badge{display:flex;}
+    /* Badge type colors — keyed to common Torn item categories. */
+    .tmit-alert-badge.type-drug{background:radial-gradient(circle at 35% 35%,#d680f0 0%,#9702ad 55%,#5a106a 100%);box-shadow:0 0 8px rgba(151,2,173,0.7),inset 0 1px 1px rgba(255,255,255,0.4);}
+    .tmit-alert-badge.type-medical{background:radial-gradient(circle at 35% 35%,#ff9090 0%,#ff4040 55%,#8b0000 100%);box-shadow:0 0 8px rgba(255,64,64,0.7),inset 0 1px 1px rgba(255,255,255,0.4);}
+    .tmit-alert-badge.type-plushie{background:radial-gradient(circle at 35% 35%,#ffb0d0 0%,#ff70a0 55%,#a04068 100%);box-shadow:0 0 8px rgba(255,112,160,0.7),inset 0 1px 1px rgba(255,255,255,0.4);}
+    .tmit-alert-badge.type-flower{background:radial-gradient(circle at 35% 35%,#a0f0b0 0%,#50dc82 55%,#1f6a40 100%);box-shadow:0 0 8px rgba(80,220,130,0.7),inset 0 1px 1px rgba(255,255,255,0.4);}
+    .tmit-alert-badge.type-booster{background:radial-gradient(circle at 35% 35%,#fff8a0 0%,#ffe066 55%,#a08010 100%);box-shadow:0 0 8px rgba(255,224,102,0.7),inset 0 1px 1px rgba(255,255,255,0.4);}
+    .tmit-alert-badge.type-alcohol{background:radial-gradient(circle at 35% 35%,#ffd080 0%,#e89020 55%,#7a4810 100%);box-shadow:0 0 8px rgba(232,144,32,0.7),inset 0 1px 1px rgba(255,255,255,0.4);}
+    .tmit-alert-badge.type-energy{background:radial-gradient(circle at 35% 35%,#a0f0ff 0%,#00e5ff 55%,#005566 100%);box-shadow:0 0 8px rgba(0,229,255,0.7),inset 0 1px 1px rgba(255,255,255,0.4);}
+    .tmit-alert-badge.type-weapon{background:radial-gradient(circle at 35% 35%,#ffc080 0%,#ff6a00 55%,#7a2500 100%);box-shadow:0 0 8px rgba(255,106,0,0.7),inset 0 1px 1px rgba(255,255,255,0.4);}
+    .tmit-alert-badge.type-armor{background:radial-gradient(circle at 35% 35%,#b0c8ff 0%,#5078d0 55%,#1a2a60 100%);box-shadow:0 0 8px rgba(80,120,208,0.7),inset 0 1px 1px rgba(255,255,255,0.4);}
+    .tmit-alert-badge.type-special{background:radial-gradient(circle at 35% 35%,#ffffff 0%,#e0e0ff 55%,#7080a0 100%);box-shadow:0 0 8px rgba(200,200,255,0.7),inset 0 1px 1px rgba(255,255,255,0.4);}
     #tmit-panel{position:fixed;bottom:90px;right:28px;width:520px;max-height:620px;background:linear-gradient(180deg,rgba(50,0,66,0.97) 0%,rgba(18,0,28,0.99) 40%,rgba(7,0,10,1) 100%);border:1px solid #9702ad;border-top:3px solid #c9a227;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,0.8),0 0 50px rgba(151,2,173,0.12),0 24px 80px rgba(0,0,0,0.9),inset 0 1px 0 rgba(201,162,39,0.15);z-index:999998;display:flex;flex-direction:column;overflow:hidden;font-family:'Inter',sans-serif;color:#f0d5f8;transition:opacity 0.2s,transform 0.2s;}
     #tmit-panel.tmit-hidden{display:none !important;}
     .tmit-header{background:linear-gradient(90deg,rgba(50,0,66,1) 0%,rgba(18,0,28,1) 60%,rgba(8,0,14,1) 100%);border-bottom:1px solid rgba(151,2,173,0.35);padding:11px 16px;display:flex;align-items:center;justify-content:space-between;cursor:move;flex-shrink:0;position:relative;}
@@ -1165,9 +1174,11 @@
     // Big spike detection — require >=3 snapshots before trusting a spike.
     // The first live snapshot after a stale market_value can look like a
     // 50% "jump" that's really just a data-source switch, not real movement.
+    // isBigSpike (50%+) drives the FAB badge: a real act-now-or-miss-it
+    // move. The previous 30% threshold produced too many false alerts.
     const trustworthy = effectiveWindow.length >= 3;
     const isSpike = trustworthy && Math.abs(changePct) > 15;
-    const isBigSpike = trustworthy && Math.abs(changePct) > 30;
+    const isBigSpike = trustworthy && Math.abs(changePct) > 50;
 
     // Data source confidence
     const dataSources = (currentPrice ? 1 : 0) + (yataPrice ? 1 : 0);
@@ -1245,19 +1256,57 @@
 
     analysisCache = results;
 
-    // Alert if any big spikes — gated by the spikeAlertEnabled setting
-    // (treat undefined as enabled so existing users keep the default).
+    // Alert if any big spikes (50%+ moves) — gated by the spikeAlertEnabled
+    // setting (treat undefined as enabled so existing users keep the
+    // default). The badge color reflects the item-type of the biggest spike
+    // so the user can tell at a glance whether it's drugs, weapons, etc.
     const bigSpikes = results.filter(r => r.isBigSpike);
     const wantAlert = settings.spikeAlertEnabled !== false && bigSpikes.length > 0;
-    if (wantAlert && !alertActive) {
-      alertActive = true;
-      document.getElementById('tmit-fab')?.classList.add('tmit-alert');
-    } else if (!wantAlert && alertActive) {
+    const fab = document.getElementById('tmit-fab');
+    const badge = document.getElementById('tmit-alert-badge');
+
+    if (wantAlert) {
+      // Pick the spike with the largest absolute move — that's the type
+      // we want to advertise on the badge.
+      const top = bigSpikes.reduce(
+        (best, r) => Math.abs(r.changePct) > Math.abs(best.changePct) ? r : best,
+        bigSpikes[0]
+      );
+      const typeClass = badgeTypeClass(top.type);
+      if (!alertActive) {
+        alertActive = true;
+        fab?.classList.add('tmit-alert');
+      }
+      if (badge && badge.dataset.typeClass !== typeClass) {
+        // Replace any previous type-* class without touching unrelated ones.
+        badge.className = 'tmit-alert-badge' + (typeClass ? ' ' + typeClass : '');
+        badge.dataset.typeClass = typeClass;
+        badge.title = `${top.name} ${top.changePct > 0 ? '+' : ''}${top.changePct}%`;
+      }
+    } else if (alertActive) {
       alertActive = false;
-      document.getElementById('tmit-fab')?.classList.remove('tmit-alert');
+      fab?.classList.remove('tmit-alert');
     }
 
     return results;
+  }
+
+  // Map a raw Torn item type to a badge CSS class. Returns '' if no match —
+  // the badge falls back to its default gold styling.
+  function badgeTypeClass(type) {
+    if (!type) return '';
+    const t = String(type).toLowerCase();
+    if (t === 'drug')                                                 return 'type-drug';
+    if (t === 'medical')                                              return 'type-medical';
+    if (t === 'plushie')                                              return 'type-plushie';
+    if (t === 'flower')                                               return 'type-flower';
+    if (t === 'booster')                                              return 'type-booster';
+    if (t === 'energy drink')                                         return 'type-energy';
+    if (t === 'alcohol')                                              return 'type-alcohol';
+    if (t === 'special')                                              return 'type-special';
+    if (RW_ARMOR_TYPE_LOWER.has(t) || t === 'defensive')              return 'type-armor';
+    if (RW_WEAPON_TYPE_LOWER.has(t) || t === 'temporary')             return 'type-weapon';
+    return '';
   }
 
   async function poll(force = false) {
@@ -1436,7 +1485,9 @@
     if (pollingTimer) clearInterval(pollingTimer);
     if (statsTimer)   clearInterval(statsTimer);
 
-    const marketMs = Math.max(15, settings.marketPollSec ?? 60) * 1000;
+    // Floor the market poll at 60s — anything faster invites the
+    // freeze/CPU-load issues we've spent days chasing. Default is 120s.
+    const marketMs = Math.max(60, settings.marketPollSec ?? 120) * 1000;
     const statsMs  = Math.max(10, settings.statsPollSec  ?? 30) * 1000;
 
     // Full market poll (prices, travel, signals)
@@ -1490,7 +1541,7 @@
       + 'border:2px solid #c9a227;cursor:pointer;display:flex;align-items:center;'
       + 'justify-content:center;z-index:2147483000;box-shadow:0 0 14px rgba(151,2,173,0.6),'
       + '0 4px 24px rgba(0,0,0,0.8);';
-    fab.innerHTML = `<img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🐘%3C/text%3E%3C/svg%3E" style="width:34px;height:34px;border-radius:50%;pointer-events:none;" draggable="false"><div class="tmit-alert-dot"></div>`;
+    fab.innerHTML = `<img src="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🐘%3C/text%3E%3C/svg%3E" style="width:34px;height:34px;border-radius:50%;pointer-events:none;" draggable="false"><div class="tmit-alert-badge" id="tmit-alert-badge">🐘</div>`;
     fab.title = "TEEM — Torn's Elephant Economy Manager";
     document.body.appendChild(fab);
 
@@ -1721,7 +1772,7 @@
         <label style="display:flex;align-items:center;gap:8px;font-size:11px;color:#d8c8f0;cursor:pointer;margin-bottom:10px;padding:6px 8px;background:rgba(0,0,0,0.25);border:1px solid rgba(151,2,173,0.15);border-radius:5px;">
           <input type="checkbox" id="tmit-spike-alert" ${settings.spikeAlertEnabled !== false ? 'checked' : ''}
             style="accent-color:#c9a227;cursor:pointer;">
-          <span style="flex:1;">Pulse the elephant on big spikes <span style="color:#a08fc0;font-size:10px;">(30%+ price moves)</span></span>
+          <span style="flex:1;">Show a coin badge on the elephant for huge spikes <span style="color:#a08fc0;font-size:10px;">(50%+ price moves; color-coded by item type)</span></span>
         </label>
 
         <button class="tmit-btn-save" id="tmit-btn-save" style="width:100%;">💾 Save All Settings</button>
