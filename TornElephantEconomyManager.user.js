@@ -593,8 +593,11 @@
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap');
     #tmit-fab{position:fixed;bottom:28px;right:28px;width:52px;height:52px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#320042,#09000d);border:2px solid #c9a227;box-shadow:0 0 14px rgba(151,2,173,0.5),0 4px 24px rgba(0,0,0,0.8);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;z-index:999999;transition:all 0.3s ease;user-select:none;}
     #tmit-fab:hover{transform:scale(1.1);box-shadow:0 0 26px rgba(151,2,173,0.8),0 4px 28px rgba(0,0,0,0.9);}
-    #tmit-fab.tmit-alert{animation:tmit-pulse 1.4s ease-in-out infinite;border-color:#ffe066;}
-    @keyframes tmit-pulse{0%{box-shadow:0 0 0 0 rgba(255,224,102,0.9),0 4px 20px rgba(0,0,0,0.7);}60%{box-shadow:0 0 0 18px rgba(255,224,102,0),0 4px 20px rgba(0,0,0,0.7);}100%{box-shadow:0 0 0 0 rgba(255,224,102,0),0 4px 20px rgba(0,0,0,0.7);}}
+    #tmit-fab.tmit-alert{animation:tmit-pulse 1.4s ease-in-out infinite;will-change:transform;}
+    /* Transform + border-color only — GPU-accelerated, no expensive repaints.
+       The previous box-shadow ring (18px blur) was forcing the browser to
+       repaint a giant halo every frame and could freeze low-end machines. */
+    @keyframes tmit-pulse{0%,100%{transform:scale(1);border-color:#c9a227;}50%{transform:scale(1.10);border-color:#ffe066;}}
     #tmit-fab .tmit-alert-dot{display:none;position:absolute;top:2px;right:2px;width:12px;height:12px;background:#ff4d4d;border-radius:50%;border:2px solid #09000d;animation:tmit-dotpop 0.3s ease;}
     #tmit-fab.tmit-alert .tmit-alert-dot{display:block;}
     @keyframes tmit-dotpop{from{transform:scale(0);}to{transform:scale(1);}}
