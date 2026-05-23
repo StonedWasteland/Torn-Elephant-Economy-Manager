@@ -477,7 +477,7 @@
 
   // ── Tooltip state ─────────────────────────────────────────────────────────
   const TOOLTIPS = {
-    signal:     'Signal shows the price trend direction.\nBUY = rising 5%+. HOLD = mild uptrend. WATCH = volatile, no clear direction. SELL = falling 8%+.',
+    signal:     'Buy-low-sell-high signal for flippers.\nSELL = price up 5%+ (cash out into strength). BUY = price down 8%+ (buy the dip). HOLD = mild rise (wait for more upside). WATCH = volatile, no clear direction.',
     confidence: 'Confidence dots show how strong the signal is.\n● ● ● = strong trend, lots of data.\n● ● ○ = moderate.\n● ○ ○ = early/thin data.',
     pph:        'Profit Per Hour — estimated $ earned per hour of round-trip travel, after 5% sales tax.',
     stock:      'YATA ✓ = live crowd-sourced stock data from yata.life.\n~stock = no data, assuming full stock (optimistic).',
@@ -485,6 +485,7 @@
     dataAge:    'How long ago prices were last fetched. Green = fresh. Yellow = >5min old. Red = >15min.',
   };
   let alertActive = false, pollingTimer = null, statsTimer = null, uiBuilt = false;
+  let pollCounter = 0;  // increments each poll; drives adaptive cadence in buildPriorityList
 
   async function fetchMyBattleStats(apiKey) {
     try {
@@ -631,7 +632,7 @@
     .tmit-filter-label{font-size:10px;color:#b481cc;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;white-space:nowrap;}
     .tmit-input-sm{background:rgba(0,0,0,0.4);border:1px solid rgba(151,2,173,0.18);border-radius:4px;color:#f0d5f8;font-size:11px;padding:3px 8px;width:100px;outline:none;font-family:monospace;}
     .tmit-input-sm:focus{border-color:rgba(151,2,173,0.5);}
-    .tmit-col-headers{display:grid;grid-template-columns:1fr 90px 90px 80px 44px;padding:5px 12px;border-bottom:1px solid rgba(151,2,173,0.12);flex-shrink:0;background:rgba(0,0,0,0.5);}
+    .tmit-col-headers{display:grid;grid-template-columns:1fr 90px 90px 80px 60px;padding:5px 12px;border-bottom:1px solid rgba(151,2,173,0.12);flex-shrink:0;background:rgba(0,0,0,0.5);}
     .tmit-col-hdr{font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#b481cc;cursor:pointer;user-select:none;transition:color 0.15s;}
     .tmit-col-hdr:hover{color:#c9a227;}
     .tmit-col-hdr.tmit-sorted{color:#c9a227;}
@@ -650,7 +651,7 @@
     .tmit-settings-panel::-webkit-scrollbar-track{background:rgba(255,255,255,0.04);border-radius:3px;}
     .tmit-settings-panel::-webkit-scrollbar-thumb{background:rgba(151,2,173,0.5);border-radius:3px;}
     .tmit-settings-panel::-webkit-scrollbar-thumb:hover{background:rgba(151,2,173,0.8);}
-    .tmit-item-row{display:grid;grid-template-columns:1fr 90px 90px 80px 44px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,0.03);align-items:center;transition:background 0.12s;cursor:default;position:relative;}
+    .tmit-item-row{display:grid;grid-template-columns:1fr 90px 90px 80px 60px;padding:7px 12px;border-bottom:1px solid rgba(255,255,255,0.03);align-items:center;transition:background 0.12s;cursor:default;position:relative;}
     .tmit-item-row:hover{background:rgba(151,2,173,0.05);}
     .tmit-item-row.tmit-hot{background:linear-gradient(90deg,rgba(232,98,26,0.08) 0%,transparent 100%);border-left:2px solid #e8621a;}
     .tmit-item-row.tmit-hot::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,#ffe066,#e8621a,#8b2500);box-shadow:0 0 6px rgba(232,98,26,0.6);}
@@ -675,8 +676,8 @@
     .tmit-change.flat{color:#9b7bb5;}
     .tmit-signal{text-align:right;}
     .tmit-signal-badge{display:inline-block;font-size:9px;font-weight:700;letter-spacing:0.06em;padding:2px 6px;border-radius:3px;text-transform:uppercase;}
-    .tmit-signal-badge.BUY{background:rgba(232,98,26,0.18);color:#ff8c42;border:1px solid rgba(232,98,26,0.4);text-shadow:0 0 6px rgba(232,98,26,0.4);}
-    .tmit-signal-badge.SELL{background:rgba(61,214,200,0.15);color:#3dd6c8;border:1px solid rgba(61,214,200,0.35);text-shadow:0 0 6px rgba(61,214,200,0.3);}
+    .tmit-signal-badge.BUY{background:rgba(61,214,200,0.15);color:#3dd6c8;border:1px solid rgba(61,214,200,0.35);text-shadow:0 0 6px rgba(61,214,200,0.3);}
+    .tmit-signal-badge.SELL{background:rgba(232,98,26,0.18);color:#ff8c42;border:1px solid rgba(232,98,26,0.4);text-shadow:0 0 6px rgba(232,98,26,0.4);}
     .tmit-signal-badge.HOLD{background:rgba(201,162,39,0.15);color:#c9a227;border:1px solid rgba(201,162,39,0.3);}
     .tmit-signal-badge.WATCH{background:rgba(151,2,173,0.12);color:#cc40f0;border:1px solid rgba(151,2,173,0.28);cursor:pointer;transition:all 0.2s;}
     .tmit-signal-badge.WATCH:hover{background:rgba(201,162,39,0.18);color:#ffe066;border-color:rgba(201,162,39,0.5);}
@@ -953,11 +954,25 @@
     for (const id of ALWAYS_LIVE_IDS) ids.add(id);
     // Watchlist
     for (const id of watchlist) ids.add(id);
-    // Items currently shown in the panel — so the view the user is actually
-    // looking at gets live minute-by-minute prices and real movement
-    for (const id of lastRenderedIds) {
+    // Items currently shown in the panel — prioritized by activity so the
+    // view the user is looking at gets live prices, but stagnant items
+    // don't crowd out movers. Cold items rotate in every 3rd poll, so a
+    // large category eventually gets full coverage without exceeding the
+    // per-poll API budget.
+    const viewItems = lastRenderedIds.map(id => {
+      if (!Number.isFinite(id)) return null;
+      const r = analysisCache.find(x => x.itemId === id);
+      // Bootstrap urgency: no analysis or thin data → highest priority
+      if (!r || r.thinData) return { id, score: 1e6 };
+      // Movement priority: |changePct| as score (movers win slots)
+      return { id, score: Math.abs(r.changePct || 0) };
+    }).filter(Boolean).sort((a, b) => b.score - a.score);
+
+    for (const { id, score } of viewItems) {
       if (ids.size >= MAX_LIVE_ITEMS) break;
-      if (Number.isFinite(id)) ids.add(id);
+      // Cold items (no meaningful movement) only fetched every 3rd poll
+      if (score < 1 && pollCounter % 3 !== 0) continue;
+      ids.add(id);
     }
     for (const country of COUNTRIES) {
       for (const item of country.items) {
@@ -1087,23 +1102,30 @@
     const slope = n > 1 ? (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX) : 0;
     const trendPct = mean > 0 ? (slope / mean) * 100 : 0;
 
-    // Signal logic
+    // Signal logic — Torn-flipper semantics (buy low, sell high).
+    // SELL on strength: price rising → cash out the spike.
+    // BUY on weakness: price dipping → accumulate at a discount.
+    // This is the opposite of momentum trading and matches how Torn
+    // players actually use the market.
     let signal = 'WATCH';
     let confidence = 1;
 
     if (changePct > 5 && trendPct > 0) {
-      signal = 'BUY'; confidence = Math.min(3, Math.floor(changePct / 5));
+      signal = 'SELL'; confidence = Math.min(3, Math.floor(changePct / 5));
     } else if (changePct < -8 && trendPct < 0) {
-      signal = 'SELL'; confidence = Math.min(3, Math.floor(Math.abs(changePct) / 8));
+      signal = 'BUY';  confidence = Math.min(3, Math.floor(Math.abs(changePct) / 8));
     } else if (changePct > 2) {
-      signal = 'HOLD'; confidence = 2;
+      signal = 'HOLD'; confidence = 2; // mild rise — hold for more upside before selling
     } else if (Math.abs(changePct) < 1 && volatility > 8) {
       signal = 'WATCH'; confidence = 2;
     }
 
-    // Big spike detection
-    const isSpike = Math.abs(changePct) > 15;
-    const isBigSpike = Math.abs(changePct) > 30;
+    // Big spike detection — require >=3 snapshots before trusting a spike.
+    // The first live snapshot after a stale market_value can look like a
+    // 50% "jump" that's really just a data-source switch, not real movement.
+    const trustworthy = effectiveWindow.length >= 3;
+    const isSpike = trustworthy && Math.abs(changePct) > 15;
+    const isBigSpike = trustworthy && Math.abs(changePct) > 30;
 
     // Data source confidence
     const dataSources = (currentPrice ? 1 : 0) + (yataPrice ? 1 : 0);
@@ -1196,6 +1218,7 @@
 
   async function poll(force = false) {
     if (!settings.apiKey) return;
+    pollCounter++;
 
     try {
       // Only show loading spinner if no cached data is displayed yet
@@ -2054,12 +2077,13 @@
         injectBuyFlow(parseInt(buyBtn.dataset.id), buyBtn.dataset.name, buyBtn.dataset.cat);
       }
       if (sellBtn) {
-        injectSellFlow(
-          parseInt(sellBtn.dataset.id),
-          sellBtn.dataset.name,
-          parseInt(sellBtn.dataset.qty),
-          parseInt(sellBtn.dataset.price)
-        );
+        // Soft guard: warn if user doesn't appear to own the item, but
+        // still navigate (inventory cache can be stale by up to one poll)
+        const id    = parseInt(sellBtn.dataset.id);
+        const owned = userInventory[id]?.quantity ?? 0;
+        const name  = sellBtn.dataset.name;
+        if (!owned) showTeemNotice(`No ${name} in your last inventory snapshot — opening Items page anyway`);
+        attemptQuickUse(name);
       }
     });
 
@@ -2247,7 +2271,9 @@
           <div class="tmit-result-row"><span class="tmit-result-label">After 5% Tax</span><span class="tmit-result-val hot">$${item?.netSellPrice?.toLocaleString() ?? '—'}</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Profit / Item</span><span class="tmit-result-val green">$${item?.profitPerItem?.toLocaleString() ?? '—'}</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Carry (effective)</span><span class="tmit-result-val">${item?.actualCap ?? '—'} items</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Total Profit</span><span class="tmit-result-val green">$${item ? Math.round(item.profitPerItem * item.actualCap).toLocaleString() : '—'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Revenue / Trip</span><span class="tmit-result-val">$${item ? Math.round(item.netSellPrice * item.actualCap).toLocaleString() : '—'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Cost / Trip (buy)</span><span class="tmit-result-val icy">−$${item ? Math.round(item.buyPrice * item.actualCap).toLocaleString() : '—'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Net Profit / Trip</span><span class="tmit-result-val green">$${item ? Math.round(item.profitPerItem * item.actualCap).toLocaleString() : '—'}</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Flight Type</span><span class="tmit-result-val gold">${({'economy':'Economy','airstrip':'Airstrip -30%','business':'Business -50%','wlt':'WLT -50%'})[settings.flightType] ?? 'Economy'}</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">One-way time</span><span class="tmit-result-val">${getAdjustedTravelTime(r.travelTime)} min</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Round Trip</span><span class="tmit-result-val">${r.roundTripHours.toFixed(1)} hrs</span></div>
@@ -2434,7 +2460,9 @@
               title="${isPinned ? 'Remove from watchlist' : 'Add to watchlist'}"
               style="color:${isPinned ? '#c9a227' : 'rgba(201,162,39,0.3)'};">★</button>
             <button class="tmit-row-btn tmit-buy-btn" data-id="${r.itemId}" data-name="${r.name}" data-cat="${r.type}"
-              title="Buy on market">🛒</button>
+              title="Buy on market" style="color:#3dd6c8;">🛒</button>
+            <button class="tmit-row-btn tmit-sell-btn" data-id="${r.itemId}" data-name="${r.name}"
+              title="List on market (opens Items page)" style="color:#e8621a;">💵</button>
           </div>
         </div>`;
     });
