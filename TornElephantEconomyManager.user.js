@@ -635,6 +635,20 @@
     }
   }
 
+  // Look up the user's inventory quantity for a given item name.
+  // Used by the Quick Use bar/tab to show stock counts and disable
+  // pinned items the user has zero of.
+  function getInventoryQty(itemName) {
+    if (!itemName) return 0;
+    const lower = itemName.toLowerCase();
+    for (const id in userInventory) {
+      if ((userInventory[id].name || '').toLowerCase() === lower) {
+        return userInventory[id].quantity || 0;
+      }
+    }
+    return 0;
+  }
+
   function formatCooldown(secs) {
     if (!secs || secs <= 0) return null;
     const h = Math.floor(secs / 3600);
@@ -2375,7 +2389,7 @@
       }
     });
 
-    // Quick items tab — add/remove
+    // Quick items tab — add / remove / use
     panel.addEventListener('click', (e) => {
       if (e.target.id === 'tmit-quick-add-btn') {
         const input = document.getElementById('tmit-quick-add-name');
@@ -2387,6 +2401,15 @@
         }
         input.value = '';
         renderQuickTab();
+      }
+      // Use button on a pinned row — fires the full Quick Use flow, even
+      // from the panel. attemptQuickUse handles cross-page navigation.
+      const useBtn = e.target.closest('[data-quick-use]');
+      if (useBtn && !useBtn.disabled) {
+        const idx = parseInt(useBtn.dataset.quickUse);
+        const item = quickItems[idx];
+        if (item) attemptQuickUse(item.name);
+        return;
       }
       const removeIdx = e.target.dataset.quickRemove;
       if (removeIdx !== undefined) {
@@ -2588,18 +2611,39 @@
     const listEl = document.getElementById('tmit-quick-list');
     if (!listEl) return;
     if (!quickItems.length) {
-      listEl.innerHTML = '<div style="font-size:10px;color:#9886b8;padding:8px 0;">No items saved yet. Add some above.</div>';
+      listEl.innerHTML = '<div style="font-size:10px;color:#9886b8;padding:8px 0;">'
+        + 'No items pinned yet. Add some above — they\'ll appear here AND on the Items page.</div>';
       return;
     }
-    listEl.innerHTML = quickItems.map((item, idx) => `
-      <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;
-                  background:rgba(0,0,0,0.25);border-radius:6px;border:1px solid rgba(201,162,39,0.12);">
-        <span style="flex:1;font-size:11px;color:#d8c8f0;">${item.name}</span>
-        <button data-quick-remove="${idx}"
-          style="font-size:10px;color:#ff6060;background:none;border:none;cursor:pointer;
-                 padding:2px 6px;opacity:0.7;">✕ Remove</button>
-      </div>
-    `).join('');
+    listEl.innerHTML = quickItems.map((item, idx) => {
+      const qty = getInventoryQty(item.name);
+      const disabled = qty === 0;
+      const useBg = disabled
+        ? 'background:rgba(80,60,90,0.25);border:1px solid rgba(120,100,140,0.3);'
+            + 'color:#7a6c8a;cursor:not-allowed;'
+        : 'background:linear-gradient(180deg,#3a0050,#1a0020);'
+            + 'border:1px solid #9702ad;color:#ff7a1f;cursor:pointer;'
+            + 'box-shadow:0 0 8px rgba(151,2,173,0.3);';
+      return `
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;
+                    background:rgba(0,0,0,0.25);border-radius:6px;border:1px solid rgba(201,162,39,0.12);">
+          <button data-quick-use="${idx}" ${disabled ? 'disabled' : ''}
+            title="${disabled ? 'You have 0 of these' : 'Use ' + item.name + ' now'}"
+            style="${useBg}border-radius:5px;font-size:10px;font-weight:700;
+                   letter-spacing:0.08em;padding:4px 10px;font-family:'Cinzel',serif;">
+            ⚡ USE
+          </button>
+          <span style="flex:1;font-size:11px;color:#d8c8f0;font-weight:500;">${item.name}</span>
+          <span style="font-size:11px;font-family:monospace;color:${disabled ? '#ff6060' : '#c9a227'};font-weight:700;">
+            (${qty})
+          </span>
+          <button data-quick-remove="${idx}"
+            title="Unpin"
+            style="font-size:11px;color:#ff6060;background:none;border:none;cursor:pointer;
+                   padding:2px 6px;opacity:0.6;">✕</button>
+        </div>
+      `;
+    }).join('');
   }
 
   function renderWarTab() {
@@ -3171,7 +3215,10 @@
 
   // ── Page injector — quick bar ─────────────────────────────────────────────
 
-  // Run injector on page load and on DOM changes (Torn is a SPA)
+  // Inject the Quick Use bar at the top of the Items page. Styled as a
+  // purple box with a neon-orange "QUICK USE" header, each pinned item
+  // shown as a button with its live inventory count. Items the user has
+  // zero of are disabled and dimmed.
   function injectQuickBar() {
     if (!window.location.href.includes('item.php')) return;
     if (document.getElementById('teem-quick-bar')) return;
@@ -3179,65 +3226,151 @@
 
     const bar = document.createElement('div');
     bar.id = 'teem-quick-bar';
-    bar.style.cssText = 'position:fixed;top:60px;left:50%;transform:translateX(-50%);'
-      + 'z-index:99999;display:flex;align-items:center;gap:8px;padding:8px 14px;'
-      + 'background:rgba(13,5,32,0.96);border:1px solid rgba(201,162,39,0.3);'
-      + 'border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.6);font-family:monospace;'
-      + 'max-width:90vw;flex-wrap:wrap;';
+    bar.style.cssText = [
+      'position:fixed', 'top:62px', 'left:50%', 'transform:translateX(-50%)',
+      'z-index:99999', 'display:flex', 'align-items:center', 'gap:10px',
+      'padding:9px 16px',
+      // Purple gradient box
+      'background:linear-gradient(180deg,#3a0050 0%,#1a0020 100%)',
+      'border:2px solid #9702ad',
+      'border-radius:10px',
+      'box-shadow:0 0 18px rgba(151,2,173,0.45),0 8px 24px rgba(0,0,0,0.7),inset 0 1px 0 rgba(255,224,102,0.18)',
+      "font-family:'Inter',sans-serif",
+      'max-width:92vw', 'flex-wrap:wrap',
+    ].join(';') + ';';
 
-    bar.innerHTML = '<span style="font-size:9px;color:#a294c0;font-weight:700;'
-      + 'text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;">⚡ Quick Use</span>'
-      + quickItems.map(item =>
-          '<button class="teem-quick-btn" data-item="' + item.name + '" '
-          + 'style="background:rgba(201,162,39,0.12);border:1px solid rgba(201,162,39,0.25);'
-          + 'border-radius:5px;color:#e8dff5;font-size:11px;padding:4px 10px;cursor:pointer;'
-          + 'font-family:monospace;white-space:nowrap;">' + item.name + '</button>'
-        ).join('')
-      + '<button id="teem-quick-bar-close" style="background:none;border:none;color:#a08fc0;'
-      + 'cursor:pointer;font-size:14px;padding:0 3px;margin-left:4px;">✕</button>';
+    // Neon-orange "QUICK USE" header with glow
+    const header =
+      '<span style="font-family:\'Cinzel\',serif;font-size:13px;font-weight:700;'
+      + 'letter-spacing:0.12em;color:#ff7a1f;'
+      + 'text-shadow:0 0 12px rgba(255,122,31,0.75),0 0 4px rgba(255,122,31,0.5);'
+      + 'white-space:nowrap;">⚡ QUICK USE</span>';
 
+    // One button per pinned item, with live inventory count and a
+    // disabled treatment when the user has none.
+    const itemBtns = quickItems.map(item => {
+      const qty = getInventoryQty(item.name);
+      const disabled = qty === 0;
+      const style = [
+        'background:' + (disabled ? 'rgba(80,60,90,0.25)' : 'rgba(201,162,39,0.14)'),
+        'border:1px solid ' + (disabled ? 'rgba(120,100,140,0.35)' : 'rgba(201,162,39,0.45)'),
+        'border-radius:6px',
+        'color:' + (disabled ? '#7a6c8a' : '#ffe066'),
+        'font-size:12px', 'font-weight:600',
+        'padding:5px 12px',
+        'cursor:' + (disabled ? 'not-allowed' : 'pointer'),
+        'font-family:inherit', 'white-space:nowrap',
+        'transition:all 0.15s', 'opacity:' + (disabled ? '0.55' : '1'),
+      ].join(';');
+      const qtyColor = disabled ? '#ff6060' : '#a294c0';
+      return '<button class="teem-quick-btn" data-item="' + item.name + '" '
+        + (disabled ? 'disabled ' : '')
+        + 'style="' + style + '">'
+        + item.name
+        + ' <span style="color:' + qtyColor + ';font-weight:400;">(' + qty + ')</span>'
+        + '</button>';
+    }).join('');
+
+    const closeBtn =
+      '<button id="teem-quick-bar-close" title="Hide bar (use TEEM panel ⚙ to re-enable)" '
+      + 'style="background:none;border:none;color:#a08fc0;cursor:pointer;'
+      + 'font-size:15px;padding:0 4px;margin-left:auto;line-height:1;">✕</button>';
+
+    bar.innerHTML = header + itemBtns + closeBtn;
     document.body.appendChild(bar);
 
     bar.querySelector('#teem-quick-bar-close')?.addEventListener('click', () => bar.remove());
 
-    // Check sessionStorage for item navigated from another page
+    // If we arrived here via a pinned-item click on a different page,
+    // resume the action now that the items DOM is loaded.
     const pendingItem = sessionStorage.getItem('teem_quick_item');
     if (pendingItem) {
       sessionStorage.removeItem('teem_quick_item');
-      setTimeout(() => attemptQuickUse(pendingItem), 800);
+      setTimeout(() => attemptQuickUse(pendingItem), 900);
     }
 
     bar.addEventListener('click', (e) => {
       const btn = e.target.closest('.teem-quick-btn');
-      if (!btn) return;
-      const itemName = btn.dataset.item;
-      const found = attemptQuickUse(itemName);
-      if (found) {
-        btn.style.borderColor = 'rgba(201,162,39,0.6)';
-        setTimeout(() => { btn.style.borderColor = ''; }, 3000);
-      }
+      if (!btn || btn.disabled) return;
+      attemptQuickUse(btn.dataset.item);
     });
   }
 
-  function attemptQuickUse(itemName) {
+  // Quick Use: find an item by name on the Items page, expand its row,
+  // click Use, and confirm the dialog. If the user is on any other page,
+  // saves the action to sessionStorage and navigates to item.php — the
+  // injectQuickBar's pending-item check on the next page will resume it.
+  // Selectors are intentionally permissive because Torn's items page is
+  // a React app with hash-suffixed class names that change over time.
+  async function attemptQuickUse(itemName) {
     if (!window.location.href.includes('item.php')) {
       sessionStorage.setItem('teem_quick_item', itemName);
       window.location.href = 'https://www.torn.com/item.php';
       return false;
     }
-    const nameEls = document.querySelectorAll('[class*="name"], .t-overflow');
-    for (const el of nameEls) {
-      if (el.textContent.trim().toLowerCase() === itemName.toLowerCase()) {
-        const row = el.closest('li, [class*="item"]');
-        if (!row) continue;
-        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const prev = row.style.outline;
-        row.style.outline = '2px solid #c9a227';
-        setTimeout(() => { row.style.outline = prev; }, 3000);
-        return true;
+
+    const targetLower = itemName.toLowerCase();
+
+    // Step 1: Find the item row by exact name match.
+    let row = null;
+    for (const el of document.querySelectorAll('[class*="name"], .t-overflow, .name')) {
+      if ((el.textContent || '').trim().toLowerCase() === targetLower) {
+        row = el.closest('li, [class*="item"]');
+        if (row) break;
       }
     }
-    return false;
+    if (!row) {
+      showTeemNotice(`Couldn't find "${itemName}" — out of stock or name changed`, 'err');
+      return false;
+    }
+
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const prevOutline = row.style.outline;
+    row.style.outline = '2px solid #ff7a1f';
+    setTimeout(() => { row.style.outline = prevOutline; }, 1500);
+
+    // Step 2: Click the row to expand its action menu (Use/Send/Drop/…).
+    row.click();
+
+    // Helpers for finding action buttons by visible text. offsetParent
+    // filters out hidden/collapsed elements.
+    const findActionBtn = (texts, exclude) => {
+      const wanted = texts.map(t => t.toLowerCase());
+      for (const el of document.querySelectorAll('button, a, [role="button"], [class*="action"]')) {
+        if (exclude && el === exclude) continue;
+        if (!el.offsetParent) continue;
+        const txt = (el.textContent || '').trim().toLowerCase();
+        if (wanted.includes(txt)) return el;
+      }
+      return null;
+    };
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+
+    // Step 3: Poll for the "Use" button — it appears after the row
+    // animation expands the action panel. Up to ~1.2s.
+    let useBtn = null;
+    for (let i = 0; i < 8; i++) {
+      await wait(150);
+      useBtn = findActionBtn(['use', 'use item']);
+      if (useBtn) break;
+    }
+    if (!useBtn) {
+      showTeemNotice(`Found "${itemName}" but no Use button appeared`, 'err');
+      return false;
+    }
+    useBtn.click();
+
+    // Step 4: Some items (drugs, etc.) trigger a confirm dialog. Poll
+    // briefly for it; if it never appears, the item used silently and
+    // that's fine.
+    for (let i = 0; i < 8; i++) {
+      await wait(150);
+      const confirmBtn = findActionBtn(['confirm', 'yes', 'ok'], useBtn);
+      if (confirmBtn) { confirmBtn.click(); break; }
+    }
+
+    showTeemNotice(`✓ Used ${itemName}`, 'ok');
+    return true;
   }
 
   // Navigate to item market page and auto-click the cheapest listing
@@ -3364,14 +3497,21 @@
     box.querySelector('#teem-sell-cancel')?.addEventListener('click', () => box.remove());
   }
 
-  function showTeemNotice(msg) {
+  function showTeemNotice(msg, variant) {
     const n = document.createElement('div');
-    n.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);'
-      + 'z-index:999999;background:rgba(13,5,32,0.95);border:1px solid rgba(201,162,39,0.3);'
-      + 'border-radius:6px;padding:8px 16px;font-family:monospace;font-size:11px;color:#c9a227;';
+    const palette = variant === 'ok'
+      ? { border: 'rgba(80,220,130,0.5)', color: '#50dc82', glow: 'rgba(80,220,130,0.4)' }
+      : variant === 'err'
+      ? { border: 'rgba(255,96,96,0.5)', color: '#ff6060', glow: 'rgba(255,96,96,0.4)' }
+      : { border: 'rgba(201,162,39,0.4)', color: '#c9a227', glow: 'rgba(201,162,39,0.3)' };
+    n.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);'
+      + 'z-index:999999;background:rgba(13,5,32,0.97);border:1.5px solid ' + palette.border + ';'
+      + 'border-radius:8px;padding:10px 18px;font-family:\'Inter\',sans-serif;font-size:12px;font-weight:600;'
+      + 'color:' + palette.color + ';box-shadow:0 0 14px ' + palette.glow + ',0 6px 20px rgba(0,0,0,0.6);'
+      + 'letter-spacing:0.02em;';
     n.textContent = msg;
     document.body.appendChild(n);
-    setTimeout(() => n.remove(), 3000);
+    setTimeout(() => n.remove(), 2800);
   }
 
   function waitForElement(selector, timeoutMs = 3000) {
