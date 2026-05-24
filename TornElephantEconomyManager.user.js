@@ -658,8 +658,13 @@
   // ── Styles ────────────────────────────────────────────────────────────────────
   GM_addStyle(`
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap');
-    #tmit-fab{position:fixed;bottom:28px;right:28px;width:52px;height:52px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#320042,#09000d);border:2px solid #c9a227;box-shadow:0 0 14px rgba(151,2,173,0.5),0 4px 24px rgba(0,0,0,0.8);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;z-index:999999;transition:all 0.3s ease;user-select:none;}
-    #tmit-fab:hover{transform:scale(1.1);box-shadow:0 0 26px rgba(151,2,173,0.8),0 4px 28px rgba(0,0,0,0.9);}
+    /* Pill-shaped FAB: elephant graphic up top, crisp CSS "TEEM" wordmark
+       below. The source PNG's baked-in wordmark is only ~3px tall at FAB
+       scale (unreadable), so we render TEEM as actual text instead. */
+    #tmit-fab{position:fixed;bottom:28px;right:28px;width:60px;height:70px;border-radius:14px;background:radial-gradient(circle at 35% 35%,#320042,#09000d);border:2px solid #c9a227;box-shadow:0 0 14px rgba(151,2,173,0.5),0 4px 24px rgba(0,0,0,0.8);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:4px 0 2px;z-index:999999;transition:all 0.3s ease;user-select:none;font-family:'Cinzel',serif;}
+    #tmit-fab:hover{transform:scale(1.06);box-shadow:0 0 26px rgba(151,2,173,0.8),0 4px 28px rgba(0,0,0,0.9);}
+    #tmit-fab .tmit-fab-elephant{width:50px;height:45px;background-size:50px 50px;background-position:center top;background-repeat:no-repeat;pointer-events:none;flex-shrink:0;}
+    #tmit-fab .tmit-fab-brand{font-size:13px;font-weight:700;color:#00e5ff;letter-spacing:0.12em;line-height:1;text-shadow:0 0 6px rgba(0,229,255,0.55);pointer-events:none;margin-top:1px;}
     /* Big-hit indicator: a static coin badge with the elephant on it.
        No animation, no transitions — just appears when a huge spike is
        detected. Toggling the .tmit-alert class is a single display swap,
@@ -848,7 +853,7 @@
     #tmit-onboard{position:fixed;bottom:28px;left:28px;z-index:9999999;animation:tmit-slidein 0.4s cubic-bezier(0.16,1,0.3,1);}
     @keyframes tmit-slidein{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
     .tmit-onboard-card{background:linear-gradient(160deg,#1a0020 0%,#09000d 100%);border:1px solid #9702ad;border-top:3px solid #c9a227;border-radius:12px;width:340px;padding:18px 18px 14px;box-shadow:0 0 40px rgba(151,2,173,0.18),0 16px 48px rgba(0,0,0,0.8);position:relative;}
-    .tmit-onboard-logo{width:56px;height:56px;border-radius:50%;border:2px solid #c9a227;margin:0 auto 14px;display:block;}
+    .tmit-onboard-logo{width:56px;height:50px;margin:0 auto 14px;display:block;background-size:56px 56px;background-position:center top;background-repeat:no-repeat;}
     .tmit-onboard-title{font-family:'Cinzel',serif;font-size:18px;font-weight:700;color:#c9a227;text-align:center;margin-bottom:4px;letter-spacing:0.05em;}
     .tmit-onboard-subtitle{font-size:11px;color:#b481cc;text-align:center;margin-bottom:20px;}
     .tmit-onboard-step{display:none;}
@@ -1620,12 +1625,17 @@
     fab.id = 'tmit-fab';
     // Inline styles guarantee visibility even if the GM_addStyle stylesheet
     // fails to load or is blocked — the FAB must never be invisible.
-    fab.style.cssText = 'position:fixed;bottom:28px;right:28px;width:52px;height:52px;'
-      + 'border-radius:50%;background:radial-gradient(circle at 35% 35%,#320042,#09000d);'
-      + 'border:2px solid #c9a227;cursor:pointer;display:flex;align-items:center;'
-      + 'justify-content:center;z-index:2147483000;box-shadow:0 0 14px rgba(151,2,173,0.6),'
+    fab.style.cssText = 'position:fixed;bottom:28px;right:28px;width:60px;height:70px;'
+      + 'border-radius:14px;background:radial-gradient(circle at 35% 35%,#320042,#09000d);'
+      + 'border:2px solid #c9a227;cursor:pointer;display:flex;flex-direction:column;'
+      + 'align-items:center;justify-content:flex-start;padding:4px 0 2px;'
+      + 'z-index:2147483000;box-shadow:0 0 14px rgba(151,2,173,0.6),'
       + '0 4px 24px rgba(0,0,0,0.8);';
-    fab.innerHTML = `<img src="${TEEM_ELEPHANT_DATAURL}" style="width:38px;height:38px;border-radius:50%;pointer-events:none;" draggable="false"><div class="tmit-alert-badge" id="tmit-alert-badge">$</div>`;
+    // Elephant graphic uses a div with background-image so host-page img
+    // rules can't shrink it. background-size 50x50 with the 50x45 div crops
+    // the bottom ~10% of the source PNG — exactly the baked-in wordmark
+    // strip, which we replace with crisp CSS text below.
+    fab.innerHTML = `<div class="tmit-fab-elephant" style="background-image:url('${TEEM_ELEPHANT_DATAURL}');"></div><div class="tmit-fab-brand">TEEM</div><div class="tmit-alert-badge" id="tmit-alert-badge">$</div>`;
     fab.title = "TEEM — Torn's Elephant Economy Manager";
     document.body.appendChild(fab);
 
@@ -1636,7 +1646,7 @@
     panel.innerHTML = `
       <div class="tmit-header" id="tmit-drag-handle">
         <div class="tmit-title">
-          <img src="${TEEM_ELEPHANT_DATAURL}" style="width:24px;height:24px;border-radius:50%;flex-shrink:0;" draggable="false">
+          <div style="width:28px;height:25px;flex-shrink:0;background:url('${TEEM_ELEPHANT_DATAURL}') center top / 28px 28px no-repeat;"></div>
           Elephant Economy Manager
         </div>
         <div class="tmit-header-right">
@@ -1887,13 +1897,13 @@
 
   // ── Onboarding ────────────────────────────────────────────────────────────
 
-  function buildOnboarding(iconDataUrl) {
+  function buildOnboarding() {
     const el = document.createElement('div');
     el.id = 'tmit-onboard';
     el.innerHTML = `
       <div class="tmit-onboard-card">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-          <img class="tmit-onboard-logo" src="${iconDataUrl}" alt="TEEM" style="width:36px;height:36px;margin:0;flex-shrink:0;">
+          <div class="tmit-onboard-logo" style="width:36px;height:32px;margin:0;flex-shrink:0;background-image:url('${TEEM_ELEPHANT_DATAURL}');background-size:36px 36px;"></div>
           <div>
             <div class="tmit-onboard-title" style="font-size:13px;text-align:left;margin:0;">Welcome to TEEM</div>
             <div class="tmit-onboard-subtitle" style="text-align:left;margin:0;font-size:10px;">Let's get you set up — Torn stays usable the whole time</div>
@@ -3126,9 +3136,7 @@
 
     // Show onboarding for new users, otherwise start polling
     if (!onboardingDone || !settings.apiKey) {
-      const fabImg = document.querySelector('#tmit-fab img');
-      const iconSrc = fabImg ? fabImg.src : '';
-      buildOnboarding(iconSrc);
+      buildOnboarding();
     } else {
       // ── Instant render from cache ──────────────────────────────────────
       // Render immediately from whatever is in memory (loaded from GM storage
