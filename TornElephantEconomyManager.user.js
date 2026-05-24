@@ -2,7 +2,7 @@
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
 // @version      6.4.0
-// @description  TEEM — Torn's Elephant Economy Manager. Market signals, travel profit rankings, and war gear pricing. Designed to run alongside TornTools.
+// @description  TEEM — Torn's Elephant Economy Manager. Market signals, travel profit rankings, war gear pricing, and crime $/hour tracker. Designed to run alongside TornTools.
 // @author       Wasteland
 // @match        https://www.torn.com/*
 // @grant        GM_setValue
@@ -469,6 +469,18 @@
   // for compatibility with installs from before the rename.
   let dollarsPerBB     = load('bbPerDollar', 7000000);
   let userInventory   = {};  // { itemId: { name, quantity, uid } } — refreshed each poll
+
+  // Crime tracker — snapshots of crimes + personalstats
+  // taken on poll. Deltas between snapshots produce attempts/hour and
+  // $/hour rates so we can recommend the top 3 crimes for the user's
+  // current skill ceiling.
+  let crimeSnapshots = load('crimeSnapshots', []);  // [{ ts, crimes: {...}, money?: number }]
+  const CRIME_SNAPSHOT_MAX = 240;                   // ~24h at 6-min intervals
+  let lastCrimeFetch = 0;
+  // Throttle: don't fetch crimes more often than every 5 minutes — we don't
+  // need second-by-second resolution and crimes data is the biggest field
+  // in the user/ response.
+  const CRIME_FETCH_INTERVAL_MS = 5 * 60 * 1000;
 
   try { if (Object.keys(itemMeta).length === 0) {
     for (const name of RW_KNOWN_WEAPONS) {
@@ -1061,6 +1073,241 @@
     return live;
   }
 
+  // ── Crime tracker ─────────────────────────────────────────────────────────
+  //
+  // Torn's `crimes` selection returns per-crime counters (attempts/successes).
+  // `personalstats` returns lifetime money totals. The shape evolves over
+  // time, so we snapshot the raw response and read defensively. Deltas
+  // between consecutive snapshots over the last hour drive recommendations.
+  //
+  // What we store per snapshot:
+  //   ts      — when we fetched it
+  //   crimes  — the raw `crimes` field (cumulative counts per crime key)
+  //   money   — total money earned via crime (from personalstats if present)
+
+  function appendCrimeSnapshot(data) {
+    if (!data) return;
+    const ps = data.personalstats ?? {};
+
+    // Crimes 2.0 moved per-crime counters around. Pull from every plausible
+    // location and merge — later sources win on key collisions, but in
+    // practice the keys don't overlap between locations.
+    const merged = {
+      ...flattenCrimeCounts(data.crimes),
+      ...flattenCrimeCounts(ps.crimes),
+    };
+
+    // Also harvest any flat `<verb>success`/`<verb>fails`-style keys directly
+    // from personalstats (the pre-Crimes-2.0 shape; some accounts still see
+    // these). Examples: criminaloffenses, theftsuccess, mugged, etc.
+    for (const [k, v] of Object.entries(ps)) {
+      if (typeof v !== 'number') continue;
+      const kl = k.toLowerCase();
+      if (kl.startsWith('crim') || kl.endsWith('success') || kl.endsWith('fails')
+          || kl === 'mugged' || kl === 'pickpocket' || kl === 'shoplift'
+          || kl === 'thefts'  || kl === 'frauds'     || kl === 'autotheft'
+          || kl === 'forgeries' || kl === 'hustling') {
+        if (merged[k] === undefined) merged[k] = v;
+      }
+    }
+
+    const moneyFromCrime =
+      (ps.crimes && typeof ps.crimes === 'object'
+        ? (ps.crimes.money_mugged ?? ps.crimes.money_earned ?? 0)
+        : 0)
+      || ps.moneymugged
+      || ps.money_mugged
+      || ps.criminal_offenses_money
+      || 0;
+
+    const snap = {
+      ts:     Date.now(),
+      crimes: merged,
+      money:  moneyFromCrime || null,
+    };
+
+    // Diagnostic: log the shape when we find nothing useful, so the user
+    // can share it back and we can patch the field names. Only logs once
+    // per session (when bootstrapping) and again if we keep finding 0 keys.
+    if (Object.keys(merged).length === 0) {
+      const sample = {};
+      if (data.crimes && typeof data.crimes === 'object') {
+        sample['data.crimes keys']  = Object.keys(data.crimes).slice(0, 12);
+      } else {
+        sample['data.crimes']       = data.crimes;
+      }
+      if (ps.crimes && typeof ps.crimes === 'object') {
+        sample['personalstats.crimes keys'] = Object.keys(ps.crimes).slice(0, 12);
+      } else {
+        sample['personalstats.crimes']      = ps.crimes;
+      }
+      sample['personalstats crime-ish keys'] = Object.keys(ps)
+        .filter(k => /crim|theft|mugg|pickpocket|shoplift|fraud|forgery|hustl/i.test(k))
+        .slice(0, 20);
+      console.warn('[TEEM Crimes] No crime counts found — share this with TEEM:', sample);
+    }
+
+    crimeSnapshots.push(snap);
+    if (crimeSnapshots.length > CRIME_SNAPSHOT_MAX) {
+      crimeSnapshots = crimeSnapshots.slice(-CRIME_SNAPSHOT_MAX);
+    }
+    store('crimeSnapshots', crimeSnapshots);
+  }
+
+  // Crimes shape varies between API generations. Sometimes it's a flat
+  // map of name→count; sometimes nested with {total, success}. Reduce to
+  // a flat { crimeName: attempts } map so deltas are easy to compute.
+  function flattenCrimeCounts(crimes) {
+    if (!crimes || typeof crimes !== 'object') return {};
+    const out = {};
+    for (const [k, v] of Object.entries(crimes)) {
+      if (typeof v === 'number') {
+        out[k] = v;
+      } else if (v && typeof v === 'object') {
+        // Try common shape variants
+        const n = v.total ?? v.attempts ?? v.count ?? v.success ?? null;
+        if (typeof n === 'number') out[k] = n;
+      }
+    }
+    return out;
+  }
+
+  // Pretty-print a Torn API crime key. Many `personalstats` keys are
+  // smushed lowercase ("criminaloffenses") so the generic splitter alone
+  // would produce "Criminaloffenses". Known keys win via the map; the rest
+  // fall back to the snake_case/camelCase splitter.
+  const CRIME_KEY_LABELS = {
+    criminaloffenses:         'Criminal Offenses',
+    criminal_offenses:        'Criminal Offenses',
+    autotheft:                'Auto Theft',
+    auto_theft:               'Auto Theft',
+    drugdeals:                'Drug Deals',
+    drugdealing:              'Drug Dealing',
+    drug_dealing:             'Drug Dealing',
+    selling_illegal_products: 'Selling Illegal Products',
+    sellingillegalproducts:   'Selling Illegal Products',
+    grandtheft:               'Grand Theft',
+    grand_theft:              'Grand Theft',
+    searchforcash:            'Search for Cash',
+    search_for_cash:          'Search for Cash',
+    pickpocket:               'Pickpocketing',
+    pickpocketing:            'Pickpocketing',
+    shoplift:                 'Shoplifting',
+    shoplifting:              'Shoplifting',
+    mugged:                   'Mugging',
+    muggings:                 'Mugging',
+    fraud:                    'Fraud',
+    frauds:                   'Fraud',
+    forgery:                  'Forgery',
+    forgeries:                'Forgery',
+    hustling:                 'Hustling',
+    bootlegging:              'Bootlegging',
+    graffiti:                 'Graffiti',
+    counterfeiting:           'Counterfeiting',
+    arson:                    'Arson',
+    arsons:                   'Arson',
+    cracking:                 'Cracking',
+    scamming:                 'Scamming',
+    burglary:                 'Burglary',
+    burglaries:               'Burglary',
+    disposal:                 'Disposal',
+    computercrimes:           'Computer Crimes',
+    computer_crimes:          'Computer Crimes',
+  };
+  function prettifyCrimeKey(key) {
+    const lc = String(key).toLowerCase();
+    if (CRIME_KEY_LABELS[lc]) return CRIME_KEY_LABELS[lc];
+    return String(key)
+      .replace(/_/g, ' ')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  // Compute rates from a window of recent snapshots.
+  // Returns: { perCrime: [{name, attemptsPerHr, attempts, share}], totalAttemptsPerHr, moneyPerHr, windowHours }
+  function computeCrimeRates() {
+    if (crimeSnapshots.length < 2) return null;
+    const now      = Date.now();
+    const horizon  = now - 24 * 60 * 60 * 1000;
+    const window   = crimeSnapshots.filter(s => s.ts >= horizon);
+    if (window.length < 2) return null;
+
+    const first = window[0];
+    const last  = window[window.length - 1];
+    const windowMs    = last.ts - first.ts;
+    if (windowMs < 60 * 1000) return null;
+    const windowHours = windowMs / 3_600_000;
+
+    // Per-key rate calc. Use each key's earliest-and-latest snapshot where
+    // it actually appears, not the global first/last — otherwise a key that
+    // gets newly tracked mid-window produces a fake gigantic delta against
+    // the implicit 0 baseline.
+    const perCrime = [];
+    let totalAttempts = 0;
+    const crimeKeys = new Set();
+    for (const s of window) {
+      for (const k of Object.keys(s.crimes || {})) crimeKeys.add(k);
+    }
+
+    for (const k of crimeKeys) {
+      let firstVal = null, firstTs = 0, lastVal = null, lastTs = 0;
+      for (const s of window) {
+        const v = s.crimes?.[k];
+        if (typeof v !== 'number') continue;
+        if (firstVal === null) { firstVal = v; firstTs = s.ts; }
+        lastVal = v; lastTs = s.ts;
+      }
+      if (firstVal === null || lastVal === null || lastTs === firstTs) continue;
+      const delta = Math.max(0, lastVal - firstVal);
+      if (delta <= 0) continue;
+      const keyHours = (lastTs - firstTs) / 3_600_000;
+      if (keyHours <= 0) continue;
+      totalAttempts += delta;
+      perCrime.push({
+        key:           k,
+        name:          prettifyCrimeKey(k),
+        attempts:      delta,
+        attemptsPerHr: delta / keyHours,
+        totalAllTime:  lastVal,
+        keyHours,
+      });
+    }
+    perCrime.sort((a, b) => b.attempts - a.attempts);
+    // Share = portion of recent crime time spent on this one. Used as a
+    // proxy for $-allocation when we can't get per-crime money directly.
+    for (const c of perCrime) c.share = totalAttempts > 0 ? c.attempts / totalAttempts : 0;
+
+    // Money delta — find first/last snapshot that has a non-null money
+    // total. Same defense against the v6.2.x parser-upgrade jump.
+    let moneyFirst = null, moneyFirstTs = 0, moneyLast = null, moneyLastTs = 0;
+    for (const s of window) {
+      if (typeof s.money !== 'number' || s.money <= 0) continue;
+      if (moneyFirst === null) { moneyFirst = s.money; moneyFirstTs = s.ts; }
+      moneyLast = s.money; moneyLastTs = s.ts;
+    }
+    let moneyPerHr = null;
+    if (moneyFirst !== null && moneyLast !== null && moneyLastTs > moneyFirstTs) {
+      const moneyDelta = Math.max(0, moneyLast - moneyFirst);
+      const moneyHours = (moneyLastTs - moneyFirstTs) / 3_600_000;
+      if (moneyDelta > 0 && moneyHours > 0) moneyPerHr = Math.round(moneyDelta / moneyHours);
+    }
+
+    // Spread the money across crimes by share — best-effort attribution
+    // since the Torn API doesn't return per-crime money breakdowns.
+    if (moneyPerHr) {
+      for (const c of perCrime) c.moneyPerHr = Math.round(moneyPerHr * c.share);
+    }
+
+    return {
+      perCrime,
+      totalAttempts,
+      totalAttemptsPerHr: totalAttempts / windowHours,
+      moneyPerHr,
+      windowHours,
+      sampleCount: window.length,
+    };
+  }
+
   async function fetchYataPrices() {
     try {
       const data = await apiGet('https://yata.life/api/v1/bazaar/abroad/?format=json')
@@ -1467,16 +1714,30 @@
       const srcLabel  = liveCount > 0 ? `⚡ ${liveCount} live` : '~ Avg';
       setStatus('ok', `${srcLabel} · ${new Date().toLocaleTimeString()}`);
 
-      // Fetch inventory for buy/sell features
+      // Fetch inventory + crime data in a single user/ call. Crimes throttled
+      // to every 5 min so the response stays small most of the time.
       try {
+        const wantCrimes = (Date.now() - lastCrimeFetch) > CRIME_FETCH_INTERVAL_MS;
+        const sels = wantCrimes
+          ? 'inventory,crimes,personalstats'
+          : 'inventory';
         const inv = await apiGet(
-          `https://api.torn.com/user/?selections=inventory&key=${settings.apiKey}&comment=TEEM`
+          `https://api.torn.com/user/?selections=${sels}&key=${settings.apiKey}&comment=TEEM`
         );
         if (inv?.inventory) {
           userInventory = {};
           for (const [, item] of Object.entries(inv.inventory)) {
             const id = item.ID ?? item.id;
             if (id) userInventory[id] = { name: item.name ?? '', quantity: item.quantity ?? 1 };
+          }
+        }
+        if (wantCrimes && !inv?.error) {
+          appendCrimeSnapshot(inv);
+          lastCrimeFetch = Date.now();
+          const panelEl2 = document.getElementById('tmit-panel');
+          if (panelEl2 && !panelEl2.classList.contains('tmit-hidden')
+              && settings.activeTab === 'crimes') {
+            try { renderCrimesTab(); } catch(e) {}
           }
         }
       } catch(e) { /* optional */ }
@@ -1621,6 +1882,7 @@
         <div class="tmit-tab" data-tab="watchlist">⭐ Watch <span class="tmit-tab-count" id="tmit-watch-count">0</span></div>
         <div class="tmit-tab" data-tab="war">⚔ War Gear</div>
         <div class="tmit-tab" data-tab="travel">✈ Travel</div>
+        <div class="tmit-tab" data-tab="crimes">🎯 Crimes</div>
       </div>
 
       <div class="tmit-controls">
@@ -1741,6 +2003,26 @@
         <div class="tmit-section-title" style="margin-top:14px;">📋 Trip Details</div>
         <div id="tmit-travel-detail" style="font-size:11px;color:#ab9bce;padding:6px 0;">
           Click a destination above to see trip details.
+        </div>
+      </div>
+
+      <!-- Crimes Tab -->
+      <div id="tmit-crimes-panel" class="tmit-tab-panel" style="display:none;flex:1;overflow-y:auto;padding:12px;">
+        <div class="tmit-section-title">🎯 Crime Tracker</div>
+        <div style="font-size:10px;color:#a08fc0;margin-bottom:8px;line-height:1.6;">
+          Tracks your personal crime activity. Money/hour is your real measured rate
+          based on snapshots since you installed — TEEM needs ~1 hour of play to give
+          meaningful numbers.
+        </div>
+
+        <div id="tmit-crime-best" style="margin-bottom:12px;"></div>
+        <div class="tmit-section-title" style="margin-top:14px;">All Crimes (last 24h)</div>
+        <div id="tmit-crime-list">
+          <div class="tmit-state-msg" style="padding:18px 0;">
+            <div class="tmit-state-icon">🎯</div>
+            Collecting crime data — first sample appears within 5 minutes,
+            ranking becomes meaningful after ~1 hour of play.
+          </div>
         </div>
       </div>
 
@@ -1908,6 +2190,11 @@
               <div class="tab-icon">⚔</div>
               <div class="tab-name">War Gear</div>
               <div class="tab-desc">Live market prices for ranked war weapons & armor, with BB trade-in values.</div>
+            </div>
+            <div class="tmit-onboard-tab-card">
+              <div class="tab-icon">🎯</div>
+              <div class="tab-name">Crimes</div>
+              <div class="tab-desc">Tracks your personal crime activity; ranks your top 3 by measured $/hour.</div>
             </div>
             <div class="tmit-onboard-tab-card">
               <div class="tab-icon">💰</div>
@@ -2373,6 +2660,11 @@
     const listEl     = document.getElementById('tmit-list');
     const warPanel    = document.getElementById('tmit-war-panel');
     const travelPanel = document.getElementById('tmit-travel-panel');
+    const crimePanel  = document.getElementById('tmit-crimes-panel');
+
+    // Defensive: any old setting that still says 'quick' or 'arb' (now-
+    // removed tabs) bumps back to the Market tab.
+    if (tab === 'quick' || tab === 'arb') { tab = 'all'; settings.activeTab = 'all'; saveSettings(); }
 
     const isMarket = tab === 'all' || tab === 'watchlist';
     if (controls)     controls.style.display    = isMarket ? '' : 'none';
@@ -2381,15 +2673,17 @@
     if (listEl)       listEl.style.display      = isMarket ? '' : 'none';
     if (warPanel)     warPanel.style.display    = tab === 'war'    ? 'flex' : 'none';
     if (travelPanel)  travelPanel.style.display = tab === 'travel' ? 'flex' : 'none';
+    if (crimePanel)   crimePanel.style.display  = tab === 'crimes' ? 'flex' : 'none';
 
     // Update active tab highlight
     document.querySelectorAll('.tmit-tab').forEach(t =>
       t.classList.toggle('tmit-tab-active', t.dataset.tab === tab)
     );
 
-    if (isMarket)           renderList();
+    if (isMarket)              renderList();
     else if (tab === 'war')    renderWarTab();
     else if (tab === 'travel') renderTravelTab();
+    else if (tab === 'crimes') renderCrimesTab();
   }
 
   // ── Travel Tab ────────────────────────────────────────────────────────────
@@ -2455,6 +2749,115 @@
         </div>`;
       });
     });
+  }
+
+  // ── Crimes Tab ─────────────────────────────────────────────────────────────
+
+  function renderCrimesTab() {
+    const bestEl = document.getElementById('tmit-crime-best');
+    const listEl = document.getElementById('tmit-crime-list');
+    if (!bestEl || !listEl) return;
+
+    const rates = computeCrimeRates();
+    const fmtM  = n => n >= 1_000_000 ? '$' + (n/1_000_000).toFixed(2) + 'M'
+                    : n >= 1_000     ? '$' + Math.round(n/100)/10 + 'K'
+                                     : '$' + Math.round(n).toLocaleString();
+
+    if (!rates) {
+      bestEl.innerHTML = '';
+      listEl.innerHTML = `<div class="tmit-state-msg" style="padding:18px 0;">
+        <div class="tmit-state-icon">🎯</div>
+        Need at least 2 crime snapshots ${crimeSnapshots.length}/2.
+        First sample lands within 5 minutes; meaningful rates after ~1 hour of play.
+      </div>`;
+    } else if (rates.perCrime.length === 0) {
+      // We have snapshots but no movement — usually means we're reading the
+      // wrong fields from the API response. Surface that explicitly with
+      // copy-paste-ready debug info.
+      const last       = crimeSnapshots[crimeSnapshots.length - 1];
+      const keyCount   = last?.crimes ? Object.keys(last.crimes).length : 0;
+      const sampleKeys = last?.crimes ? Object.keys(last.crimes).slice(0, 6).join(', ') : '—';
+      bestEl.innerHTML = '';
+      listEl.innerHTML = `<div class="tmit-state-msg" style="padding:18px 0;text-align:left;font-size:11px;line-height:1.7;">
+        <div style="text-align:center;font-size:24px;margin-bottom:8px;">🔍</div>
+        <div style="color:#ffe066;font-weight:700;text-align:center;margin-bottom:8px;">No crime activity detected</div>
+        <div style="color:#a08fc0;">
+          TEEM has <b style="color:#c9a227;">${crimeSnapshots.length}</b> snapshots over <b style="color:#c9a227;">${rates.windowHours.toFixed(1)}h</b>,
+          tracking <b style="color:#c9a227;">${keyCount}</b> crime key${keyCount === 1 ? '' : 's'}:
+          <br><span style="font-family:monospace;font-size:10px;color:#9886b8;">${sampleKeys || '(none)'}</span>
+          <br><br>
+          If you've done crimes recently and nothing shows here, the Torn API
+          probably moved the crime counters. Open <b>F12 → Console</b> and look
+          for <code style="background:rgba(0,0,0,0.4);padding:1px 5px;border-radius:3px;color:#ffe066;">[TEEM Crimes]</code> —
+          share the line with the developer and we'll patch the parser.
+        </div>
+      </div>`;
+      return;
+    } else {
+      const top3 = rates.perCrime.slice(0, 3);
+      bestEl.innerHTML = `
+        <div class="tmit-section-title" style="margin:0 0 6px;">⚡ Your Top 3 Crimes (last ${rates.windowHours.toFixed(1)}h)</div>
+        ${top3.length === 0
+          ? '<div style="font-size:11px;color:#9886b8;padding:6px 0;">No crime activity detected in window.</div>'
+          : `<div style="display:flex;flex-direction:column;gap:6px;">
+              ${top3.map((c, i) => {
+                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
+                const rankCol = i === 0 ? '#ffe066' : i === 1 ? '#c0c0c0' : '#cd7f32';
+                const moneyLine = c.moneyPerHr
+                  ? `<span style="color:#50dc82;font-weight:700;">${fmtM(c.moneyPerHr)}/hr</span>`
+                  : `<span style="color:#9886b8;">—</span>`;
+                return `<div style="display:grid;grid-template-columns:28px 1fr 90px 70px;gap:8px;
+                          align-items:center;padding:7px 10px;background:rgba(0,0,0,0.3);
+                          border:1px solid rgba(201,162,39,0.18);border-left:3px solid ${rankCol};
+                          border-radius:6px;">
+                  <div style="font-size:16px;text-align:center;">${medal}</div>
+                  <div>
+                    <div style="font-size:12px;color:#e8caf5;font-weight:600;">${c.name}</div>
+                    <div style="font-size:9px;color:#9886b8;">${c.attempts} attempts · ${c.attemptsPerHr.toFixed(1)}/hr · ${(c.share*100).toFixed(0)}% of crime time</div>
+                  </div>
+                  <div style="text-align:right;font-family:monospace;font-size:11px;">${moneyLine}</div>
+                  <div style="text-align:right;font-family:monospace;font-size:10px;color:#c9a227;">${c.totalAllTime.toLocaleString()} all-time</div>
+                </div>`;
+              }).join('')}
+            </div>
+            ${rates.moneyPerHr
+              ? `<div style="margin-top:8px;font-size:10px;color:#a08fc0;text-align:center;">
+                  Total crime money rate: <b style="color:#50dc82;">${fmtM(rates.moneyPerHr)}/hr</b>
+                  · Distributed by attempt share (Torn doesn't expose per-crime money directly)
+                </div>`
+              : '<div style="margin-top:8px;font-size:10px;color:#a08fc0;text-align:center;">No money delta detected — need a longer window to estimate $/hr.</div>'}
+          `}
+      `;
+
+      if (rates.perCrime.length === 0) {
+        listEl.innerHTML = `<div class="tmit-state-msg" style="padding:14px 0;font-size:11px;">
+          No crime activity in the last 24 hours.
+        </div>`;
+      } else {
+        const rows = rates.perCrime.map(c => {
+          const moneyLabel = c.moneyPerHr
+            ? `<span style="color:#50dc82;">${fmtM(c.moneyPerHr)}/hr</span>`
+            : '<span style="color:#9886b8;">—</span>';
+          return `<div style="display:grid;grid-template-columns:1fr 70px 70px 60px;
+                    padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.04);
+                    align-items:center;font-size:11px;">
+            <div style="color:#e8caf5;">${c.name}</div>
+            <div style="text-align:right;font-family:monospace;">${c.attempts}</div>
+            <div style="text-align:right;font-family:monospace;">${c.attemptsPerHr.toFixed(1)}/hr</div>
+            <div style="text-align:right;font-family:monospace;">${moneyLabel}</div>
+          </div>`;
+        });
+        listEl.innerHTML = `<div style="display:grid;grid-template-columns:1fr 70px 70px 60px;
+            padding:4px 8px;background:rgba(0,0,0,0.4);border:1px solid rgba(201,162,39,0.12);
+            border-radius:4px 4px 0 0;margin-bottom:1px;font-size:9px;font-weight:700;
+            letter-spacing:0.05em;color:#b481cc;text-transform:uppercase;">
+            <div>Crime</div>
+            <div style="text-align:right">Attempts</div>
+            <div style="text-align:right">Rate</div>
+            <div style="text-align:right">$/hr</div>
+          </div>` + rows.join('');
+      }
+    }
   }
 
   // ── War Gear Tab ──────────────────────────────────────────────────────────
@@ -2761,6 +3164,15 @@
           const bb = getBBValue(rarity, 1, wt);
           return [r.name, r.type, r.currentPrice, bb, Math.round(bb * dollarsPerBB), r.changePct];
         });
+    } else if (tab === 'crimes') {
+      const rates = computeCrimeRates();
+      headers = ['Crime','Attempts (window)','Attempts/hr','Est $/hr','All-time'];
+      rows = rates
+        ? rates.perCrime.map(c => [
+            c.name, c.attempts, c.attemptsPerHr.toFixed(2),
+            c.moneyPerHr ?? '—', c.totalAllTime,
+          ])
+        : [];
     }
 
     if (!rows.length) {
