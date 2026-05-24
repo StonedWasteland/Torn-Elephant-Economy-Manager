@@ -631,13 +631,11 @@
   // ── Styles ────────────────────────────────────────────────────────────────────
   GM_addStyle(`
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap');
-    /* Pill-shaped FAB: elephant graphic up top, crisp CSS "TEEM" wordmark
-       below. The source PNG's baked-in wordmark is only ~3px tall at FAB
-       scale (unreadable), so we render TEEM as actual text instead. */
-    #tmit-fab{position:fixed;bottom:28px;right:28px;width:60px;height:70px;border-radius:14px;background:radial-gradient(circle at 35% 35%,#320042,#09000d);border:2px solid #c9a227;box-shadow:0 0 14px rgba(151,2,173,0.5),0 4px 24px rgba(0,0,0,0.8);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:4px 0 2px;z-index:999999;transition:all 0.3s ease;user-select:none;font-family:'Cinzel',serif;}
+    /* Rounded-square FAB showing the full logo PNG (elephant + baked-in
+       "TEEM" wordmark). No clipping, no overlay — just the image as-is. */
+    #tmit-fab{position:fixed;bottom:28px;right:28px;width:64px;height:64px;border-radius:12px;background:radial-gradient(circle at 35% 35%,#320042,#09000d);border:2px solid #c9a227;box-shadow:0 0 14px rgba(151,2,173,0.5),0 4px 24px rgba(0,0,0,0.8);cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:999999;transition:all 0.3s ease;user-select:none;}
     #tmit-fab:hover{transform:scale(1.06);box-shadow:0 0 26px rgba(151,2,173,0.8),0 4px 28px rgba(0,0,0,0.9);}
-    #tmit-fab .tmit-fab-elephant{width:50px;height:45px;background-size:50px 50px;background-position:center top;background-repeat:no-repeat;pointer-events:none;flex-shrink:0;}
-    #tmit-fab .tmit-fab-brand{font-size:13px;font-weight:700;color:#00e5ff;letter-spacing:0.12em;line-height:1;text-shadow:0 0 6px rgba(0,229,255,0.55);pointer-events:none;margin-top:1px;}
+    #tmit-fab .tmit-fab-elephant{width:100%;height:100%;background-size:contain;background-position:center;background-repeat:no-repeat;pointer-events:none;}
     /* Big-hit indicator: a static coin badge with the elephant on it.
        No animation, no transitions — just appears when a huge spike is
        detected. Toggling the .tmit-alert class is a single display swap,
@@ -1600,17 +1598,15 @@
     fab.id = 'tmit-fab';
     // Inline styles guarantee visibility even if the GM_addStyle stylesheet
     // fails to load or is blocked — the FAB must never be invisible.
-    fab.style.cssText = 'position:fixed;bottom:28px;right:28px;width:60px;height:70px;'
-      + 'border-radius:14px;background:radial-gradient(circle at 35% 35%,#320042,#09000d);'
-      + 'border:2px solid #c9a227;cursor:pointer;display:flex;flex-direction:column;'
-      + 'align-items:center;justify-content:flex-start;padding:4px 0 2px;'
-      + 'z-index:2147483000;box-shadow:0 0 14px rgba(151,2,173,0.6),'
+    fab.style.cssText = 'position:fixed;bottom:28px;right:28px;width:64px;height:64px;'
+      + 'border-radius:12px;background:radial-gradient(circle at 35% 35%,#320042,#09000d);'
+      + 'border:2px solid #c9a227;cursor:pointer;display:flex;align-items:center;'
+      + 'justify-content:center;z-index:2147483000;box-shadow:0 0 14px rgba(151,2,173,0.6),'
       + '0 4px 24px rgba(0,0,0,0.8);';
-    // Elephant graphic uses a div with background-image so host-page img
-    // rules can't shrink it. background-size 50x50 with the 50x45 div crops
-    // the bottom ~10% of the source PNG — exactly the baked-in wordmark
-    // strip, which we replace with crisp CSS text below.
-    fab.innerHTML = `<div class="tmit-fab-elephant" style="background-image:url('${TEEM_ELEPHANT_DATAURL}');"></div><div class="tmit-fab-brand">TEEM</div><div class="tmit-alert-badge" id="tmit-alert-badge">$</div>`;
+    // Full logo PNG (elephant + baked-in "TEEM" wordmark) shown via
+    // background-image on a div, so host-page img rules can't squash it.
+    // No clipping, no overlay — just the image scaled to fit.
+    fab.innerHTML = `<div class="tmit-fab-elephant" style="background-image:url('${TEEM_ELEPHANT_DATAURL}');"></div><div class="tmit-alert-badge" id="tmit-alert-badge">$</div>`;
     fab.title = "TEEM — Torn's Elephant Economy Manager";
     document.body.appendChild(fab);
 
