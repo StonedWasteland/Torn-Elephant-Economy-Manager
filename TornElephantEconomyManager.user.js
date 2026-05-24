@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.0.0
-// @description  TEEM — Torn's Elephant Economy Manager. Market tracker with hot/cold signals, travel profit rankings, war gear price tracker, and quick item use.
-// @author       TornTravelTracker
+// @version      6.4.0
+// @description  TEEM — Torn's Elephant Economy Manager. Market signals, travel profit rankings, war gear pricing, and quick item use. Designed to run alongside TornTools.
+// @author       Wasteland
 // @match        https://www.torn.com/*
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -312,34 +312,6 @@
     'Chainsaw','Taser',
   ]);
 
-  // Ranked war weapon bonuses — community verified (May 2026)
-  // Source: wiki.torn.com/wiki/Weapon_Bonus + community guides
-  const RW_BONUSES = {
-    // Bonuses that can appear on ALL ranged weapons (rifle, SMG, pistol, shotgun, MG, heavy)
-    ranged: [
-      'Assassinate','Bloodlust','Conserve','Cripple','Deadeye',
-      'Demoralize','Empower','Execute','Expose','Freeze',
-      'Frenzy','Fury','Motivation','Penetrate','Powerful',
-      'Puncture','Quicken','Rage','Revitalize','Slow',
-      'Specialist','Stun','Sure Shot','Warlord','Weaken',
-    ],
-    melee: [
-      'Achilles','Berserk','Bleed','Bloodlust','Crushing',
-      'Empower','Execute','Freeze','Frenzy','Fury',
-      'Home Run','Lacerate','Motivation','Parry','Powerful',
-      'Quicken','Rage','Revitalize','Slow','Warlord','Weaken',
-    ],
-    // Shotgun-only extras (on top of ranged)
-    shotgun_extra: ['Spray'],
-    // SMG-only extras (dual SMGs)
-    smg_extra: ['Spray'],
-    // Armour bonuses
-    armour: [
-      'Block','Cushion','Durable','Fortify','Guard',
-      'Parry','Reflect','Resilient','Shield','Sturdy',
-    ],
-  };
-
   function store(key, val) {
     try { GM_setValue(SCRIPT_KEY + key, JSON.stringify(val)); } catch(e) {}
   }
@@ -486,15 +458,16 @@
   function saveWatchlist() { store('watchlist', [...watchlist]); }
 
   // ── Session tracker ───────────────────────────────────────────────────────
-  let sessionStart      = Date.now();
   let sessionStartPrices = {}; // { itemId: price at session start }
   let sessionProfit     = 0;
 
   // ── Onboarding ────────────────────────────────────────────────────────────
   let onboardingDone  = load('onboardingDone', false);
   thinAllHistory()
-  let bbPerDollar      = load('bbPerDollar', 7000000);
-  let userBBBalance    = 0;
+  // Dollars per single Bunker Buck — used by the War Gear tab to convert
+  // BB trade-in values into a $ equivalent. Storage key kept as `bbPerDollar`
+  // for compatibility with installs from before the rename.
+  let dollarsPerBB     = load('bbPerDollar', 7000000);
   let userInventory   = {};  // { itemId: { name, quantity, uid } } — refreshed each poll
   let quickItems      = load('quickItems',   []);  // [{ name }] — saved items for quick-use bar
 
@@ -761,13 +734,15 @@
     .tmit-change.down{color:#3dd6c8;text-shadow:0 0 8px rgba(61,214,200,0.4);}
     .tmit-change.flat{color:#9b7bb5;}
     .tmit-signal{text-align:right;}
-    .tmit-signal-badge{display:inline-block;font-size:9px;font-weight:700;letter-spacing:0.06em;padding:2px 6px;border-radius:3px;text-transform:uppercase;}
+    .tmit-signal-badge{display:inline-block;font-size:9px;font-weight:700;letter-spacing:0.06em;padding:2px 6px;border-radius:3px;text-transform:uppercase;cursor:pointer;transition:all 0.15s;}
+    .tmit-signal-badge:hover{filter:brightness(1.25);}
     .tmit-signal-badge.BUY{background:rgba(61,214,200,0.15);color:#3dd6c8;border:1px solid rgba(61,214,200,0.35);text-shadow:0 0 6px rgba(61,214,200,0.3);}
     .tmit-signal-badge.SELL{background:rgba(232,98,26,0.18);color:#ff8c42;border:1px solid rgba(232,98,26,0.4);text-shadow:0 0 6px rgba(232,98,26,0.4);}
     .tmit-signal-badge.HOLD{background:rgba(201,162,39,0.15);color:#c9a227;border:1px solid rgba(201,162,39,0.3);}
-    .tmit-signal-badge.WATCH{background:rgba(151,2,173,0.12);color:#cc40f0;border:1px solid rgba(151,2,173,0.28);cursor:pointer;transition:all 0.2s;}
-    .tmit-signal-badge.WATCH:hover{background:rgba(201,162,39,0.18);color:#ffe066;border-color:rgba(201,162,39,0.5);}
-    .tmit-signal-badge.WATCH.tmit-watched{background:rgba(201,162,39,0.22);color:#ffe066;border-color:#c9a227;box-shadow:0 0 7px rgba(201,162,39,0.45);}
+    .tmit-signal-badge.WATCH{background:rgba(151,2,173,0.12);color:#cc40f0;border:1px solid rgba(151,2,173,0.28);}
+    .tmit-signal-badge.WATCH:hover{background:rgba(201,162,39,0.18);color:#ffe066;border-color:rgba(201,162,39,0.5);filter:none;}
+    .tmit-signal-badge.tmit-watched{border-color:#c9a227 !important;box-shadow:0 0 7px rgba(201,162,39,0.45);}
+    .tmit-signal-badge.WATCH.tmit-watched{background:rgba(201,162,39,0.22);color:#ffe066;}
     .tmit-confidence-bar{display:flex;gap:2px;align-items:center;}
     .tmit-conf-dot{width:5px;height:5px;border-radius:50%;background:rgba(151,2,173,0.12);}
     .tmit-conf-dot.filled{background:#9702ad;box-shadow:0 0 3px rgba(151,2,173,0.5);}
@@ -2249,21 +2224,12 @@
 
     // Save settings
     panel.querySelector('#tmit-btn-save').addEventListener('click', () => {
-      const key        = panel.querySelector('#tmit-apikey-input')?.value.trim()    || '';
-      const yataKey    = panel.querySelector('#tmit-yata-key-input')?.value.trim() || '';
-      const marketPoll = parseInt(panel.querySelector('#tmit-market-poll')?.value) || 60;
-      const statsPoll  = parseInt(panel.querySelector('#tmit-stats-poll')?.value)  || 30;
+      const key     = panel.querySelector('#tmit-apikey-input')?.value.trim()    || '';
+      const yataKey = panel.querySelector('#tmit-yata-key-input')?.value.trim() || '';
 
-      if (key)     { settings.apiKey = key; }
+      if (key)     settings.apiKey = key;
       if (yataKey) store('yataKey', yataKey);
-
-      // Always save poll intervals and restart timers if changed
-      const intervalsChanged = settings.marketPollSec !== marketPoll || settings.statsPollSec !== statsPoll;
-      settings.marketPollSec = Math.max(15, marketPoll);
-      settings.statsPollSec  = Math.max(10, statsPoll);
       saveSettings();
-
-      if (intervalsChanged && settings.apiKey) startPolling();
 
       // Feedback
       const saved = [key && 'Torn', yataKey && 'YATA'].filter(Boolean);
@@ -2344,16 +2310,20 @@
       const buyBtn  = e.target.closest('.tmit-buy-btn');
       const sellBtn = e.target.closest('.tmit-sell-btn');
       if (buyBtn) {
-        injectBuyFlow(parseInt(buyBtn.dataset.id), buyBtn.dataset.name, buyBtn.dataset.cat);
+        openItemMarket(parseInt(buyBtn.dataset.id), buyBtn.dataset.name, buyBtn.dataset.cat);
       }
       if (sellBtn) {
-        // Soft guard: warn if user doesn't appear to own the item, but
-        // still navigate (inventory cache can be stale by up to one poll)
+        // Soft guard: warn if user doesn't appear to own the item, then
+        // just navigate to Items so they (or TornTools' Quick Sell) can
+        // list it. We don't try to auto-fill anymore — Torn's React market
+        // page has hashed class names that break fragile injection.
         const id    = parseInt(sellBtn.dataset.id);
         const owned = userInventory[id]?.quantity ?? 0;
         const name  = sellBtn.dataset.name;
         if (!owned) showTeemNotice(`No ${name} in your last inventory snapshot — opening Items page anyway`);
-        attemptQuickUse(name);
+        if (!window.location.href.includes('item.php')) {
+          window.location.href = 'https://www.torn.com/item.php';
+        }
       }
     });
 
@@ -2441,7 +2411,7 @@
 
     // Watch badge click delegation
     panel.querySelector('#tmit-list').addEventListener('click', (e) => {
-      const badge = e.target.closest('.tmit-signal-badge.WATCH');
+      const badge = e.target.closest('.tmit-signal-badge');
       if (!badge) return;
       const row = badge.closest('[data-item-id]');
       if (!row) return;
@@ -2661,7 +2631,7 @@
 
       const weapType = classifyWeaponType(r.name, r.type);
       const bbVal    = rarity ? getBBValue(rarity, 1, weapType) : 0;
-      const bbDollar = bbVal > 0 ? `$${Math.round(bbVal * bbPerDollar / 1_000_000)}M` : '—';
+      const bbDollar = bbVal > 0 ? `$${Math.round(bbVal * dollarsPerBB / 1_000_000)}M` : '—';
 
       // Rarity dot indicator
       const rarityDot = rarity === 'red'    ? '<span style="color:#ff4040;font-size:8px">●</span> '
@@ -2757,7 +2727,8 @@
 
       const isPinned   = watchlist.has(r.itemId);
       const finalClass = rowClass + (isPinned ? ' tmit-pinned' : '');
-      const watchedCls = (r.signal === 'WATCH' && isPinned) ? ' tmit-watched' : '';
+      const watchedCls = isPinned ? ' tmit-watched' : '';
+      const badgeTitle = isPinned ? 'Click to remove from watchlist' : 'Click to add to watchlist';
 
       return `
         <div class="${finalClass}" data-item-id="${r.itemId}">
@@ -2770,7 +2741,7 @@
           <div class="tmit-price">$${r.currentPrice.toLocaleString()}</div>
           <div class="tmit-change ${changeClass}">${changeSign}${r.changePct}%</div>
           <div class="tmit-signal">
-            <span class="tmit-signal-badge ${r.signal}${watchedCls}">${r.signal}</span>
+            <span class="tmit-signal-badge ${r.signal}${watchedCls}" title="${badgeTitle}">${r.signal}</span>
             <div class="tmit-confidence-bar" style="justify-content:flex-end;margin-top:2px">${confDots}</div>
           </div>
           <div style="display:flex;gap:3px;align-items:center;">
@@ -2913,7 +2884,7 @@
           const price = r.currentPrice;
           const rarity = price > 500_000_000 ? 'red' : price > 50_000_000 ? 'orange' : 'yellow';
           const bb = getBBValue(rarity, 1, wt);
-          return [r.name, r.type, r.currentPrice, bb, Math.round(bb * bbPerDollar), r.changePct];
+          return [r.name, r.type, r.currentPrice, bb, Math.round(bb * dollarsPerBB), r.changePct];
         });
     }
 
@@ -3339,128 +3310,15 @@
     return true;
   }
 
-  // Navigate to item market page and auto-click the cheapest listing
-  async function injectBuyFlow(itemId, itemName, category) {
-    if (!window.location.href.includes('imarket.php')) {
-      const cat = category || '';
-      window.location.href = itemId
-        ? `https://www.torn.com/page.php?sid=ItemMarket#/market/view=category&categoryName=${encodeURIComponent(cat)}&itemID=${itemId}`
-        : 'https://www.torn.com/page.php?sid=ItemMarket';
-      return;
-    }
-    // Already on market page — find and click the item
-    await waitForElement('.item-info-wrap, .item-market-wrap', 3000);
-    const nameEls = document.querySelectorAll('.t-overflow, .bold.name, [class*="name"]');
-    for (const el of nameEls) {
-      if (el.textContent.trim().toLowerCase() === itemName.toLowerCase()) {
-        el.closest('li, [class*="item"]')?.click();
-        await new Promise(r => setTimeout(r, 600));
-        // Click the first/cheapest buy button
-        const buyBtn = document.querySelector('[class*="buy"], button[data-action="buy"], a.buy');
-        if (buyBtn) {
-          buyBtn.click();
-          await new Promise(r => setTimeout(r, 400));
-          const confirmBtn = document.querySelector('[class*="confirm"], button[data-action="confirm"]');
-          if (confirmBtn) confirmBtn.click();
-        }
-        return;
-      }
-    }
-  }
-
-  // Navigate to bazaar/sell page and auto-fill item + price
-  async function injectSellFlow(itemId, itemName, quantity, price) {
-    // Store pending sell in sessionStorage so the injector can pick it up after navigation
-    sessionStorage.setItem('teem_pending_sell', JSON.stringify({ itemId, itemName, quantity, price }));
-    if (!window.location.href.includes('bazaar.php') && !window.location.href.includes('item.php')) {
-      window.location.href = 'https://www.torn.com/item.php';
-      return;
-    }
-    await executePendingSell();
-  }
-
-  async function executePendingSell() {
-    const raw = sessionStorage.getItem('teem_pending_sell');
-    if (!raw) return;
-    let pending;
-    try { pending = JSON.parse(raw); } catch(e) { return; }
-    sessionStorage.removeItem('teem_pending_sell');
-
-    const { itemId, itemName, quantity, price } = pending;
-
-    // Wait for items to load
-    await waitForElement('.name-wrap, [class*="item"]', 4000);
-    await new Promise(r => setTimeout(r, 800));
-
-    // Find item by name in inventory
-    const nameEls = document.querySelectorAll('.name-wrap .name, .name.bold');
-    for (const el of nameEls) {
-      if (el.textContent.trim().toLowerCase() === itemName.toLowerCase()) {
-        const row = el.closest('li, [class*="item"]');
-        if (!row) continue;
-        row.click();
-        await new Promise(r => setTimeout(r, 600));
-
-        // Look for "Sell" option in the action menu
-        const sellBtn = document.querySelector(
-          'a[data-action="sell"], button[data-action="sell"], li.sell a, [class*="sell-link"]'
-        );
-        if (sellBtn) {
-          sellBtn.click();
-          await new Promise(r => setTimeout(r, 500));
-
-          // Fill in quantity
-          const qtyInput = document.querySelector('input[name="qty"], input[class*="qty"], input[type="number"]');
-          if (qtyInput) { qtyInput.value = quantity; qtyInput.dispatchEvent(new Event('input', { bubbles: true })); }
-
-          // Fill in price
-          const priceInput = document.querySelector('input[name="price"], input[class*="price"]');
-          if (priceInput) { priceInput.value = price; priceInput.dispatchEvent(new Event('input', { bubbles: true })); }
-
-          // Show confirmation overlay instead of auto-submitting — user confirms final price
-          showSellConfirm(itemName, quantity, price);
-        }
-        return;
-      }
-    }
-    showTeemNotice(`Could not find "${itemName}" in your inventory.`);
-  }
-
-  function showSellConfirm(name, qty, price) {
-    const existing = document.getElementById('teem-sell-confirm');
-    if (existing) existing.remove();
-    const box = document.createElement('div');
-    box.id = 'teem-sell-confirm';
-    box.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);'
-      + 'z-index:999999;background:rgba(13,5,32,0.98);border:1px solid rgba(201,162,39,0.4);'
-      + 'border-radius:10px;padding:20px 24px;font-family:monospace;min-width:280px;'
-      + 'box-shadow:0 8px 32px rgba(0,0,0,0.8);text-align:center;';
-    box.innerHTML = `
-      <div style="font-size:13px;color:#c9a227;font-weight:700;margin-bottom:8px;">⚡ TEEM Sell</div>
-      <div style="font-size:11px;color:#d8c8f0;margin-bottom:4px;">${name}</div>
-      <div style="font-size:11px;color:#8a7aaa;margin-bottom:12px;">${qty}x @ $${price.toLocaleString()}</div>
-      <div style="font-size:10px;color:#a08fc0;margin-bottom:14px;">Price fields have been auto-filled.<br>Click Confirm to submit the listing.</div>
-      <div style="display:flex;gap:8px;justify-content:center;">
-        <button id="teem-sell-ok" style="background:rgba(80,180,100,0.2);border:1px solid rgba(80,180,100,0.4);
-          border-radius:5px;color:#50dc82;padding:6px 16px;cursor:pointer;font-family:monospace;font-size:11px;">
-          ✓ Confirm
-        </button>
-        <button id="teem-sell-cancel" style="background:rgba(255,96,96,0.1);border:1px solid rgba(255,96,96,0.3);
-          border-radius:5px;color:#ff6060;padding:6px 16px;cursor:pointer;font-family:monospace;font-size:11px;">
-          ✕ Cancel
-        </button>
-      </div>
-    `;
-    document.body.appendChild(box);
-    box.querySelector('#teem-sell-ok')?.addEventListener('click', () => {
-      // Click Torn's own submit button
-      const submitBtn = document.querySelector(
-        'button[type="submit"], input[type="submit"], [class*="confirm-sell"], [class*="submit"]'
-      );
-      if (submitBtn) submitBtn.click();
-      box.remove();
-    });
-    box.querySelector('#teem-sell-cancel')?.addEventListener('click', () => box.remove());
+  // Navigate to the item market filtered to a specific item. We don't try
+  // to auto-click the listing — Torn's market is a React app with hashed
+  // class names that change, and any modern bot-snipe would beat us to
+  // the cheapest listing anyway. Reliable beats clever.
+  function openItemMarket(itemId, itemName, category) {
+    const cat = category || '';
+    window.location.href = itemId
+      ? `https://www.torn.com/page.php?sid=ItemMarket#/market/view=category&categoryName=${encodeURIComponent(cat)}&itemID=${itemId}`
+      : 'https://www.torn.com/page.php?sid=ItemMarket';
   }
 
   function showTeemNotice(msg, variant) {
@@ -3480,17 +3338,6 @@
     setTimeout(() => n.remove(), 2800);
   }
 
-  function waitForElement(selector, timeoutMs = 3000) {
-    return new Promise(resolve => {
-      if (document.querySelector(selector)) return resolve(true);
-      const observer = new MutationObserver(() => {
-        if (document.querySelector(selector)) { observer.disconnect(); resolve(true); }
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
-      setTimeout(() => { observer.disconnect(); resolve(false); }, timeoutMs);
-    });
-  }
-
   function safeInit() {
     try { init(); } catch(e) {
       // If init crashes, at minimum show the FAB so user knows TEEM is there
@@ -3503,7 +3350,6 @@
       document.body.appendChild(f);
     }
     try { setTimeout(injectQuickBar, 1500); } catch(e) {}
-    try { setTimeout(executePendingSell, 1500); } catch(e) {}
   }
 
   if (document.readyState === 'loading') {
