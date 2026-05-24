@@ -622,12 +622,13 @@
   GM_addStyle(`
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap');
     /* Rounded-square FAB showing the full logo JPEG (elephant + baked-in
-       "TEEM" wordmark). overflow:hidden clips the JPEG's square black
-       corners to the rounded FAB shape. The image fills 100% via an
-       absolutely-positioned child, defeating host-page CSS interference. */
-    #tmit-fab{position:fixed;bottom:28px;right:28px;width:84px;height:84px;border-radius:14px;background:#000;border:2px solid #c9a227;box-shadow:0 0 14px rgba(151,2,173,0.5),0 4px 24px rgba(0,0,0,0.8);cursor:pointer;z-index:999999;overflow:hidden;transition:all 0.3s ease;user-select:none;}
+       "TEEM" wordmark). The image div gets border-radius:inherit so its
+       background gets clipped to the rounded shape — that way the FAB
+       itself doesn't need overflow:hidden (which would also clip the
+       alert badge that sits outside the corner). */
+    #tmit-fab{position:fixed;bottom:28px;right:28px;width:84px;height:84px;border-radius:14px;background:#000;border:2px solid #c9a227;box-shadow:0 0 14px rgba(151,2,173,0.5),0 4px 24px rgba(0,0,0,0.8);cursor:pointer;z-index:999999;transition:all 0.3s ease;user-select:none;}
     #tmit-fab:hover{transform:scale(1.06);box-shadow:0 0 26px rgba(151,2,173,0.8),0 4px 28px rgba(0,0,0,0.9);}
-    #tmit-fab .tmit-fab-elephant{position:absolute !important;top:0 !important;right:0 !important;bottom:0 !important;left:0 !important;background-size:100% 100% !important;background-position:center !important;background-repeat:no-repeat !important;pointer-events:none;}
+    #tmit-fab .tmit-fab-elephant{position:absolute !important;top:0 !important;right:0 !important;bottom:0 !important;left:0 !important;background-size:100% 100% !important;background-position:center !important;background-repeat:no-repeat !important;border-radius:inherit !important;pointer-events:none;}
     /* Big-hit indicator: a static coin badge with the elephant on it.
        No animation, no transitions — just appears when a huge spike is
        detected. Toggling the .tmit-alert class is a single display swap,
@@ -1592,7 +1593,7 @@
     // fails to load or is blocked — the FAB must never be invisible.
     fab.style.cssText = 'position:fixed;bottom:28px;right:28px;width:84px;height:84px;'
       + 'border-radius:14px;background:#000;'
-      + 'border:2px solid #c9a227;cursor:pointer;overflow:hidden;'
+      + 'border:2px solid #c9a227;cursor:pointer;'
       + 'z-index:2147483000;box-shadow:0 0 14px rgba(151,2,173,0.6),'
       + '0 4px 24px rgba(0,0,0,0.8);';
     // Full logo PNG (elephant + baked-in "TEEM" wordmark) shown via
