@@ -826,7 +826,7 @@
     #tmit-onboard{position:fixed;bottom:28px;left:28px;z-index:9999999;animation:tmit-slidein 0.4s cubic-bezier(0.16,1,0.3,1);}
     @keyframes tmit-slidein{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
     .tmit-onboard-card{background:linear-gradient(160deg,#1a0020 0%,#09000d 100%);border:1px solid #9702ad;border-top:3px solid #c9a227;border-radius:12px;width:340px;padding:18px 18px 14px;box-shadow:0 0 40px rgba(151,2,173,0.18),0 16px 48px rgba(0,0,0,0.8);position:relative;}
-    .tmit-onboard-logo{width:56px;height:50px;margin:0 auto 14px;display:block;background-size:56px 56px;background-position:center top;background-repeat:no-repeat;}
+    .tmit-onboard-logo{width:56px;height:56px;margin:0 auto 14px;display:block;background-size:contain;background-position:center;background-repeat:no-repeat;}
     .tmit-onboard-title{font-family:'Cinzel',serif;font-size:18px;font-weight:700;color:#c9a227;text-align:center;margin-bottom:4px;letter-spacing:0.05em;}
     .tmit-onboard-subtitle{font-size:11px;color:#b481cc;text-align:center;margin-bottom:20px;}
     .tmit-onboard-step{display:none;}
@@ -1617,7 +1617,7 @@
     panel.innerHTML = `
       <div class="tmit-header" id="tmit-drag-handle">
         <div class="tmit-title">
-          <div style="width:28px;height:25px;flex-shrink:0;background:url('${TEEM_ELEPHANT_DATAURL}') center top / 28px 28px no-repeat;"></div>
+          <div style="width:28px;height:28px;flex-shrink:0;background:url('${TEEM_ELEPHANT_DATAURL}') center / contain no-repeat;"></div>
           Elephant Economy Manager
         </div>
         <div class="tmit-header-right">
@@ -1874,7 +1874,7 @@
     el.innerHTML = `
       <div class="tmit-onboard-card">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-          <div class="tmit-onboard-logo" style="width:36px;height:32px;margin:0;flex-shrink:0;background-image:url('${TEEM_ELEPHANT_DATAURL}');background-size:36px 36px;"></div>
+          <div class="tmit-onboard-logo" style="width:36px;height:36px;margin:0;flex-shrink:0;background-image:url('${TEEM_ELEPHANT_DATAURL}');"></div>
           <div>
             <div class="tmit-onboard-title" style="font-size:13px;text-align:left;margin:0;">Welcome to TEEM</div>
             <div class="tmit-onboard-subtitle" style="text-align:left;margin:0;font-size:10px;">Let's get you set up — Torn stays usable the whole time</div>
