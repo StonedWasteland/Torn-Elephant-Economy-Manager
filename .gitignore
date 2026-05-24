@@ -1,0 +1,18 @@
+# Local design assets — the userscript embeds its own logo as a base64 JPEG,
+# so loose PNG source files don't belong in the repo.
+*.png
+*.jpg
+*.jpeg
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Temp scratch files
+*.tmp
+*.bak
+*~
