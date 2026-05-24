@@ -2,7 +2,7 @@
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
 // @version      6.4.0
-// @description  TEEM — Torn's Elephant Economy Manager. Market signals, travel profit rankings, war gear pricing, and quick item use. Designed to run alongside TornTools.
+// @description  TEEM — Torn's Elephant Economy Manager. Market signals, travel profit rankings, and war gear pricing. Designed to run alongside TornTools.
 // @author       Wasteland
 // @match        https://www.torn.com/*
 // @grant        GM_setValue
@@ -469,7 +469,6 @@
   // for compatibility with installs from before the rename.
   let dollarsPerBB     = load('bbPerDollar', 7000000);
   let userInventory   = {};  // { itemId: { name, quantity, uid } } — refreshed each poll
-  let quickItems      = load('quickItems',   []);  // [{ name }] — saved items for quick-use bar
 
   try { if (Object.keys(itemMeta).length === 0) {
     for (const name of RW_KNOWN_WEAPONS) {
@@ -554,20 +553,6 @@
       console.warn('[TEEM] Battlestats fetch failed:', e.message);
       return null;
     }
-  }
-
-  // Look up the user's inventory quantity for a given item name.
-  // Used by the Quick Use bar/tab to show stock counts and disable
-  // pinned items the user has zero of.
-  function getInventoryQty(itemName) {
-    if (!itemName) return 0;
-    const lower = itemName.toLowerCase();
-    for (const id in userInventory) {
-      if ((userInventory[id].name || '').toLowerCase() === lower) {
-        return userInventory[id].quantity || 0;
-      }
-    }
-    return 0;
   }
 
   function formatCooldown(secs) {
@@ -1636,7 +1621,6 @@
         <div class="tmit-tab" data-tab="watchlist">⭐ Watch <span class="tmit-tab-count" id="tmit-watch-count">0</span></div>
         <div class="tmit-tab" data-tab="war">⚔ War Gear</div>
         <div class="tmit-tab" data-tab="travel">✈ Travel</div>
-        <div class="tmit-tab" data-tab="quick">⚡ Quick</div>
       </div>
 
       <div class="tmit-controls">
@@ -1758,23 +1742,6 @@
         <div id="tmit-travel-detail" style="font-size:11px;color:#ab9bce;padding:6px 0;">
           Click a destination above to see trip details.
         </div>
-      </div>
-
-      <!-- Quick Items Tab -->
-      <div id="tmit-quick-panel" class="tmit-tab-panel" style="display:none;flex:1;overflow-y:auto;padding:12px;">
-        <div class="tmit-section-title">⚡ Quick Use Items</div>
-        <div style="font-size:10px;color:#a08fc0;margin-bottom:10px;line-height:1.6;">
-          Pin items here for fast access. TEEM injects a bar at the top of the
-          <a href="https://www.torn.com/item.php" style="color:#c9a227;text-decoration:none;">Items page</a>
-          with your saved items. Clicking one scrolls directly to that item —
-          if you're elsewhere, TEEM navigates there automatically.
-        </div>
-        <div style="display:flex;gap:6px;margin-bottom:10px;">
-          <input type="text" id="tmit-quick-add-name" placeholder="e.g. Xanax"
-            class="tmit-input-full" style="flex:1;">
-          <button class="tmit-btn-calc" style="margin:0;padding:5px 10px;" id="tmit-quick-add-btn">+ Add</button>
-        </div>
-        <div id="tmit-quick-list" style="display:flex;flex-direction:column;gap:6px;"></div>
       </div>
 
       <div class="tmit-settings-panel" id="tmit-settings-panel">
@@ -1941,11 +1908,6 @@
               <div class="tab-icon">⚔</div>
               <div class="tab-name">War Gear</div>
               <div class="tab-desc">Live market prices for ranked war weapons & armor, with BB trade-in values.</div>
-            </div>
-            <div class="tmit-onboard-tab-card">
-              <div class="tab-icon">⚡</div>
-              <div class="tab-name">Quick</div>
-              <div class="tab-desc">Pin items for one-click access from the Torn Items page.</div>
             </div>
             <div class="tmit-onboard-tab-card">
               <div class="tab-icon">💰</div>
@@ -2316,40 +2278,6 @@
       }
     });
 
-    // Quick items tab — add / remove / use
-    panel.addEventListener('click', (e) => {
-      if (e.target.id === 'tmit-quick-add-btn') {
-        const input = document.getElementById('tmit-quick-add-name');
-        const name  = (input?.value || '').trim();
-        if (!name) return;
-        if (!quickItems.some(i => i.name.toLowerCase() === name.toLowerCase())) {
-          quickItems.push({ name });
-          store('quickItems', quickItems);
-        }
-        input.value = '';
-        renderQuickTab();
-      }
-      // Use button on a pinned row — fires the full Quick Use flow, even
-      // from the panel. attemptQuickUse handles cross-page navigation.
-      const useBtn = e.target.closest('[data-quick-use]');
-      if (useBtn && !useBtn.disabled) {
-        const idx = parseInt(useBtn.dataset.quickUse);
-        const item = quickItems[idx];
-        if (item) attemptQuickUse(item.name);
-        return;
-      }
-      const removeIdx = e.target.dataset.quickRemove;
-      if (removeIdx !== undefined) {
-        quickItems.splice(parseInt(removeIdx), 1);
-        store('quickItems', quickItems);
-        renderQuickTab();
-      }
-    });
-
-    panel.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && e.target.id === 'tmit-quick-add-name') { document.getElementById('tmit-quick-add-btn')?.click(); }
-    });
-
     // Export button
     panel.querySelector('#tmit-btn-export')?.addEventListener('click', exportCurrentView);
 
@@ -2445,7 +2373,6 @@
     const listEl     = document.getElementById('tmit-list');
     const warPanel    = document.getElementById('tmit-war-panel');
     const travelPanel = document.getElementById('tmit-travel-panel');
-    const quickPanel  = document.getElementById('tmit-quick-panel');
 
     const isMarket = tab === 'all' || tab === 'watchlist';
     if (controls)     controls.style.display    = isMarket ? '' : 'none';
@@ -2454,7 +2381,6 @@
     if (listEl)       listEl.style.display      = isMarket ? '' : 'none';
     if (warPanel)     warPanel.style.display    = tab === 'war'    ? 'flex' : 'none';
     if (travelPanel)  travelPanel.style.display = tab === 'travel' ? 'flex' : 'none';
-    if (quickPanel)   quickPanel.style.display  = tab === 'quick'  ? 'flex' : 'none';
 
     // Update active tab highlight
     document.querySelectorAll('.tmit-tab').forEach(t =>
@@ -2463,7 +2389,6 @@
 
     if (isMarket)           renderList();
     else if (tab === 'war')    renderWarTab();
-    else if (tab === 'quick')  renderQuickTab();
     else if (tab === 'travel') renderTravelTab();
   }
 
@@ -2533,45 +2458,6 @@
   }
 
   // ── War Gear Tab ──────────────────────────────────────────────────────────
-
-  function renderQuickTab() {
-    const listEl = document.getElementById('tmit-quick-list');
-    if (!listEl) return;
-    if (!quickItems.length) {
-      listEl.innerHTML = '<div style="font-size:10px;color:#9886b8;padding:8px 0;">'
-        + 'No items pinned yet. Add some above — they\'ll appear here AND on the Items page.</div>';
-      return;
-    }
-    listEl.innerHTML = quickItems.map((item, idx) => {
-      const qty = getInventoryQty(item.name);
-      const disabled = qty === 0;
-      const useBg = disabled
-        ? 'background:rgba(80,60,90,0.25);border:1px solid rgba(120,100,140,0.3);'
-            + 'color:#7a6c8a;cursor:not-allowed;'
-        : 'background:linear-gradient(180deg,#3a0050,#1a0020);'
-            + 'border:1px solid #9702ad;color:#ff7a1f;cursor:pointer;'
-            + 'box-shadow:0 0 8px rgba(151,2,173,0.3);';
-      return `
-        <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;
-                    background:rgba(0,0,0,0.25);border-radius:6px;border:1px solid rgba(201,162,39,0.12);">
-          <button data-quick-use="${idx}" ${disabled ? 'disabled' : ''}
-            title="${disabled ? 'You have 0 of these' : 'Use ' + item.name + ' now'}"
-            style="${useBg}border-radius:5px;font-size:10px;font-weight:700;
-                   letter-spacing:0.08em;padding:4px 10px;font-family:'Cinzel',serif;">
-            ⚡ USE
-          </button>
-          <span style="flex:1;font-size:11px;color:#d8c8f0;font-weight:500;">${item.name}</span>
-          <span style="font-size:11px;font-family:monospace;color:${disabled ? '#ff6060' : '#c9a227'};font-weight:700;">
-            (${qty})
-          </span>
-          <button data-quick-remove="${idx}"
-            title="Unpin"
-            style="font-size:11px;color:#ff6060;background:none;border:none;cursor:pointer;
-                   padding:2px 6px;opacity:0.6;">✕</button>
-        </div>
-      `;
-    }).join('');
-  }
 
   function renderWarTab() {
     const listEl = document.getElementById('tmit-war-tracker-list');
@@ -3139,166 +3025,6 @@
     if (settings.apiKey) { setTimeout(() => fetchMyBattleStats(settings.apiKey), 3000); }
   }
 
-  // ── Page injector — quick bar ─────────────────────────────────────────────
-
-  // Inject the Quick Use bar at the top of the Items page. Styled as a
-  // purple box with a neon-orange "QUICK USE" header, each pinned item
-  // shown as a button with its live inventory count. Items the user has
-  // zero of are disabled and dimmed.
-  function injectQuickBar() {
-    if (!window.location.href.includes('item.php')) return;
-    if (document.getElementById('teem-quick-bar')) return;
-    if (!quickItems.length) return;
-
-    const bar = document.createElement('div');
-    bar.id = 'teem-quick-bar';
-    bar.style.cssText = [
-      'position:fixed', 'top:62px', 'left:50%', 'transform:translateX(-50%)',
-      'z-index:99999', 'display:flex', 'align-items:center', 'gap:10px',
-      'padding:9px 16px',
-      // Purple gradient box
-      'background:linear-gradient(180deg,#3a0050 0%,#1a0020 100%)',
-      'border:2px solid #9702ad',
-      'border-radius:10px',
-      'box-shadow:0 0 18px rgba(151,2,173,0.45),0 8px 24px rgba(0,0,0,0.7),inset 0 1px 0 rgba(255,224,102,0.18)',
-      "font-family:'Inter',sans-serif",
-      'max-width:92vw', 'flex-wrap:wrap',
-    ].join(';') + ';';
-
-    // Neon-orange "QUICK USE" header with glow
-    const header =
-      '<span style="font-family:\'Cinzel\',serif;font-size:13px;font-weight:700;'
-      + 'letter-spacing:0.12em;color:#ff7a1f;'
-      + 'text-shadow:0 0 12px rgba(255,122,31,0.75),0 0 4px rgba(255,122,31,0.5);'
-      + 'white-space:nowrap;">⚡ QUICK USE</span>';
-
-    // One button per pinned item, with live inventory count and a
-    // disabled treatment when the user has none.
-    const itemBtns = quickItems.map(item => {
-      const qty = getInventoryQty(item.name);
-      const disabled = qty === 0;
-      const style = [
-        'background:' + (disabled ? 'rgba(80,60,90,0.25)' : 'rgba(201,162,39,0.14)'),
-        'border:1px solid ' + (disabled ? 'rgba(120,100,140,0.35)' : 'rgba(201,162,39,0.45)'),
-        'border-radius:6px',
-        'color:' + (disabled ? '#7a6c8a' : '#ffe066'),
-        'font-size:12px', 'font-weight:600',
-        'padding:5px 12px',
-        'cursor:' + (disabled ? 'not-allowed' : 'pointer'),
-        'font-family:inherit', 'white-space:nowrap',
-        'transition:all 0.15s', 'opacity:' + (disabled ? '0.55' : '1'),
-      ].join(';');
-      const qtyColor = disabled ? '#ff6060' : '#a294c0';
-      return '<button class="teem-quick-btn" data-item="' + item.name + '" '
-        + (disabled ? 'disabled ' : '')
-        + 'style="' + style + '">'
-        + item.name
-        + ' <span style="color:' + qtyColor + ';font-weight:400;">(' + qty + ')</span>'
-        + '</button>';
-    }).join('');
-
-    const closeBtn =
-      '<button id="teem-quick-bar-close" title="Hide bar (use TEEM panel ⚙ to re-enable)" '
-      + 'style="background:none;border:none;color:#a08fc0;cursor:pointer;'
-      + 'font-size:15px;padding:0 4px;margin-left:auto;line-height:1;">✕</button>';
-
-    bar.innerHTML = header + itemBtns + closeBtn;
-    document.body.appendChild(bar);
-
-    bar.querySelector('#teem-quick-bar-close')?.addEventListener('click', () => bar.remove());
-
-    // If we arrived here via a pinned-item click on a different page,
-    // resume the action now that the items DOM is loaded.
-    const pendingItem = sessionStorage.getItem('teem_quick_item');
-    if (pendingItem) {
-      sessionStorage.removeItem('teem_quick_item');
-      setTimeout(() => attemptQuickUse(pendingItem), 900);
-    }
-
-    bar.addEventListener('click', (e) => {
-      const btn = e.target.closest('.teem-quick-btn');
-      if (!btn || btn.disabled) return;
-      attemptQuickUse(btn.dataset.item);
-    });
-  }
-
-  // Quick Use: find an item by name on the Items page, expand its row,
-  // click Use, and confirm the dialog. If the user is on any other page,
-  // saves the action to sessionStorage and navigates to item.php — the
-  // injectQuickBar's pending-item check on the next page will resume it.
-  // Selectors are intentionally permissive because Torn's items page is
-  // a React app with hash-suffixed class names that change over time.
-  async function attemptQuickUse(itemName) {
-    if (!window.location.href.includes('item.php')) {
-      sessionStorage.setItem('teem_quick_item', itemName);
-      window.location.href = 'https://www.torn.com/item.php';
-      return false;
-    }
-
-    const targetLower = itemName.toLowerCase();
-
-    // Step 1: Find the item row by exact name match.
-    let row = null;
-    for (const el of document.querySelectorAll('[class*="name"], .t-overflow, .name')) {
-      if ((el.textContent || '').trim().toLowerCase() === targetLower) {
-        row = el.closest('li, [class*="item"]');
-        if (row) break;
-      }
-    }
-    if (!row) {
-      showTeemNotice(`Couldn't find "${itemName}" — out of stock or name changed`, 'err');
-      return false;
-    }
-
-    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    const prevOutline = row.style.outline;
-    row.style.outline = '2px solid #ff7a1f';
-    setTimeout(() => { row.style.outline = prevOutline; }, 1500);
-
-    // Step 2: Click the row to expand its action menu (Use/Send/Drop/…).
-    row.click();
-
-    // Helpers for finding action buttons by visible text. offsetParent
-    // filters out hidden/collapsed elements.
-    const findActionBtn = (texts, exclude) => {
-      const wanted = texts.map(t => t.toLowerCase());
-      for (const el of document.querySelectorAll('button, a, [role="button"], [class*="action"]')) {
-        if (exclude && el === exclude) continue;
-        if (!el.offsetParent) continue;
-        const txt = (el.textContent || '').trim().toLowerCase();
-        if (wanted.includes(txt)) return el;
-      }
-      return null;
-    };
-    const wait = ms => new Promise(r => setTimeout(r, ms));
-
-    // Step 3: Poll for the "Use" button — it appears after the row
-    // animation expands the action panel. Up to ~1.2s.
-    let useBtn = null;
-    for (let i = 0; i < 8; i++) {
-      await wait(150);
-      useBtn = findActionBtn(['use', 'use item']);
-      if (useBtn) break;
-    }
-    if (!useBtn) {
-      showTeemNotice(`Found "${itemName}" but no Use button appeared`, 'err');
-      return false;
-    }
-    useBtn.click();
-
-    // Step 4: Some items (drugs, etc.) trigger a confirm dialog. Poll
-    // briefly for it; if it never appears, the item used silently and
-    // that's fine.
-    for (let i = 0; i < 8; i++) {
-      await wait(150);
-      const confirmBtn = findActionBtn(['confirm', 'yes', 'ok'], useBtn);
-      if (confirmBtn) { confirmBtn.click(); break; }
-    }
-
-    showTeemNotice(`✓ Used ${itemName}`, 'ok');
-    return true;
-  }
-
   // Navigate to the item market filtered to a specific item. We don't try
   // to auto-click the listing — Torn's market is a React app with hashed
   // class names that change, and any modern bot-snipe would beat us to
@@ -3338,7 +3064,6 @@
       f.onclick = () => alert('TEEM init error: ' + e.message + '\n\nTry clearing TEEM storage in Tampermonkey dashboard.');
       document.body.appendChild(f);
     }
-    try { setTimeout(injectQuickBar, 1500); } catch(e) {}
   }
 
   if (document.readyState === 'loading') {
