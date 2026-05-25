@@ -61,10 +61,10 @@ Designed to run alongside [TornTools](https://www.torntools.com/).
 ## 🚀 Installation
 
 ### Requirements
-- [Tampermonkey](https://www.tampermonkey.net/) browser extension
-- Works on **Chrome, Firefox, Edge, Opera GX** — any Chromium or Firefox browser with Tampermonkey
+- **Desktop**: [Tampermonkey](https://www.tampermonkey.net/) on Chrome, Firefox, Edge, or Opera GX
+- **Mobile**: [Torn PDA](https://www.tornpda.com/) — the official Torn mobile app supports custom userscripts natively
 
-### Install
+### Desktop (Tampermonkey)
 1. Open the [`TornElephantEconomyManager.user.js`](TornElephantEconomyManager.user.js) file in this repo
 2. Click the **Raw** button on GitHub — Tampermonkey will detect it and show an Install dialog
 3. Click **Install**
@@ -74,6 +74,14 @@ Or manually:
 2. Select all the default template text and delete it
 3. Paste the contents of `TornElephantEconomyManager.user.js`
 4. Hit **Save** (Ctrl+S)
+
+### Mobile (Torn PDA)
+1. Open **Torn PDA** → **Settings** → **Userscripts**
+2. Tap **+** to add a new script
+3. Paste the contents of `TornElephantEconomyManager.user.js` (or import via raw GitHub URL if PDA prompts for one)
+4. Make sure the script is **enabled** and reload any Torn page
+
+The panel switches to a near-fullscreen layout on mobile, drag works via touch, and `?` tooltips become tap-to-show. System notifications are disabled on PDA — the FAB coin badge still flashes on spikes.
 
 Refresh any `https://www.torn.com/*` page and the 🐘 button appears in the bottom-right.
 
@@ -179,7 +187,15 @@ BB trade-in values shown in the War Gear tab (community verified):
 
 ## 📋 Changelog
 
-### v6.4.0 — Current
+### v6.5.0 — Current
+- 📱 **Torn PDA / mobile support** — the panel now adapts to phone-sized viewports (near-fullscreen with the same five tabs)
+- Drag handlers rewritten with Pointer Events so the FAB and panel can be dragged with a finger as well as a mouse
+- `?` help tooltips now tap-to-show on touch devices (hover still works on desktop)
+- Browser `Notification` API calls guarded — TEEM no longer throws inside Torn PDA's WebView; FAB coin badge remains the visual spike alert there
+- Fixed FAB drag-bounds clamp using a stale 56px value when the FAB is actually 84px
+- Fixed Travel tab showing `—` instead of the item name under each destination (and in the trip details card)
+
+### v6.4.0
 - 🎯 **Crime Tracker tab** — snapshots crime activity every 5 min, ranks top 3 crimes by attempts/hr with measured $/hr
 - Removed Quick Use tab — TornTools' Quick Sell covers this ground better
 - New black-background JPEG logo embedded as 256×256 base64 (no external image dependencies)

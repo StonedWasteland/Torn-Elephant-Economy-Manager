@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.4.0
-// @description  TEEM — Torn's Elephant Economy Manager. Market signals, travel profit rankings, war gear pricing, and crime $/hour tracker. Designed to run alongside TornTools.
+// @version      6.5.0
+// @description  TEEM — Torn's Elephant Economy Manager. Market signals, travel profit rankings, war gear pricing, and crime $/hour tracker. Now mobile-friendly and Torn PDA compatible.
 // @author       Wasteland
 // @match        https://www.torn.com/*
 // @grant        GM_setValue
@@ -21,6 +21,18 @@
 
 
   const SCRIPT_KEY   = 'tmit_';
+
+  // Torn PDA (mobile) runs userscripts inside a Flutter WebView. We detect it
+  // so we can skip browser-only APIs (Notification) and switch the layout to
+  // a near-fullscreen panel. GM_* and pointer events work fine on PDA.
+  const IS_PDA = (typeof window !== 'undefined') && (
+    !!window.flutter_inappwebview ||
+    /Torn ?PDA/i.test(navigator.userAgent || '')
+  );
+  // Treat any narrow viewport as "mobile" for layout, even outside PDA — this
+  // also covers desktop users who resize the window very small.
+  const IS_MOBILE_VIEWPORT = (typeof window !== 'undefined') && window.innerWidth <= 768;
+
   // Poll intervals are user-configurable via settings — see startPolling()
   // Tiered history retention — keeps long-term trends without storage bloat
   // Resolution tiers per snapshot age:
@@ -213,8 +225,12 @@
       const pph = (profitPerItem * actualCap) / roundTripHours;
       if (pph > bestProfit) {
         bestProfit = pph;
-        bestItem = { ...item, id, sellPrice, netSellPrice, profitPerItem, actualCap, stockLevel,
-          stockConf: yataStock?.[country.code] !== undefined ? 'yata' : 'assumed' };
+        bestItem = {
+          ...item,
+          itemName: item.itemName, // explicit so it survives even if some env mishandles the spread
+          id, sellPrice, netSellPrice, profitPerItem, actualCap, stockLevel,
+          stockConf: yataStock?.[country.code] !== undefined ? 'yata' : 'assumed',
+        };
       }
     }
     return {
@@ -848,6 +864,27 @@
     .tmit-onboard-btn:disabled{opacity:0.4;cursor:default;}
     .tmit-onboard-skip{font-size:11px;color:#9b7bb5;cursor:pointer;text-decoration:underline;background:none;border:none;padding:0;}
     .tmit-onboard-skip:hover{color:#7a2090;}
+
+    /* Tap-to-show tooltip class — paired with :hover so the same tooltip works on touch */
+    .tmit-help.tmit-help-active::after{opacity:1;}
+
+    /* Touch drag targets: stop the browser from interpreting the gesture as scroll/zoom */
+    #tmit-fab,.tmit-header{touch-action:none;}
+
+    /* Mobile / PDA layout — applies on narrow viewports (Torn PDA WebView,
+       phones, or desktop windows resized small). Panel becomes near-fullscreen
+       so the existing tab UI is usable on a phone screen. */
+    @media (max-width: 768px){
+      #tmit-fab{width:64px;height:64px;bottom:18px;right:18px;border-radius:12px;}
+      #tmit-panel{width:calc(100vw - 16px) !important;max-width:520px;max-height:calc(100vh - 100px);left:8px !important;right:auto !important;bottom:auto !important;}
+      .tmit-onboard-card{width:calc(100vw - 32px);max-width:340px;}
+      .tmit-help::after{width:min(220px, calc(100vw - 40px));}
+    }
+    /* Disable :hover-triggered transforms on touch-only devices — they
+       otherwise stick after a tap and look like the FAB is permanently scaled. */
+    @media (hover: none){
+      #tmit-fab:hover{transform:none;box-shadow:0 0 14px rgba(151,2,173,0.5),0 4px 24px rgba(0,0,0,0.8);}
+    }
   `);
 
   // ── API calls ─────────────────────────────────────────────────────────────────
@@ -2348,8 +2385,18 @@
   function openPanel(fab, panel) {
     panel.classList.remove('tmit-hidden');
 
-    // If user has previously moved the panel, restore that position
-    if (settings.posX !== null) {
+    // On narrow viewports (PDA / phones / small browser windows) ignore any
+    // saved desktop position and let the @media (max-width:768px) CSS pin
+    // the panel near-fullscreen. Otherwise a position saved on desktop would
+    // push the panel off-screen on mobile.
+    const isNarrow = window.innerWidth <= 768;
+    if (isNarrow) {
+      panel.style.right  = '';
+      panel.style.bottom = '';
+      panel.style.left   = '';
+      panel.style.top    = '8px';
+    } else if (settings.posX !== null) {
+      // Desktop: restore the previously saved position
       panel.style.right  = 'auto';
       panel.style.bottom = 'auto';
       panel.style.left   = settings.posX + 'px';
@@ -2385,14 +2432,18 @@
     let fabDragging = false;
     let fabStartX = 0, fabStartY = 0, fabOx = 0, fabOy = 0;
 
-    fab.addEventListener('mousedown', (e) => {
-      if (e.button !== 0) return;
+    // Pointer events unify mouse + touch + pen so this works on desktop
+    // browsers AND inside the Torn PDA WebView with no platform branching.
+    fab.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       fabDragging = false;
       fabStartX = e.clientX;
       fabStartY = e.clientY;
       const rect = fab.getBoundingClientRect();
       fabOx = rect.left;
       fabOy = rect.top;
+      const fabW = rect.width  || 84;
+      const fabH = rect.height || 84;
 
       const onMove = (e) => {
         const dx = e.clientX - fabStartX;
@@ -2401,21 +2452,22 @@
           fabDragging = true;
           fab.style.right  = 'auto';
           fab.style.bottom = 'auto';
-          fab.style.left   = Math.max(0, Math.min(window.innerWidth  - 56, fabOx + dx)) + 'px';
-          fab.style.top    = Math.max(0, Math.min(window.innerHeight - 56, fabOy + dy)) + 'px';
+          fab.style.left   = Math.max(0, Math.min(window.innerWidth  - fabW, fabOx + dx)) + 'px';
+          fab.style.top    = Math.max(0, Math.min(window.innerHeight - fabH, fabOy + dy)) + 'px';
         }
       };
 
       const onUp = () => {
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup',   onUp);
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup',   onUp);
+        document.removeEventListener('pointercancel', onUp);
         if (fabDragging) {
           settings.fabX = parseInt(fab.style.left);
           settings.fabY = parseInt(fab.style.top);
           settings.posX = null; settings.posY = null;
           saveSettings();
         } else {
-          // Simple click — toggle panel
+          // Simple tap/click — toggle panel
           if (panel.classList.contains('tmit-hidden')) {
             openPanel(fab, panel);
           } else {
@@ -2426,8 +2478,9 @@
         fabDragging = false;
       };
 
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup',   onUp);
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup',   onUp);
+      document.addEventListener('pointercancel', onUp);
     });
 
     panel.querySelector('#tmit-btn-close').addEventListener('click', () => {
@@ -2711,7 +2764,7 @@
         <div class="tmit-travel-flag">${r.flagEmoji}</div>
         <div>
           <div class="tmit-travel-dest">${r.country}</div>
-          <div class="tmit-travel-sub">${r.bestItem?.name ?? '—'}</div>
+          <div class="tmit-travel-sub">${r.bestItem?.itemName ?? '—'}</div>
         </div>
         <div class="${pphClass}">${formatPPH(r.profitPerHour)}</div>
         <div class="tmit-travel-time">${getAdjustedTravelTime(r.travelTime)}m ea</div>
@@ -2732,7 +2785,7 @@
         const item = r.bestItem;
         detailEl.innerHTML = `<div class="tmit-travel-detail-card">
           <div class="tmit-result-row"><span class="tmit-result-label">${r.flagEmoji} Destination</span><span class="tmit-result-val gold">${r.country}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Best Item</span><span class="tmit-result-val">${item?.name ?? '—'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Best Item</span><span class="tmit-result-val">${item?.itemName ?? '—'}</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Buy Price (abroad)</span><span class="tmit-result-val icy">$${item?.buyPrice?.toLocaleString() ?? '—'}</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Market Price</span><span class="tmit-result-val hot">$${item?.sellPrice?.toLocaleString() ?? '—'}</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">After 5% Tax</span><span class="tmit-result-val hot">$${item?.netSellPrice?.toLocaleString() ?? '—'}</span></div>
@@ -3105,9 +3158,13 @@
     store('lastTravelPPH',  lastTopTravelPPH);
     store('lastTravelAlertWindow', windowKey);
 
-    try {
-      new Notification('TEEM ✈ Good Time to Fly!', { body, icon: '', silent: false });
-    } catch(e) {}
+    // Torn PDA's WebView has no browser Notification API; the in-panel data
+    // updates remain the user's signal there. Guard so we don't throw.
+    if (!IS_PDA && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      try {
+        new Notification('TEEM ✈ Good Time to Fly!', { body, icon: '', silent: false });
+      } catch(e) {}
+    }
   }
 
   function recomputeTravel() {
@@ -3292,7 +3349,12 @@
   function makeDraggable(el, handle) {
     let ox = 0, oy = 0, startX = 0, startY = 0;
 
-    handle.addEventListener('mousedown', (e) => {
+    handle.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      // Don't start a drag from interactive header controls (close/settings/refresh
+      // buttons). Their click handlers still fire normally because we don't
+      // preventDefault on those targets.
+      if (e.target.closest('button, input, select')) return;
       e.preventDefault();
       startX = e.clientX;
       startY = e.clientY;
@@ -3310,15 +3372,17 @@
       }
 
       function onUp(e) {
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        document.removeEventListener('pointercancel', onUp);
         settings.posX = parseInt(el.style.left);
         settings.posY = parseInt(el.style.top);
         saveSettings();
       }
 
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+      document.addEventListener('pointercancel', onUp);
     });
   }
 
@@ -3354,6 +3418,21 @@
       }
     }, 250);
 
+    // Tap-to-show tooltips for ? help dots. Desktop users still get hover
+    // tooltips via CSS; tapping the ? on mobile/PDA toggles the same tooltip,
+    // and tapping anywhere else closes it.
+    document.addEventListener('click', (e) => {
+      const help = e.target.closest && e.target.closest('.tmit-help');
+      // Close any open tooltip not under the current target
+      document.querySelectorAll('.tmit-help.tmit-help-active').forEach(el => {
+        if (el !== help) el.classList.remove('tmit-help-active');
+      });
+      if (help) {
+        help.classList.toggle('tmit-help-active');
+        e.stopPropagation();
+      }
+    });
+
     // Keyboard shortcut Alt+T to toggle panel
     document.addEventListener('keydown', (e) => {
       if (e.altKey && e.key === 't') {
@@ -3370,8 +3449,12 @@
       }
     });
 
-    // Notification permission request (needed for travel + spike alerts)
-    if (Notification.permission === 'default') { Notification.requestPermission(); }
+    // Notification permission request (needed for travel + spike alerts).
+    // Skip on Torn PDA — its WebView has no Notification API and accessing it
+    // would throw. The FAB coin badge still works as a visual spike alert.
+    if (!IS_PDA && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      try { Notification.requestPermission(); } catch(e) {}
+    }
 
     // Flush throttled history save on tab close so we don't lose snapshots
     // accumulated since the last idle save.
