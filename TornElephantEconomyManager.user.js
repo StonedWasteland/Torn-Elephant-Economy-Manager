@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.5.1
+// @version      6.5.2
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings, war gear pricing, and crime $/hour tracker. Now mobile-friendly and Torn PDA compatible.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -29,12 +29,12 @@
     !!window.flutter_inappwebview ||
     /Torn ?PDA/i.test(navigator.userAgent || '')
   );
-  // Treat any narrow viewport as "mobile" for layout, even outside PDA \u2014 this
+  // Treat any narrow viewport as "mobile" for layout, even outside PDA — this
   // also covers desktop users who resize the window very small.
   const IS_MOBILE_VIEWPORT = (typeof window !== 'undefined') && window.innerWidth <= 768;
 
-  // Poll intervals are user-configurable via settings \u2014 see startPolling()
-  // Tiered history retention \u2014 keeps long-term trends without storage bloat
+  // Poll intervals are user-configurable via settings — see startPolling()
+  // Tiered history retention — keeps long-term trends without storage bloat
   // Resolution tiers per snapshot age:
   //   0-24h:   keep every snapshot (full resolution)
   //   1-7d:    keep one per hour
@@ -61,7 +61,7 @@
   // Categories built dynamically from whatever Torn API actually returns
   let CATEGORIES = ['All'];
 
-  // \u2500\u2500 Bunker Bucks data (used by war calculator and BB tab) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Bunker Bucks data (used by war calculator and BB tab) ──────────────────
   const BB_TABLE = {
     Yellow: { 'Pistol/SMG': 4, 'Melee': 6, 'Shotgun/Rifle': 10, 'Armour': 12, 'Heavies': 14 },
     Orange: {
@@ -82,8 +82,8 @@
     return BB_TABLE[r]?.[b]?.[weaponType] ?? 0;
   }
 
-  // \u2500\u2500 Travel data \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-  // Travel countries \u2014 items identified by NAME, resolved to IDs at runtime
+  // ── Travel data ─────────────────────────────────────────────────────────────
+  // Travel countries — items identified by NAME, resolved to IDs at runtime
   // Sources: Torn wiki, community guides (verified Aug 2025)
   // Buy prices = in-store abroad price (Torn $)
   // Travel times = one-way economy flight in minutes
@@ -258,7 +258,7 @@
   function classifyWeaponType(name, apiType) {
     const n = (name || '').toLowerCase();
     const t = (apiType || '').toLowerCase();
-    // All comparisons lowercased \u2014 Torn is inconsistent with capitalisation
+    // All comparisons lowercased — Torn is inconsistent with capitalisation
     if (t === 'melee' || t === 'piercing' || t === 'slashing' || t === 'clubbing' || t === 'mechanical') return 'Melee';
     if (t === 'heavy artillery') return 'Heavies';
     if (t === 'shotgun' || t === 'rifle' || t === 'machine gun') return 'Shotgun/Rifle';
@@ -268,7 +268,7 @@
     return null;
   }
 
-  // Canonical RW item type check \u2014 case-insensitive to handle Torn API inconsistencies
+  // Canonical RW item type check — case-insensitive to handle Torn API inconsistencies
   // Torn returns: 'Rifle', 'SMG', 'Shotgun', 'Pistol', 'Machine gun', 'Heavy artillery'
   // Melee subtypes: 'Piercing', 'Slashing', 'Clubbing', 'Mechanical'
   const RW_WEAPON_TYPE_LOWER = new Set([
@@ -280,7 +280,7 @@
 
   function isRWItem(name, type) {
     if (!name) return false;
-    // Check hardcoded weapon name list first \u2014 most reliable
+    // Check hardcoded weapon name list first — most reliable
     if (RW_KNOWN_WEAPONS.has(name)) return true;
     // Check type string (case-insensitive)
     if (type) {
@@ -316,12 +316,12 @@
     // Heavy Artillery
     'Anti-Tank Missile Launcher','Flamethrower','Milkor MGL','Minigun',
     'RPG Launcher','SMAW Launcher',
-    // Melee \u2014 Piercing
+    // Melee — Piercing
     'Dagger','DBK','Dual Bladed Katars','Harpoon','Kitchen Knife',
     'Macana','Swiss Army Knife',
-    // Melee \u2014 Slashing
+    // Melee — Slashing
     'Guandao','Katana','Kukri','Machete',
-    // Melee \u2014 Clubbing
+    // Melee — Clubbing
     'Baseball Bat','Bo Staff','Dual Hammers','Flail','Metal Nunchucks',
     'Wushu Double Axes','Wooden Nunchaku',
     // Mechanical
@@ -337,12 +337,12 @@
       const v = GM_getValue(SCRIPT_KEY + key);
       if (v === undefined || v === null || v === '') return def;
       const parsed = JSON.parse(v);
-      // Sanity check \u2014 if type doesn't match default, return default
+      // Sanity check — if type doesn't match default, return default
       if (Array.isArray(def) && !Array.isArray(parsed)) return def;
       if (def !== null && typeof def === 'object' && !Array.isArray(def) && typeof parsed !== 'object') return def;
       return parsed;
     } catch(e) {
-      // Corrupted storage \u2014 clear it and return default
+      // Corrupted storage — clear it and return default
       try { GM_setValue(SCRIPT_KEY + key, JSON.stringify(def)); } catch(e2) {}
       return def;
     }
@@ -358,7 +358,7 @@
     activeTab: 'all',
     carryCapacity: 10,
     flightType: 'economy',      // economy | airstrip | business | wlt
-    marketPollSec: 120,         // how often to fetch item prices (seconds) \u2014 floored at 60 in startPolling
+    marketPollSec: 120,         // how often to fetch item prices (seconds) — floored at 60 in startPolling
     statsPollSec:  30,          // how often to fetch bars/cooldowns (seconds)
     alertOnDrugClear: false,    // only alert when drug cooldown is clear
     alertOnBoosterClear: false, // only alert when booster cooldown is clear
@@ -380,9 +380,9 @@
     if (!priceHistory[itemId]) priceHistory[itemId] = [];
     const now = Date.now();
     priceHistory[itemId].push({ ts: now, price: tornPrice, yataPrice });
-    // Only thin when the array gets large \u2014 the tiered scheme caps at ~2069
+    // Only thin when the array gets large — the tiered scheme caps at ~2069
     // snapshots per item, but most items have <60. Thinning on every append
-    // costs O(snapshots) \u00d7 per call which adds up to 50-100ms a poll.
+    // costs O(snapshots) × per call which adds up to 50-100ms a poll.
     if (priceHistory[itemId].length > 300) {
       priceHistory[itemId] = thinHistory(priceHistory[itemId], now);
     }
@@ -408,12 +408,12 @@
 
       if (!lastKept[key]) { result.push(s);
         lastKept[key] = true; }
-      // Otherwise skip \u2014 a snapshot for this time bucket already kept
+      // Otherwise skip — a snapshot for this time bucket already kept
     }
     return result;
   }
 
-  // Run thinning on all existing history on startup \u2014 cleans up old flat data
+  // Run thinning on all existing history on startup — cleans up old flat data
   // and compacts history that was stored before tiered thinning was introduced
   function thinAllHistory() {
     const now = Date.now();
@@ -451,7 +451,7 @@
     }
   }
   function saveHistoryNow() {
-    // Synchronous flush \u2014 only call on beforeunload
+    // Synchronous flush — only call on beforeunload
     _saveScheduled = false; _pollsSinceSave = 0;
     try { store('priceHistory', priceHistory); } catch(e) {}
   }
@@ -460,7 +460,7 @@
 
   let lastYataPrices = {};
   let analysisCache  = [];
-  let lastRenderedIds = [];  // item IDs currently shown in the panel \u2014 fed into the live-fetch priority list
+  let lastRenderedIds = [];  // item IDs currently shown in the panel — fed into the live-fetch priority list
   let watchlist      = new Set(load('watchlist', []));
   let myBattleStats    = load('myBattleStats', null);
   let statHistory      = load('statHistory', []);         // [ { ts, str, def, spd, dex, ts_total } ]
@@ -473,27 +473,27 @@
 
   function saveWatchlist() { store('watchlist', [...watchlist]); }
 
-  // \u2500\u2500 Session tracker \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Session tracker ───────────────────────────────────────────────────────
   let sessionStartPrices = {}; // { itemId: price at session start }
   let sessionProfit     = 0;
 
-  // \u2500\u2500 Onboarding \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Onboarding ────────────────────────────────────────────────────────────
   let onboardingDone  = load('onboardingDone', false);
   thinAllHistory()
-  // Dollars per single Bunker Buck \u2014 used by the War Gear tab to convert
+  // Dollars per single Bunker Buck — used by the War Gear tab to convert
   // BB trade-in values into a $ equivalent. Storage key kept as `bbPerDollar`
   // for compatibility with installs from before the rename.
   let dollarsPerBB     = load('bbPerDollar', 7000000);
-  let userInventory   = {};  // { itemId: { name, quantity, uid } } \u2014 refreshed each poll
+  let userInventory   = {};  // { itemId: { name, quantity, uid } } — refreshed each poll
 
-  // Crime tracker \u2014 snapshots of crimes + personalstats
+  // Crime tracker — snapshots of crimes + personalstats
   // taken on poll. Deltas between snapshots produce attempts/hour and
   // $/hour rates so we can recommend the top 3 crimes for the user's
   // current skill ceiling.
   let crimeSnapshots = load('crimeSnapshots', []);  // [{ ts, crimes: {...}, money?: number }]
   const CRIME_SNAPSHOT_MAX = 240;                   // ~24h at 6-min intervals
   let lastCrimeFetch = 0;
-  // Throttle: don't fetch crimes more often than every 5 minutes \u2014 we don't
+  // Throttle: don't fetch crimes more often than every 5 minutes — we don't
   // need second-by-second resolution and crimes data is the biggest field
   // in the user/ response.
   const CRIME_FETCH_INTERVAL_MS = 5 * 60 * 1000;
@@ -504,11 +504,11 @@
     }
   } } catch(e) {}
 
-  // \u2500\u2500 Travel alert tracking \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Travel alert tracking ─────────────────────────────────────────────────
   let lastTopTravelCode = load('lastTravelCode', null);
   let lastTopTravelPPH  = load('lastTravelPPH',  0);
 
-  // \u2500\u2500 Tooltip state \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Tooltip state ─────────────────────────────────────────────────────────
   const TOOLTIPS = {
     signal:     'Buy-low-sell-high signal for flippers.\nSELL = price up 5%+ (cash out into strength). BUY = price down 8%+ (buy the dip). HOLD = mild rise (wait for more upside). WATCH = volatile, no clear direction.',
     confidence: 'Confidence dots show how strong the signal is.\n\u25cf \u25cf \u25cf = strong trend, lots of data.\n\u25cf \u25cf \u25cb = moderate.\n\u25cf \u25cb \u25cb = early/thin data.',
@@ -517,18 +517,18 @@
     change:     'Price change % over your selected timeframe.\nOrange = price rising (hot). Teal = falling (cold).',
     dataAge:    'How long ago prices were last fetched. Green = fresh. Yellow = >5min old. Red = >15min.',
   };
-  // \u2500\u2500 Brand mark \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Brand mark ─────────────────────────────────────────────────────────────
   // TEEM logo: purple-caparisoned elephant + cyan/orange "TEEM" wordmark.
   // Embedded as a 256x256 base64 JPEG (~16KB) for a self-contained script.
   // JPEG (not PNG) because the image is photographic and has no transparency
-  // \u2014 the opaque black background lets the FAB show the logo edge-to-edge
+  // — the opaque black background lets the FAB show the logo edge-to-edge
   // without needing the underlying purple coin gradient to bleed through.
   // Used in the FAB, the panel title, and the onboarding card.
   const TEEM_ELEPHANT_DATAURL = "data:image/jpeg;base64,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";
 
   let alertActive = false, pollingTimer = null, statsTimer = null, uiBuilt = false;
   let sessionTimer = null, footerTimer = null;
-  let backgroundSuspended = true;  // start suspended \u2014 only run when panel is open
+  let backgroundSuspended = true;  // start suspended — only run when panel is open
   let pollCounter = 0;  // increments each poll; drives adaptive cadence in buildPriorityList
 
   async function fetchMyBattleStats(apiKey) {
@@ -591,7 +591,7 @@
     return `${m}m`;
   }
 
-  // \u2500\u2500 Carry capacity auto-detect \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Carry capacity auto-detect ───────────────────────────────────────────
   async function detectCarryCapacity(apiKey) {
     try {
       const data = await apiGet(
@@ -611,7 +611,7 @@
       if (hasLargeSuitcase) base += 4;
       else if (hasMedSuitcase) base += 2;
 
-      // Faction Excursion special \u2014 up to +10
+      // Faction Excursion special — up to +10
       const factionPerks = data.faction_perks ?? data.perks?.faction ?? [];
       const excursion = factionPerks.find?.(p =>
         typeof p === 'string' ? p.toLowerCase().includes('excursion') :
@@ -622,8 +622,8 @@
         if (match) base += Math.min(10, parseInt(match[1]));
       }
 
-      // Lingerie Store 3* job special (+2) \u2014 can't reliably detect, skip
-      // Cruise Line Agency 3*/10* (+2/+3) \u2014 same
+      // Lingerie Store 3* job special (+2) — can't reliably detect, skip
+      // Cruise Line Agency 3*/10* (+2/+3) — same
 
       return Math.max(5, base);
     } catch(e) {
@@ -631,7 +631,7 @@
     }
   }
 
-  // \u2500\u2500 Styles \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Styles ────────────────────────────────────────────────────────────────────
   GM_addStyle(`
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap');
     /* Rounded-square FAB showing the full logo JPEG (elephant + baked-in
@@ -887,10 +887,10 @@
     }
   `);
 
-  // \u2500\u2500 API calls \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── API calls ─────────────────────────────────────────────────────────────────
 
   // apiGet with a custom timeout
-  // Core HTTP helper \u2014 uses Promise.race to guarantee timeout fires
+  // Core HTTP helper — uses Promise.race to guarantee timeout fires
   // even if GM_xmlhttpRequest ignores the timeout field (some browsers/versions do)
   function _gmFetch(url) {
     return new Promise((resolve, reject) => {
@@ -914,12 +914,12 @@
     );
   }
 
-  // apiGet \u2014 12s hard timeout via Promise.race
+  // apiGet — 12s hard timeout via Promise.race
   function apiGet(url) {
     return Promise.race([_gmFetch(url), _timeout(12000, 'API call')]);
   }
 
-  // apiGetWithTimeout \u2014 custom timeout via Promise.race
+  // apiGetWithTimeout — custom timeout via Promise.race
   function apiGetWithTimeout(url, timeoutMs) {
     return Promise.race([
       _gmFetch(url).catch(() => ({ _error: 'network' })),
@@ -927,26 +927,26 @@
     ]);
   }
 
-  // \u2500\u2500 Price fetching \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Price fetching ────────────────────────────────────────────────────────
   //
   // Each poll:
-  //   1. Fetch torn/items \u2014 metadata (name, type) + market_value for all items
+  //   1. Fetch torn/items — metadata (name, type) + market_value for all items
   //   2. Fetch YATA prices in parallel
   //   3. Fetch live market listings for up to MAX_LIVE_ITEMS priority items
   //   4. Record snapshot: live price if available, else YATA, else market_value
-  //      BUT only record market_value if it changed \u2014 avoids flat history poison
+  //      BUT only record market_value if it changed — avoids flat history poison
   //
   const MAX_LIVE_ITEMS   = 50;
   const METADATA_TTL_MS  = 6 * 60 * 60 * 1000
   let   lastMetadataFetch = load('lastMetadataFetch', 0);
 
-  // Fetch all items \u2014 metadata + market_value fallback prices
-  // Cached for 6h in GM storage \u2014 most page loads skip this entirely
+  // Fetch all items — metadata + market_value fallback prices
+  // Cached for 6h in GM storage — most page loads skip this entirely
   async function fetchAllItems(apiKey) {
     const now = Date.now();
     // The RW temp seed (rw_* keys with market_value:0) only exists so the
     // War Gear tab has names to show before the first real poll. It must
-    // NOT count as "we have a cached catalog" \u2014 if it did, we'd silently
+    // NOT count as "we have a cached catalog" — if it did, we'd silently
     // suppress real torn/items errors on a fresh install and the snapshot
     // loop would iterate temp seeds with no prices and write nothing.
     // lastMetadataFetch is set only after a successful real fetch, so it
@@ -986,7 +986,7 @@
   // Fetch live lowest-listing price for a single item (average of lowest 5)
   async function fetchLivePrice(apiKey, itemId) {
     try {
-      // Torn API v2 item market \u2014 the current live-listings endpoint.
+      // Torn API v2 item market — the current live-listings endpoint.
       // The old v1 `market?selections=itemmarket` no longer returns the
       // live item-market listings, which left every item stuck on a stale
       // 6-hour average and showing 0% movement.
@@ -1018,7 +1018,7 @@
   }
 
   // Build priority list for live fetches
-  // High-traffic items always fetched live \u2014 these drive most market signals
+  // High-traffic items always fetched live — these drive most market signals
   // IDs verified from torn/items API (May 2026)
   const ALWAYS_LIVE_IDS = new Set([
     206,  // Xanax
@@ -1043,7 +1043,7 @@
     for (const id of ALWAYS_LIVE_IDS) ids.add(id);
     // Watchlist
     for (const id of watchlist) ids.add(id);
-    // Items currently shown in the panel \u2014 prioritized by activity so the
+    // Items currently shown in the panel — prioritized by activity so the
     // view the user is looking at gets live prices, but stagnant items
     // don't crowd out movers. Cold items rotate in every 3rd poll, so a
     // large category eventually gets full coverage without exceeding the
@@ -1051,7 +1051,7 @@
     const viewItems = lastRenderedIds.map(id => {
       if (!Number.isFinite(id)) return null;
       const r = analysisCache.find(x => x.itemId === id);
-      // Bootstrap urgency: no analysis or thin data \u2192 highest priority
+      // Bootstrap urgency: no analysis or thin data → highest priority
       if (!r || r.thinData) return { id, score: 1e6 };
       // Movement priority: |changePct| as score (movers win slots)
       return { id, score: Math.abs(r.changePct || 0) };
@@ -1110,7 +1110,7 @@
     return live;
   }
 
-  // \u2500\u2500 Crime tracker \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Crime tracker ─────────────────────────────────────────────────────────
   //
   // Torn's `crimes` selection returns per-crime counters (attempts/successes).
   // `personalstats` returns lifetime money totals. The shape evolves over
@@ -1118,16 +1118,16 @@
   // between consecutive snapshots over the last hour drive recommendations.
   //
   // What we store per snapshot:
-  //   ts      \u2014 when we fetched it
-  //   crimes  \u2014 the raw `crimes` field (cumulative counts per crime key)
-  //   money   \u2014 total money earned via crime (from personalstats if present)
+  //   ts      — when we fetched it
+  //   crimes  — the raw `crimes` field (cumulative counts per crime key)
+  //   money   — total money earned via crime (from personalstats if present)
 
   function appendCrimeSnapshot(data) {
     if (!data) return;
     const ps = data.personalstats ?? {};
 
     // Crimes 2.0 moved per-crime counters around. Pull from every plausible
-    // location and merge \u2014 later sources win on key collisions, but in
+    // location and merge — later sources win on key collisions, but in
     // practice the keys don't overlap between locations.
     const merged = {
       ...flattenCrimeCounts(data.crimes),
@@ -1192,7 +1192,7 @@
   }
 
   // Crimes shape varies between API generations. Sometimes it's a flat
-  // map of name\u2192count; sometimes nested with {total, success}. Reduce to
+  // map of name→count; sometimes nested with {total, success}. Reduce to
   // a flat { crimeName: attempts } map so deltas are easy to compute.
   function flattenCrimeCounts(crimes) {
     if (!crimes || typeof crimes !== 'object') return {};
@@ -1276,7 +1276,7 @@
     const windowHours = windowMs / 3_600_000;
 
     // Per-key rate calc. Use each key's earliest-and-latest snapshot where
-    // it actually appears, not the global first/last \u2014 otherwise a key that
+    // it actually appears, not the global first/last — otherwise a key that
     // gets newly tracked mid-window produces a fake gigantic delta against
     // the implicit 0 baseline.
     const perCrime = [];
@@ -1314,7 +1314,7 @@
     // proxy for $-allocation when we can't get per-crime money directly.
     for (const c of perCrime) c.share = totalAttempts > 0 ? c.attempts / totalAttempts : 0;
 
-    // Money delta \u2014 find first/last snapshot that has a non-null money
+    // Money delta — find first/last snapshot that has a non-null money
     // total. Same defense against the v6.2.x parser-upgrade jump.
     let moneyFirst = null, moneyFirstTs = 0, moneyLast = null, moneyLastTs = 0;
     for (const s of window) {
@@ -1329,7 +1329,7 @@
       if (moneyDelta > 0 && moneyHours > 0) moneyPerHr = Math.round(moneyDelta / moneyHours);
     }
 
-    // Spread the money across crimes by share \u2014 best-effort attribution
+    // Spread the money across crimes by share — best-effort attribution
     // since the Torn API doesn't return per-crime money breakdowns.
     if (moneyPerHr) {
       for (const c of perCrime) c.moneyPerHr = Math.round(moneyPerHr * c.share);
@@ -1409,13 +1409,13 @@
 
     const changePct = ((effectivePrice - oldestPrice) / oldestPrice) * 100;
 
-    // Volatility \u2014 std dev of price changes in window
+    // Volatility — std dev of price changes in window
     const prices = effectiveWindow.map(h => h.price || h.yataPrice || 0).filter(Boolean);
     const mean = prices.reduce((a, b) => a + b, 0) / prices.length;
     const variance = prices.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / prices.length;
     const volatility = Math.sqrt(variance) / mean * 100;
 
-    // Trend \u2014 simple linear regression slope
+    // Trend — simple linear regression slope
     const n = effectiveWindow.length;
     const xs = effectiveWindow.map((_, i) => i);
     const ys = effectiveWindow.map(h => h.price || h.yataPrice || 0);
@@ -1426,9 +1426,9 @@
     const slope = n > 1 ? (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX) : 0;
     const trendPct = mean > 0 ? (slope / mean) * 100 : 0;
 
-    // Signal logic \u2014 Torn-flipper semantics (buy low, sell high).
-    // SELL on strength: price rising \u2192 cash out the spike.
-    // BUY on weakness: price dipping \u2192 accumulate at a discount.
+    // Signal logic — Torn-flipper semantics (buy low, sell high).
+    // SELL on strength: price rising → cash out the spike.
+    // BUY on weakness: price dipping → accumulate at a discount.
     // This is the opposite of momentum trading and matches how Torn
     // players actually use the market.
     let signal = 'WATCH';
@@ -1439,12 +1439,12 @@
     } else if (changePct < -8 && trendPct < 0) {
       signal = 'BUY';  confidence = Math.min(3, Math.floor(Math.abs(changePct) / 8));
     } else if (changePct > 2) {
-      signal = 'HOLD'; confidence = 2; // mild rise \u2014 hold for more upside before selling
+      signal = 'HOLD'; confidence = 2; // mild rise — hold for more upside before selling
     } else if (Math.abs(changePct) < 1 && volatility > 8) {
       signal = 'WATCH'; confidence = 2;
     }
 
-    // Big spike detection \u2014 require >=3 snapshots before trusting a spike.
+    // Big spike detection — require >=3 snapshots before trusting a spike.
     // The first live snapshot after a stale market_value can look like a
     // 50% "jump" that's really just a data-source switch, not real movement.
     // isBigSpike (50%+) drives the FAB badge: a real act-now-or-miss-it
@@ -1488,7 +1488,7 @@
       if (result) { results.push(result); seen.add(parseInt(idStr)); }
     }
 
-    // Items in itemMeta with no history yet \u2014 show with market_value as price
+    // Items in itemMeta with no history yet — show with market_value as price
     for (const [idStr, meta] of Object.entries(itemMeta)) {
       const id = parseInt(idStr);
       if (seen.has(id)) continue;
@@ -1529,7 +1529,7 @@
 
     analysisCache = results;
 
-    // Alert if any big spikes (50%+ moves) \u2014 gated by the spikeAlertEnabled
+    // Alert if any big spikes (50%+ moves) — gated by the spikeAlertEnabled
     // setting (treat undefined as enabled so existing users keep the
     // default). The badge color reflects the item-type of the biggest spike
     // so the user can tell at a glance whether it's drugs, weapons, etc.
@@ -1539,7 +1539,7 @@
     const badge = document.getElementById('tmit-alert-badge');
 
     if (wantAlert) {
-      // Pick the spike with the largest absolute move \u2014 that's the type
+      // Pick the spike with the largest absolute move — that's the type
       // we want to advertise on the badge.
       const top = bigSpikes.reduce(
         (best, r) => Math.abs(r.changePct) > Math.abs(best.changePct) ? r : best,
@@ -1565,7 +1565,7 @@
     return results;
   }
 
-  // Map a raw Torn item type to a badge CSS class. Returns '' if no match \u2014
+  // Map a raw Torn item type to a badge CSS class. Returns '' if no match —
   // the badge falls back to its default gold styling.
   function badgeTypeClass(type) {
     if (!type) return '';
@@ -1585,26 +1585,26 @@
 
   // Pick a micro-icon for the badge based on item type. Pairs with the
   // colored background to give the user both a category color AND a
-  // recognizable symbol at a glance \u2014 no need to open the panel to know
+  // recognizable symbol at a glance — no need to open the panel to know
   // whether it's drugs, weapons, plushies, etc.
   //
   // These are monochrome Unicode glyphs (not emoji) so they render in the
-  // badge's CSS `color` (black) instead of full-color emoji. The "\ufe0e"
-  // suffix on \u26a1 and \u2694 forces the text presentation in fonts that would
+  // badge's CSS `color` (black) instead of full-color emoji. The "︎"
+  // suffix on ⚡ and ⚔ forces the text presentation in fonts that would
   // otherwise render them as colored emoji.
   function badgeIconForType(type) {
     if (!type) return '$';
     const t = String(type).toLowerCase();
-    if (t === 'drug')                                                 return '\u211e';     // \u211e prescription
-    if (t === 'medical')                                              return '\u271a';     // \u271a heavy cross
-    if (t === 'plushie')                                              return '\u2665';     // \u2665 heart
-    if (t === 'flower')                                               return '\u273f';     // \u273f florette
-    if (t === 'booster')                                              return '\u2605';     // \u2605 star
-    if (t === 'energy drink')                                         return '\u26a1\ufe0e'; // \u26a1 lightning (text)
-    if (t === 'alcohol')                                              return '\u269c';     // \u269c fleur-de-lis
-    if (t === 'special')                                              return '\u2726';     // \u2726 four-pointed star
-    if (RW_ARMOR_TYPE_LOWER.has(t) || t === 'defensive')              return '\u26e8';     // \u26e8 heraldic shield
-    if (RW_WEAPON_TYPE_LOWER.has(t) || t === 'temporary')             return '\u2694\ufe0e'; // \u2694 crossed swords (text)
+    if (t === 'drug')                                                 return '\u211e';     // ℞ prescription
+    if (t === 'medical')                                              return '\u271a';     // ✚ heavy cross
+    if (t === 'plushie')                                              return '\u2665';     // ♥ heart
+    if (t === 'flower')                                               return '\u273f';     // ✿ florette
+    if (t === 'booster')                                              return '\u2605';     // ★ star
+    if (t === 'energy drink')                                         return '\u26a1\ufe0e'; // ⚡ lightning (text)
+    if (t === 'alcohol')                                              return '\u269c';     // ⚜ fleur-de-lis
+    if (t === 'special')                                              return '\u2726';     // ✦ four-pointed star
+    if (RW_ARMOR_TYPE_LOWER.has(t) || t === 'defensive')              return '\u26e8';     // ⛨ heraldic shield
+    if (RW_WEAPON_TYPE_LOWER.has(t) || t === 'temporary')             return '\u2694\ufe0e'; // ⚔ crossed swords (text)
     return '$';
   }
 
@@ -1654,7 +1654,7 @@
       // Always rebuild seenTypes from current itemMeta
       for (const m of Object.values(itemMeta)) { if (m.type) seenTypes.add(m.type); }
 
-      // Step 3: Resolve travel IDs \u2014 skip temp seeded entries (no real numeric ID)
+      // Step 3: Resolve travel IDs — skip temp seeded entries (no real numeric ID)
       resolveTravelItemIds(
         Object.fromEntries(
           Object.entries(itemMeta)
@@ -1783,7 +1783,7 @@
       recomputeTravel();
       // Always refresh analysisCache so the next poll's priority list and
       // spike alerts stay accurate. But skip the expensive DOM render and
-      // travel-tab render unless the panel is actually visible \u2014 that's
+      // travel-tab render unless the panel is actually visible — that's
       // what was making the script periodically hammer the main thread.
       runAnalysis();
       _sec('afterAnalyze');
@@ -1823,7 +1823,7 @@
     if (pollingTimer) clearInterval(pollingTimer);
     if (statsTimer)   clearInterval(statsTimer);
 
-    // Floor the market poll at 60s \u2014 anything faster invites the
+    // Floor the market poll at 60s — anything faster invites the
     // freeze/CPU-load issues we've spent days chasing. Default is 120s.
     const marketMs = Math.max(60, settings.marketPollSec ?? 120) * 1000;
     const statsMs  = Math.max(10, settings.statsPollSec  ?? 30) * 1000;
@@ -1840,10 +1840,10 @@
     }, Math.min(statsMs / 2, 15000));
   }
 
-  // \u2500\u2500 DOM timer gating \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── DOM timer gating ────────────────────────────────────────────────────────
   // Polling and stats run continuously so the FAB spike-alert pulse still
   // fires when the panel is closed. The session bar and footer timers only
-  // tick while the panel is open \u2014 they do nothing but update hidden DOM
+  // tick while the panel is open — they do nothing but update hidden DOM
   // when it's closed. The freeze that motivated sleep mode was actually
   // caused by infinite CSS animations on an opacity:0 panel, not by the
   // polling cadence itself.
@@ -1863,7 +1863,7 @@
     if (!footerTimer)  footerTimer  = setInterval(updateFooter, 30000);
   }
 
-  // \u2500\u2500 UI \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── UI ────────────────────────────────────────────────────────────────────────
 
   function buildUI() {
     if (uiBuilt) return;
@@ -1873,7 +1873,7 @@
     const fab = document.createElement('div');
     fab.id = 'tmit-fab';
     // Inline styles guarantee visibility even if the GM_addStyle stylesheet
-    // fails to load or is blocked \u2014 the FAB must never be invisible.
+    // fails to load or is blocked — the FAB must never be invisible.
     fab.style.cssText = 'position:fixed;bottom:28px;right:28px;width:84px;height:84px;'
       + 'border-radius:14px;background:#000;'
       + 'border:2px solid #c9a227;cursor:pointer;'
@@ -1881,7 +1881,7 @@
       + '0 4px 24px rgba(0,0,0,0.8);';
     // Full logo PNG (elephant + baked-in "TEEM" wordmark) shown via
     // background-image on a div, so host-page img rules can't squash it.
-    // No clipping, no overlay \u2014 just the image scaled to fit.
+    // No clipping, no overlay — just the image scaled to fit.
     fab.innerHTML = `<div class="tmit-fab-elephant" style="background-image:url('${TEEM_ELEPHANT_DATAURL}');"></div><div class="tmit-alert-badge" id="tmit-alert-badge">$</div>`;
     fab.title = "TEEM \u2014 Torn's Elephant Economy Manager";
     document.body.appendChild(fab);
@@ -2142,10 +2142,10 @@
       fab.style.top    = settings.fabY + 'px';
     }
 
-    // Panel starts hidden \u2014 position is set when it opens (see openPanel())
+    // Panel starts hidden — position is set when it opens (see openPanel())
   }
 
-  // \u2500\u2500 Onboarding \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Onboarding ────────────────────────────────────────────────────────────
 
   function buildOnboarding() {
     const el = document.createElement('div');
@@ -2362,7 +2362,7 @@
 
     skipBtn.addEventListener('click', finishOnboarding);
 
-    // X button in top-right \u2014 same as skip
+    // X button in top-right — same as skip
     el.querySelector('#tmit-ob-close-x')?.addEventListener('click', finishOnboarding);
 
     function finishOnboarding() {
@@ -2375,7 +2375,7 @@
 
     // NOTE: the API settings page is opened only when the user clicks the
     // "Open Torn API Settings" button above. Auto-opening it caused an
-    // infinite tab loop \u2014 the new torn.com tab re-ran onboarding and
+    // infinite tab loop — the new torn.com tab re-ran onboarding and
     // auto-opened another tab, endlessly.
 
     // Start with next disabled until key validated
@@ -2402,7 +2402,7 @@
       panel.style.left   = settings.posX + 'px';
       panel.style.top    = settings.posY + 'px';
     } else {
-      // First open \u2014 position relative to FAB
+      // First open — position relative to FAB
       const fabRect    = fab.getBoundingClientRect();
       const panelW     = 480;
       const panelH     = 600;
@@ -2428,7 +2428,7 @@
   }
 
   function bindEvents(fab, panel) {
-    // FAB \u2014 simple click to open/close, drag to reposition
+    // FAB — simple click to open/close, drag to reposition
     let fabDragging = false;
     let fabStartX = 0, fabStartY = 0, fabOx = 0, fabOy = 0;
 
@@ -2467,7 +2467,7 @@
           settings.posX = null; settings.posY = null;
           saveSettings();
         } else {
-          // Simple tap/click \u2014 toggle panel
+          // Simple tap/click — toggle panel
           if (panel.classList.contains('tmit-hidden')) {
             openPanel(fab, panel);
           } else {
@@ -2491,7 +2491,7 @@
     // Refresh
     panel.querySelector('#tmit-btn-refresh').addEventListener('click', () => poll(true));
 
-    // Eye toggle buttons \u2014 show/hide API key fields
+    // Eye toggle buttons — show/hide API key fields
     panel.addEventListener('click', (e) => {
       const toggleMap = {
         'tmit-apikey-toggle':  '#tmit-apikey-input',
@@ -2508,7 +2508,7 @@
     // Settings toggle
     panel.querySelector('#tmit-btn-settings-toggle').addEventListener('click', () => {
       panel.querySelector('#tmit-settings-panel').classList.toggle('tmit-open');
-      // Ensure key fields are populated (safety net \u2014 should already be set from build)
+      // Ensure key fields are populated (safety net — should already be set from build)
       const yataInput = panel.querySelector('#tmit-yata-key-input');
       if (yataInput && !yataInput.value) yataInput.value = load('yataKey', '');
     });
@@ -2564,7 +2564,7 @@
       renderList();
     });
 
-    // Search \u2014 debounced so a full re-render doesn't fire on every keystroke
+    // Search — debounced so a full re-render doesn't fire on every keystroke
     let searchDebounce;
     panel.querySelector('#tmit-search').addEventListener('input', () => {
       clearTimeout(searchDebounce);
@@ -2606,7 +2606,7 @@
       if (sellBtn) {
         // Soft guard: warn if user doesn't appear to own the item, then
         // just navigate to Items so they (or TornTools' Quick Sell) can
-        // list it. We don't try to auto-fill anymore \u2014 Torn's React market
+        // list it. We don't try to auto-fill anymore — Torn's React market
         // page has hashed class names that break fragile injection.
         const id    = parseInt(sellBtn.dataset.id);
         const owned = userInventory[id]?.quantity ?? 0;
@@ -2647,7 +2647,7 @@
       if (e.target.id === 'tmit-spike-alert') {
         settings.spikeAlertEnabled = e.target.checked;
         saveSettings();
-        // If disabling while currently pulsing, stop immediately \u2014
+        // If disabling while currently pulsing, stop immediately —
         // don't wait for the next poll to clear the animation.
         if (!e.target.checked && alertActive) {
           alertActive = false;
@@ -2701,7 +2701,7 @@
     makeDraggable(panel, panel.querySelector('#tmit-drag-handle'));
   }
 
-  // \u2500\u2500 Stats Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Stats Tab ─────────────────────────────────────────────────────────────
 
   function switchTab(tab) {
     settings.activeTab = tab;
@@ -2739,7 +2739,7 @@
     else if (tab === 'crimes') renderCrimesTab();
   }
 
-  // \u2500\u2500 Travel Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Travel Tab ────────────────────────────────────────────────────────────
 
   function renderTravelTab() {
     const listEl = document.getElementById('tmit-travel-list');
@@ -2804,7 +2804,7 @@
     });
   }
 
-  // \u2500\u2500 Crimes Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Crimes Tab ─────────────────────────────────────────────────────────────
 
   function renderCrimesTab() {
     const bestEl = document.getElementById('tmit-crime-best');
@@ -2824,7 +2824,7 @@
         First sample lands within 5 minutes; meaningful rates after ~1 hour of play.
       </div>`;
     } else if (rates.perCrime.length === 0) {
-      // We have snapshots but no movement \u2014 usually means we're reading the
+      // We have snapshots but no movement — usually means we're reading the
       // wrong fields from the API response. Surface that explicitly with
       // copy-paste-ready debug info.
       const last       = crimeSnapshots[crimeSnapshots.length - 1];
@@ -2913,7 +2913,7 @@
     }
   }
 
-  // \u2500\u2500 War Gear Tab \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── War Gear Tab ──────────────────────────────────────────────────────────
 
   function renderWarTab() {
     const listEl = document.getElementById('tmit-war-tracker-list');
@@ -2950,7 +2950,7 @@
 
     const rows = sorted.map(r => {
       // Determine rarity from market price ranges (rough heuristic)
-      // Yellow < ~50M, Orange 50M\u2013500M, Red > 500M
+      // Yellow < ~50M, Orange 50M–500M, Red > 500M
       const price = r.currentPrice;
       const rarity = price > 500_000_000 ? 'red'
                    : price > 50_000_000  ? 'orange'
@@ -2987,7 +2987,7 @@
     listEl.innerHTML = rows.join('');
   }
 
-  // \u2500\u2500 Market List \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Market List ────────────────────────────────────────────────────────────
 
   function renderList() {
     const listEl = document.getElementById('tmit-list');
@@ -3120,17 +3120,17 @@
     const lastAlertWindow = load('lastTravelAlertWindow', '');
     if (windowKey === lastAlertWindow) return;
 
-    // \u2500\u2500 Cooldown checks \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    // ── Cooldown checks ──────────────────────────────────────────────────
     if (settings.alertOnDrugClear && myBattleStats?.drugCd > 0) return;
     if (settings.alertOnBoosterClear && myBattleStats?.boosterCd > 0) return;
 
-    // \u2500\u2500 Stock check \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    // ── Stock check ──────────────────────────────────────────────────────
     if (settings.alertRequireStock && top.bestItem) {
       const stockLevel = top.bestItem.stockLevel ?? 1;
       if (stockLevel < 0.1) return
     }
 
-    // \u2500\u2500 Build notification body \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    // ── Build notification body ──────────────────────────────────────────
     const mult     = getFlightMultiplier();
     const oneWay   = getAdjustedTravelTime(top.travelTime);
     const flightLabel = {
@@ -3259,7 +3259,7 @@
   }
 
   function updateSessionTracker() {
-    // Skip work when the panel is hidden \u2014 the session bar isn't visible
+    // Skip work when the panel is hidden — the session bar isn't visible
     // and iterating the full priceHistory every 15s on a backgrounded
     // panel is what was causing the periodic freezing.
     const panelEl = document.getElementById('tmit-panel');
@@ -3270,7 +3270,7 @@
     const ageDotEl = document.getElementById('tmit-age-dot');
     const ageTextEl = document.getElementById('tmit-age-text');
 
-    // Recompute session profit fresh on each call \u2014 (current - session-start) per item
+    // Recompute session profit fresh on each call — (current - session-start) per item
     let computedProfit = 0;
     for (const [idStr, hist] of Object.entries(priceHistory)) {
       if (!hist.length) continue;
@@ -3331,7 +3331,7 @@
   }
 
   function updateFooter() {
-    // Skip when the panel is hidden \u2014 nothing the user can see.
+    // Skip when the panel is hidden — nothing the user can see.
     const panelEl = document.getElementById('tmit-panel');
     if (!panelEl || panelEl.classList.contains('tmit-hidden')) return;
 
@@ -3344,7 +3344,7 @@
     if (nextEl) nextEl.textContent = '~1m';
   }
 
-  // \u2500\u2500 Drag \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Drag ──────────────────────────────────────────────────────────────────────
 
   function makeDraggable(el, handle) {
     let ox = 0, oy = 0, startX = 0, startY = 0;
@@ -3386,14 +3386,14 @@
     });
   }
 
-  // \u2500\u2500 Init \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // ── Init ──────────────────────────────────────────────────────────────────────
 
   function init() {
     buildUI();
 
-    // \u2500\u2500 Diagnostics \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    // ── Diagnostics ─────────────────────────────────────────────────────
     // These help isolate the source of any periodic UI freezes. They log
-    // to the browser console (F12 \u2192 Console), tagged with [TEEM \u2026] so
+    // to the browser console (F12 → Console), tagged with [TEEM …] so
     // they're easy to spot.
     try {
       // 1) One-shot startup: how much data have we accumulated?
@@ -3450,7 +3450,7 @@
     });
 
     // Notification permission request (needed for travel + spike alerts).
-    // Skip on Torn PDA \u2014 its WebView has no Notification API and accessing it
+    // Skip on Torn PDA — its WebView has no Notification API and accessing it
     // would throw. The FAB coin badge still works as a visual spike alert.
     if (!IS_PDA && typeof Notification !== 'undefined' && Notification.permission === 'default') {
       try { Notification.requestPermission(); } catch(e) {}
@@ -3479,7 +3479,7 @@
     if (!onboardingDone || !settings.apiKey) {
       buildOnboarding();
     } else {
-      // \u2500\u2500 Instant render from cache \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+      // ── Instant render from cache ──────────────────────────────────────
       // Render immediately from whatever is in memory (loaded from GM storage
       // at script start) so the market list appears instantly on page load.
       // The background poll will update prices and show a fresh timestamp.
@@ -3521,7 +3521,7 @@
   }
 
   // Navigate to the item market filtered to a specific item. We don't try
-  // to auto-click the listing \u2014 Torn's market is a React app with hashed
+  // to auto-click the listing — Torn's market is a React app with hashed
   // class names that change, and any modern bot-snipe would beat us to
   // the cheapest listing anyway. Reliable beats clever.
   function openItemMarket(itemId, itemName, category) {
@@ -3569,7 +3569,7 @@
 
 
   } catch(e) {
-    // Fatal error \u2014 show minimal FAB with error info
+    // Fatal error — show minimal FAB with error info
     function showError(msg) {
       if (document.body) {
         const f = document.createElement('div');
