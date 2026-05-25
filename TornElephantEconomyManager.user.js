@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.5.2
-// @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings, war gear pricing, and crime $/hour tracker. Now mobile-friendly and Torn PDA compatible.
+// @version      6.5.3
+// @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
 // @grant        GM_setValue
@@ -83,11 +83,15 @@
   }
 
   // ── Travel data ─────────────────────────────────────────────────────────────
-  // Travel countries — items identified by NAME, resolved to IDs at runtime
-  // Sources: Torn wiki, community guides (verified Aug 2025)
-  // Buy prices = in-store abroad price (Torn $)
-  // Travel times = one-way economy flight in minutes
-  // Capacity = approximate max items available per restock cycle
+  // Travel countries — items identified by NAME, resolved to IDs at runtime.
+  // `buyPrice` is the fixed in-store vendor price (stable for plushies, flowers,
+  // grenades, suitcases). Items WITHOUT a `buyPrice` (drugs: Xanax/LSD/Opium)
+  // have no fixed vendor — their abroad cost is whatever the foreign market is
+  // currently asking, which we read live from YATA per poll. If YATA is down,
+  // those entries are skipped (no fiction).
+  // Travel times = one-way economy flight in minutes.
+  // `capacity` = max units available per restock cycle, used as an upper bound
+  // independent of YATA's reported live quantity.
   const COUNTRIES = [
     {
       name: 'Mexico', code: 'mex', flagEmoji: '\ud83c\uddf2\ud83c\uddfd', travelTime: 20,
@@ -108,7 +112,7 @@
       items: [
         { itemName: 'Wolverine Plushie', buyPrice: 30,  capacity: 400  },
         { itemName: 'Crocus',            buyPrice: 600, capacity: 1000 },
-        { itemName: 'Xanax',             buyPrice: 750, capacity: 100  },
+        { itemName: 'Xanax',                            capacity: 100  },
       ]
     },
     {
@@ -124,7 +128,7 @@
         { itemName: 'Red Fox Plushie', buyPrice: 1000, capacity: 400  },
         { itemName: 'Nessie Plushie',  buyPrice: 200,  capacity: 400  },
         { itemName: 'Heather',         buyPrice: 5000, capacity: 1000 },
-        { itemName: 'Xanax',           buyPrice: 750,  capacity: 100  },
+        { itemName: 'Xanax',                           capacity: 100  },
       ]
     },
     {
@@ -133,7 +137,7 @@
         { itemName: 'Monkey Plushie', buyPrice: 400,   capacity: 400  },
         { itemName: 'Ceibo Flower',   buyPrice: 500,   capacity: 1000 },
         { itemName: 'Tear Gas',       buyPrice: 15000, capacity: 500  },
-        { itemName: 'LSD',            buyPrice: 150,   capacity: 100  },
+        { itemName: 'LSD',                             capacity: 100  },
       ]
     },
     {
@@ -142,15 +146,15 @@
         { itemName: 'Chamois Plushie', buyPrice: 400,   capacity: 400  },
         { itemName: 'Edelweiss',       buyPrice: 900,   capacity: 1000 },
         { itemName: 'Flash Grenade',   buyPrice: 12000, capacity: 500  },
-        { itemName: 'LSD',             buyPrice: 150,   capacity: 100  },
+        { itemName: 'LSD',                              capacity: 100  },
       ]
     },
     {
       name: 'Japan', code: 'jap', flagEmoji: '\ud83c\uddef\ud83c\uddf5', travelTime: 225,
       items: [
         { itemName: 'Cherry Blossom', buyPrice: 500, capacity: 1000 },
-        { itemName: 'Xanax',          buyPrice: 750, capacity: 100  },
-        { itemName: 'Opium',          buyPrice: 75,  capacity: 100  },
+        { itemName: 'Xanax',                         capacity: 100  },
+        { itemName: 'Opium',                         capacity: 100  },
       ]
     },
     {
@@ -158,8 +162,8 @@
       items: [
         { itemName: 'Panda Plushie', buyPrice: 400,  capacity: 400  },
         { itemName: 'Peony',         buyPrice: 5000, capacity: 1000 },
-        { itemName: 'LSD',           buyPrice: 150,  capacity: 100  },
-        { itemName: 'Opium',         buyPrice: 75,   capacity: 100  },
+        { itemName: 'LSD',                           capacity: 100  },
+        { itemName: 'Opium',                         capacity: 100  },
       ]
     },
     {
@@ -174,12 +178,24 @@
       items: [
         { itemName: 'Lion Plushie',   buyPrice: 400,  capacity: 400  },
         { itemName: 'African Violet', buyPrice: 2000, capacity: 1000 },
-        { itemName: 'Xanax',          buyPrice: 750,  capacity: 100  },
-        { itemName: 'LSD',            buyPrice: 150,  capacity: 100  },
-        { itemName: 'Opium',          buyPrice: 75,   capacity: 100  },
+        { itemName: 'Xanax',                          capacity: 100  },
+        { itemName: 'LSD',                            capacity: 100  },
+        { itemName: 'Opium',                          capacity: 100  },
       ]
     },
   ];
+
+  // YATA travel-export keys most countries by the same 3-letter code TEEM uses,
+  // but ships 'uni' for the UK and 'sou' for South Africa. Map TEEM-internal
+  // codes to whatever YATA uses so stock + price lookups match.
+  const YATA_COUNTRY_CODE = {
+    mex: 'mex', cay: 'cay', can: 'can', haw: 'haw',
+    uk:  'uni', arg: 'arg', swi: 'swi', jap: 'jap',
+    chi: 'chi', uae: 'uae', saf: 'sou',
+  };
+  const YATA_TO_TEEM = Object.fromEntries(
+    Object.entries(YATA_COUNTRY_CODE).map(([teem, yata]) => [yata, teem])
+  );
 
   // Resolved at runtime: { 'Xanax': 206, 'LSD': 197, ... }
   let travelItemIdMap = {};
@@ -206,9 +222,11 @@
     }
   }
 
-  function calcTravelProfit(country, marketPrices, yataStock, carryCapacity) {
+  function calcTravelProfit(country, marketPrices, yataStock, yataTravelPrices, carryCapacity) {
     const adjustedOneWay = getAdjustedTravelTime(country.travelTime);
     const roundTripHours = (adjustedOneWay * 2) / 60;
+    const countryStock   = yataStock?.[country.code];
+    const countryPrices  = yataTravelPrices?.[country.code];
     let bestItem = null, bestProfit = -Infinity;
     for (const item of country.items) {
       // Resolve ID from name at runtime
@@ -216,20 +234,45 @@
       if (!id) continue;
       const sellPrice = marketPrices[id] ?? 0;
       if (!sellPrice) continue;
+
+      // Foreign buy price: live YATA cost preferred. Hardcoded `buyPrice` is
+      // the vendor-fixed fallback (plushies, flowers, grenades, suitcases).
+      // Items with no hardcoded buyPrice (drugs) MUST have a live YATA price —
+      // otherwise we skip them rather than invent a number.
+      const livePrice = countryPrices?.[id];
+      const buyPrice  = (typeof livePrice === 'number' && livePrice > 0)
+        ? livePrice
+        : item.buyPrice;
+      if (!buyPrice || buyPrice <= 0) continue;
+      const priceSource = (typeof livePrice === 'number' && livePrice > 0) ? 'yata' : 'vendor';
+
       // Deduct 5% Torn sales tax from sell price
-      const netSellPrice = Math.round(sellPrice * 0.95);
-      const profitPerItem = netSellPrice - item.buyPrice;
+      const netSellPrice  = Math.round(sellPrice * 0.95);
+      const profitPerItem = netSellPrice - buyPrice;
       if (profitPerItem <= 0) continue;
-      const stockLevel = yataStock?.[country.code]?.[id] ?? 1.0;
-      const actualCap  = Math.min(Math.floor(carryCapacity * stockLevel), item.capacity, carryCapacity);
+
+      // YATA returns raw available quantity. The effective cap is the minimum
+      // of (your carry capacity, restock-cycle ceiling, live availability).
+      // If YATA stock data is missing, fall back to optimistic full capacity.
+      const stockQty       = countryStock?.[id];
+      const haveStockData  = typeof stockQty === 'number';
+      const availableCap   = haveStockData ? Math.min(stockQty, carryCapacity) : carryCapacity;
+      const actualCap      = Math.min(availableCap, item.capacity, carryCapacity);
+      if (actualCap <= 0) continue;
+
       const pph = (profitPerItem * actualCap) / roundTripHours;
       if (pph > bestProfit) {
         bestProfit = pph;
         bestItem = {
           ...item,
           itemName: item.itemName, // explicit so it survives even if some env mishandles the spread
-          id, sellPrice, netSellPrice, profitPerItem, actualCap, stockLevel,
-          stockConf: yataStock?.[country.code] !== undefined ? 'yata' : 'assumed',
+          id, sellPrice, netSellPrice, buyPrice, profitPerItem, actualCap,
+          stockQty: haveStockData ? stockQty : null,
+          // Derived 0..1 stock fraction; keeps existing consumers (alerts, UI)
+          // working while we migrate them to raw quantity where it's clearer.
+          stockLevel: haveStockData ? Math.min(1.0, stockQty / Math.max(1, carryCapacity)) : 1.0,
+          stockConf: haveStockData ? 'yata' : 'assumed',
+          priceSource,
         };
       }
     }
@@ -241,9 +284,9 @@
     };
   }
 
-  function rankTravelDestinations(marketPrices, yataStock, carryCapacity) {
+  function rankTravelDestinations(marketPrices, yataStock, yataTravelPrices, carryCapacity) {
     return COUNTRIES
-      .map(c => calcTravelProfit(c, marketPrices, yataStock, carryCapacity))
+      .map(c => calcTravelProfit(c, marketPrices, yataStock, yataTravelPrices, carryCapacity))
       .filter(r => r.viable)
       .sort((a, b) => b.profitPerHour - a.profitPerHour);
   }
@@ -469,7 +512,11 @@
   function saveStatHistory() { store('statHistory', statHistory); }
   function saveMyBattleStats() { store('myBattleStats', myBattleStats); }
   let travelRanking  = [];
+  // yataStockCache:        { teemCode: { itemId: rawQuantityAvailable } }
+  // yataTravelPriceCache:  { teemCode: { itemId: currentCostAbroad } }
+  // Both are populated together by the YATA travel-export fetch (poll()).
   let yataStockCache = null;
+  let yataTravelPriceCache = null;
 
   function saveWatchlist() { store('watchlist', [...watchlist]); }
 
@@ -1666,20 +1713,33 @@
       // Step 4: Fetch live prices for priority items
       const livePrices = await fetchLivePrices(settings.apiKey);
 
-      // Also fetch YATA travel stock for travel tab
+      // Also fetch YATA travel stock + foreign buy prices for the travel tab.
+      // YATA shape (as of 2026-05): { stocks: { mex: { stocks: [ {id, quantity, cost}, ... ] }, ... } }
+      // We populate two caches in parallel keyed by TEEM-internal country code:
+      //   yataStockCache       -> raw available quantity per item
+      //   yataTravelPriceCache -> current foreign buy cost per item (used for drugs)
       try {
-        const travelStock = await apiGet('https://yata.life/api/v1/travel/export/?format=json');
-        if (travelStock && !travelStock.error) {
-          const result = {};
-          for (const [countryKey, countryData] of Object.entries(travelStock?.countries ?? {})) {
-            const code = countryKey.toLowerCase().slice(0, 3);
-            result[code] = {};
-            for (const [itemIdStr, itemData] of Object.entries(countryData?.items ?? {})) {
-              const stockPct = itemData?.stock ?? itemData?.quantity ?? 100;
-              result[code][parseInt(itemIdStr)] = Math.min(stockPct / 100, 1.0);
+        const travelData = await apiGet('https://yata.life/api/v1/travel/export/?format=json');
+        const countries = travelData?.stocks;
+        if (countries && !travelData.error) {
+          const stockRes = {};
+          const priceRes = {};
+          for (const [yataCode, countryData] of Object.entries(countries)) {
+            const teemCode = YATA_TO_TEEM[yataCode];
+            if (!teemCode) continue;
+            stockRes[teemCode] = {};
+            priceRes[teemCode] = {};
+            const items = Array.isArray(countryData?.stocks) ? countryData.stocks : [];
+            for (const it of items) {
+              if (typeof it?.id !== 'number') continue;
+              if (typeof it.quantity === 'number') stockRes[teemCode][it.id] = it.quantity;
+              if (typeof it.cost     === 'number') priceRes[teemCode][it.id] = it.cost;
             }
           }
-          if (Object.keys(result).length > 0) yataStockCache = result;
+          if (Object.keys(stockRes).length > 0) {
+            yataStockCache = stockRes;
+            yataTravelPriceCache = priceRes;
+          }
         }
       } catch(e) { /* silent fail */ }
 
@@ -2753,12 +2813,22 @@
       return;
     }
 
+    const carry = settings.carryCapacity || 10;
     const rows = travelRanking.map((r, i) => {
       const rankClass = i === 0 ? 'rank1' : i === 1 ? 'rank2' : i === 2 ? 'rank3' : '';
       const pphClass  = i === 0 ? 'tmit-travel-pph top' : 'tmit-travel-pph';
-      const stockPct  = r.bestItem ? Math.round(r.bestItem.stockLevel * 100) : 100;
       const stockConf = r.bestItem?.stockConf ?? 'assumed';
-      const stockTxt  = stockConf === 'yata' ? `${stockPct}% \u2713` : '~stock';
+      const stockQty  = r.bestItem?.stockQty;
+      let stockTxt;
+      if (stockConf !== 'yata' || typeof stockQty !== 'number') {
+        stockTxt = '~stock';
+      } else if (stockQty === 0) {
+        stockTxt = 'EMPTY';
+      } else if (stockQty < carry) {
+        stockTxt = `${stockQty} only`;
+      } else {
+        stockTxt = `${stockQty} \u2713`;
+      }
 
       return `<div class="tmit-travel-row ${rankClass}" data-code="${r.code}">
         <div class="tmit-travel-flag">${r.flagEmoji}</div>
@@ -2786,7 +2856,7 @@
         detailEl.innerHTML = `<div class="tmit-travel-detail-card">
           <div class="tmit-result-row"><span class="tmit-result-label">${r.flagEmoji} Destination</span><span class="tmit-result-val gold">${r.country}</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Best Item</span><span class="tmit-result-val">${item?.itemName ?? '\u2014'}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Buy Price (abroad)</span><span class="tmit-result-val icy">$${item?.buyPrice?.toLocaleString() ?? '\u2014'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Buy Price (abroad)</span><span class="tmit-result-val icy">$${item?.buyPrice?.toLocaleString() ?? '\u2014'} <span style="font-size:9px;color:${item?.priceSource === 'yata' ? '#50dc82' : '#c9a227'};">${item?.priceSource === 'yata' ? '(YATA live)' : '(vendor)'}</span></span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Market Price</span><span class="tmit-result-val hot">$${item?.sellPrice?.toLocaleString() ?? '\u2014'}</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">After 5% Tax</span><span class="tmit-result-val hot">$${item?.netSellPrice?.toLocaleString() ?? '\u2014'}</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Profit / Item</span><span class="tmit-result-val green">$${item?.profitPerItem?.toLocaleString() ?? '\u2014'}</span></div>
@@ -2798,7 +2868,11 @@
           <div class="tmit-result-row"><span class="tmit-result-label">One-way time</span><span class="tmit-result-val">${getAdjustedTravelTime(r.travelTime)} min</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Round Trip</span><span class="tmit-result-val">${r.roundTripHours.toFixed(1)} hrs</span></div>
           <div class="tmit-result-row"><span class="tmit-result-label">Profit / Hour</span><span class="tmit-result-val gold">${formatPPH(r.profitPerHour)}</span></div>
-          <div class="tmit-result-row"><span class="tmit-result-label">Stock Data</span><span class="tmit-result-val ${item?.stockConf === 'yata' ? 'green' : ''}">${item?.stockConf === 'yata' ? 'YATA \u2713' : 'Assumed full'}</span></div>
+          <div class="tmit-result-row"><span class="tmit-result-label">Stock Data</span><span class="tmit-result-val ${item?.stockConf === 'yata' ? 'green' : ''}">${
+            item?.stockConf === 'yata' && typeof item?.stockQty === 'number'
+              ? (item.stockQty === 0 ? 'YATA: EMPTY' : `YATA: ${item.stockQty} listed \u2713`)
+              : 'Assumed full'
+          }</span></div>
         </div>`;
       });
     });
@@ -3138,8 +3212,8 @@
       business: 'Business Class', wlt: 'WLT'
     }[settings.flightType] ?? 'Economy';
 
-    const stockStr = top.bestItem?.stockConf === 'yata'
-      ? ` \u00b7 Stock: ${Math.round((top.bestItem.stockLevel ?? 1) * 100)}%`
+    const stockStr = (top.bestItem?.stockConf === 'yata' && typeof top.bestItem?.stockQty === 'number')
+      ? ` \u00b7 Stock: ${top.bestItem.stockQty} listed`
       : '';
 
     const cdStr = [];
@@ -3187,7 +3261,7 @@
         if (p > 0) marketPrices[parseInt(idStr)] = p;
       }
     }
-    travelRanking = rankTravelDestinations(marketPrices, yataStockCache, capacity);
+    travelRanking = rankTravelDestinations(marketPrices, yataStockCache, yataTravelPriceCache, capacity);
     checkTravelAlerts();
   }
 
