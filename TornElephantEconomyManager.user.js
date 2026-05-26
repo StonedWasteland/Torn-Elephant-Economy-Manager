@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.5.8
+// @version      6.5.9
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
+// @updateURL    https://raw.githubusercontent.com/StonedWasteland/Torn-Elephant-Economy-Manager/main/TornElephantEconomyManager.user.js
+// @downloadURL  https://raw.githubusercontent.com/StonedWasteland/Torn-Elephant-Economy-Manager/main/TornElephantEconomyManager.user.js
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_addStyle
@@ -2204,13 +2206,11 @@
     updateFooter();
     // footerTimer is started by resumeBackgroundWork() when the panel opens
 
-    // Restore FAB position. On narrow viewports (PDA / phones / small browser
-    // windows) ignore any saved desktop coordinates — they'd push the FAB
-    // off-screen with no way to grab it back. Default bottom-right inline
-    // style stays in effect there. On desktop, restore + clamp so a coord
-    // saved on a since-removed monitor still lands inside the viewport.
-    const isNarrowFab = window.innerWidth <= 768;
-    if (settings.fabX !== null && !isNarrowFab) {
+    // Restore FAB position. We always apply saved fabX/fabY when present and
+    // let clampFabPos rescue off-screen coords — this is the v6.5.6 behaviour
+    // before the (overzealous) narrow-viewport skip that hid FF Android
+    // installs whose only-visible position came from a previous mobile drag.
+    if (settings.fabX !== null) {
       fab.style.right  = 'auto';
       fab.style.bottom = 'auto';
       fab.style.left   = settings.fabX + 'px';
@@ -3615,23 +3615,13 @@
         if (panel && !panel.classList.contains('tmit-hidden')) {
           clampPanelPos(panel, true);
         }
-        // FAB: on narrow viewports, clear ALL FOUR sides so the @media
-        // rule's bottom-right defaults take over. Just clearing left/top
-        // would leave behind right:auto + bottom:auto from a previous
-        // drag — the FAB would then have no anchor at all and render
-        // off-screen (this is exactly the v6.5.6 disappearing-on-mobile
-        // bug). On wide viewports, clamp to the new bounds if dragged.
+        // FAB: clamp dragged position into the new bounds. If the user
+        // never dragged (no saved coords), clampFabPos no-ops and the CSS
+        // defaults (base rule on desktop, @media rule on mobile) stay in
+        // effect. We no longer wipe the FAB sides on narrow viewports — that
+        // path threw away the user's only-visible position on FF Android.
         const fab = document.getElementById('tmit-fab');
-        if (fab) {
-          if (window.innerWidth <= 768) {
-            fab.style.left   = '';
-            fab.style.top    = '';
-            fab.style.right  = '';
-            fab.style.bottom = '';
-          } else {
-            clampFabPos(fab, true);
-          }
-        }
+        if (fab) clampFabPos(fab, true);
       });
     });
 
