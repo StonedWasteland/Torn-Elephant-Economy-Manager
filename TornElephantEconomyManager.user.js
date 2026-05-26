@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.5.3
+// @version      6.5.5
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -9,6 +9,7 @@
 // @grant        GM_getValue
 // @grant        GM_addStyle
 // @grant        GM_xmlhttpRequest
+// @grant        GM_registerMenuCommand
 // @connect      api.torn.com
 // @connect      yata.life
 // @connect      yata.yt
@@ -2461,6 +2462,10 @@
       panel.style.bottom = 'auto';
       panel.style.left   = settings.posX + 'px';
       panel.style.top    = settings.posY + 'px';
+      // Rescue stuck positions: a posX/posY saved on a larger viewport (or a
+      // monitor that's since been disconnected) could place the panel mostly
+      // off-screen on this one. Clamp back inside before the user sees it.
+      clampPanelPos(panel, true);
     } else {
       // First open — position relative to FAB
       const fabRect    = fab.getBoundingClientRect();
@@ -3420,8 +3425,41 @@
 
   // ── Drag ──────────────────────────────────────────────────────────────────────
 
+  // Force the panel back inside the viewport. Used on drag, on open (rescues
+  // positions saved from a larger viewport / removed monitor), and on resize.
+  // Skips when the @media(max-width:768px) rule has taken over — there CSS
+  // pins the panel and computed left/top would fight the !important rules.
+  // PANEL_MARGIN keeps the panel an inch off every viewport edge so its
+  // gold border-top, header ::before gradient, and outer box-shadow glow
+  // don't get visually clipped against the chrome.
+  const PANEL_MARGIN = 10;
+  function clampPanelPos(elNode, persist) {
+    if (!elNode || elNode.classList.contains('tmit-hidden')) return;
+    if (window.innerWidth <= 768) return;
+    const rect = elNode.getBoundingClientRect();
+    const vw   = window.innerWidth;
+    const vh   = window.innerHeight;
+    let left = parseInt(elNode.style.left, 10);
+    let top  = parseInt(elNode.style.top,  10);
+    if (Number.isNaN(left)) left = rect.left;
+    if (Number.isNaN(top))  top  = rect.top;
+    const maxLeft = Math.max(PANEL_MARGIN, vw - rect.width  - PANEL_MARGIN);
+    const maxTop  = Math.max(PANEL_MARGIN, vh - rect.height - PANEL_MARGIN);
+    const cL = Math.min(maxLeft, Math.max(PANEL_MARGIN, left));
+    const cT = Math.min(maxTop,  Math.max(PANEL_MARGIN, top));
+    elNode.style.right  = 'auto';
+    elNode.style.bottom = 'auto';
+    elNode.style.left   = cL + 'px';
+    elNode.style.top    = cT + 'px';
+    if (persist) {
+      settings.posX = cL;
+      settings.posY = cT;
+      saveSettings();
+    }
+  }
+
   function makeDraggable(el, handle) {
-    let ox = 0, oy = 0, startX = 0, startY = 0;
+    let ox = 0, oy = 0, startX = 0, startY = 0, maxLeft = 0, maxTop = 0;
 
     handle.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -3435,14 +3473,16 @@
       const rect = el.getBoundingClientRect();
       ox = rect.left;
       oy = rect.top;
+      maxLeft = Math.max(PANEL_MARGIN, window.innerWidth  - rect.width  - PANEL_MARGIN);
+      maxTop  = Math.max(PANEL_MARGIN, window.innerHeight - rect.height - PANEL_MARGIN);
 
       function onMove(e) {
         const dx = e.clientX - startX;
         const dy = e.clientY - startY;
         el.style.right  = 'auto';
         el.style.bottom = 'auto';
-        el.style.left   = Math.max(0, ox + dx) + 'px';
-        el.style.top    = Math.max(0, oy + dy) + 'px';
+        el.style.left   = Math.min(maxLeft, Math.max(PANEL_MARGIN, ox + dx)) + 'px';
+        el.style.top    = Math.min(maxTop,  Math.max(PANEL_MARGIN, oy + dy)) + 'px';
       }
 
       function onUp(e) {
@@ -3522,6 +3562,49 @@
         }
       }
     });
+
+    // Re-clamp the panel if the viewport shrinks (window resize, devtools
+    // open, browser-zoom change, mobile rotation). rAF-debounced so we run
+    // once per frame even when resize fires every pixel.
+    let resizeRaf = 0;
+    window.addEventListener('resize', () => {
+      if (resizeRaf) cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = 0;
+        const panel = document.getElementById('tmit-panel');
+        if (panel && !panel.classList.contains('tmit-hidden')) {
+          clampPanelPos(panel, true);
+        }
+      });
+    });
+
+    // Tampermonkey menu: emergency reset for the panel position. If a saved
+    // posX/posY ever leaves the drag handle unreachable (e.g. stored before
+    // the clamp shipped, or saved on a since-removed monitor), the user can
+    // trigger this from the TM icon dropdown to snap the panel back home.
+    if (typeof GM_registerMenuCommand === 'function') {
+      try {
+        GM_registerMenuCommand('TEEM: Reset panel position', () => {
+          settings.posX = null;
+          settings.posY = null;
+          saveSettings();
+          const panel = document.getElementById('tmit-panel');
+          const fab   = document.getElementById('tmit-fab');
+          if (panel && fab) {
+            // Force the "first-open" branch in openPanel() to re-compute
+            // position relative to the FAB and re-clamp to viewport.
+            panel.style.left = '';
+            panel.style.top  = '';
+            if (panel.classList.contains('tmit-hidden')) {
+              openPanel(fab, panel);
+            } else {
+              panel.classList.add('tmit-hidden');
+              openPanel(fab, panel);
+            }
+          }
+        });
+      } catch(e) {}
+    }
 
     // Notification permission request (needed for travel + spike alerts).
     // Skip on Torn PDA — its WebView has no Notification API and accessing it
