@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.5.5
+// @version      6.5.6
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -2195,12 +2195,18 @@
     updateFooter();
     // footerTimer is started by resumeBackgroundWork() when the panel opens
 
-    // Restore FAB position
-    if (settings.fabX !== null) {
+    // Restore FAB position. On narrow viewports (PDA / phones / small browser
+    // windows) ignore any saved desktop coordinates — they'd push the FAB
+    // off-screen with no way to grab it back. Default bottom-right inline
+    // style stays in effect there. On desktop, restore + clamp so a coord
+    // saved on a since-removed monitor still lands inside the viewport.
+    const isNarrowFab = window.innerWidth <= 768;
+    if (settings.fabX !== null && !isNarrowFab) {
       fab.style.right  = 'auto';
       fab.style.bottom = 'auto';
       fab.style.left   = settings.fabX + 'px';
       fab.style.top    = settings.fabY + 'px';
+      clampFabPos(fab, true);
     }
 
     // Panel starts hidden — position is set when it opens (see openPanel())
@@ -3458,6 +3464,31 @@
     }
   }
 
+  // FAB clamp. Mirrors clampPanelPos but allows the FAB to sit flush with
+  // the viewport edges (no PANEL_MARGIN), since users like parking it in
+  // the corner. Called after restoring a saved fabX/fabY and on resize.
+  // If left/top aren't set (FAB is still using the default right/bottom
+  // inline anchor), nothing to clamp.
+  function clampFabPos(fab, persist) {
+    if (!fab) return;
+    let left = parseInt(fab.style.left, 10);
+    let top  = parseInt(fab.style.top,  10);
+    if (Number.isNaN(left) || Number.isNaN(top)) return;
+    const rect = fab.getBoundingClientRect();
+    const maxLeft = Math.max(0, window.innerWidth  - rect.width);
+    const maxTop  = Math.max(0, window.innerHeight - rect.height);
+    const cL = Math.min(maxLeft, Math.max(0, left));
+    const cT = Math.min(maxTop,  Math.max(0, top));
+    if (cL === left && cT === top) return;
+    fab.style.left = cL + 'px';
+    fab.style.top  = cT + 'px';
+    if (persist) {
+      settings.fabX = cL;
+      settings.fabY = cT;
+      saveSettings();
+    }
+  }
+
   function makeDraggable(el, handle) {
     let ox = 0, oy = 0, startX = 0, startY = 0, maxLeft = 0, maxTop = 0;
 
@@ -3575,6 +3606,18 @@
         if (panel && !panel.classList.contains('tmit-hidden')) {
           clampPanelPos(panel, true);
         }
+        // FAB: on narrow viewports, drop any saved left/top so the default
+        // bottom-right inline anchor takes over (matches what we do on init).
+        // On wide viewports, clamp to the new bounds if it's been dragged.
+        const fab = document.getElementById('tmit-fab');
+        if (fab) {
+          if (window.innerWidth <= 768) {
+            fab.style.left = '';
+            fab.style.top  = '';
+          } else {
+            clampFabPos(fab, true);
+          }
+        }
       });
     });
 
@@ -3584,12 +3627,21 @@
     // trigger this from the TM icon dropdown to snap the panel back home.
     if (typeof GM_registerMenuCommand === 'function') {
       try {
-        GM_registerMenuCommand('TEEM: Reset panel position', () => {
+        GM_registerMenuCommand('TEEM: Reset panel + FAB position', () => {
           settings.posX = null;
           settings.posY = null;
+          settings.fabX = null;
+          settings.fabY = null;
           saveSettings();
           const panel = document.getElementById('tmit-panel');
           const fab   = document.getElementById('tmit-fab');
+          if (fab) {
+            // Drop any inline left/top so the default `bottom:28px;right:28px`
+            // from the inline cssText takes over. Mobile @media kicks in too
+            // because there's nothing inline overriding it now.
+            fab.style.left = '';
+            fab.style.top  = '';
+          }
           if (panel && fab) {
             // Force the "first-open" branch in openPanel() to re-compute
             // position relative to the FAB and re-clamp to viewport.
