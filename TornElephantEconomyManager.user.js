@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.5.9
+// @version      6.6.0
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -415,6 +415,7 @@
     posY: null,
     fabX: null,
     fabY: null,
+    fabSize: 'normal',         // 'normal' | 'small' — double-tap FAB to toggle
   });
 
   function saveSettings() { store('settings', settings); }
@@ -691,6 +692,9 @@
        alert badge that sits outside the corner). */
     #tmit-fab{position:fixed;bottom:28px;right:28px;width:84px;height:84px;border-radius:14px;background:#000;border:2px solid #c9a227;box-shadow:0 0 14px rgba(151,2,173,0.5),0 4px 24px rgba(0,0,0,0.8);cursor:pointer;z-index:999999;transition:all 0.3s ease;user-select:none;}
     #tmit-fab:hover{transform:scale(1.06);box-shadow:0 0 26px rgba(151,2,173,0.8),0 4px 28px rgba(0,0,0,0.9);}
+    /* Half-size FAB — toggled by double-tapping the FAB. !important is
+       required to beat the inline width/height set in buildUI()'s cssText. */
+    #tmit-fab.tmit-fab-small{width:42px !important;height:42px !important;border-radius:9px !important;}
     #tmit-fab .tmit-fab-elephant{position:absolute !important;top:0 !important;right:0 !important;bottom:0 !important;left:0 !important;background-size:100% 100% !important;background-position:center !important;background-repeat:no-repeat !important;border-radius:inherit !important;pointer-events:none;}
     /* Big-hit indicator: a static coin badge with the elephant on it.
        No animation, no transitions \u2014 just appears when a huge spike is
@@ -929,6 +933,9 @@
          hide the FAB. The URL bar overlays the viewport up to ~56px from
          the bottom on most FF Android builds; 80px gives clear separation. */
       #tmit-fab{width:64px;height:64px;bottom:80px;right:18px;border-radius:12px;}
+      /* On mobile the half-size variant settles at 36px — small enough to
+         feel compact, still a comfortable touch target. */
+      #tmit-fab.tmit-fab-small{width:36px !important;height:36px !important;border-radius:8px !important;}
       #tmit-panel{width:calc(100vw - 16px) !important;max-width:520px;max-height:calc(100vh - 100px);left:8px !important;right:auto !important;bottom:auto !important;}
       .tmit-onboard-card{width:calc(100vw - 32px);max-width:340px;}
       .tmit-help::after{width:min(220px, calc(100vw - 40px));}
@@ -1956,6 +1963,9 @@
     // No clipping, no overlay — just the image scaled to fit.
     fab.innerHTML = `<div class="tmit-fab-elephant" style="background-image:url('${TEEM_ELEPHANT_DATAURL}');"></div><div class="tmit-alert-badge" id="tmit-alert-badge">$</div>`;
     fab.title = "TEEM \u2014 Torn's Elephant Economy Manager";
+    // Restore saved compact-size choice before append so the first paint
+    // already has the right dimensions (no flash-of-large-FAB on reload).
+    if (settings.fabSize === 'small') fab.classList.add('tmit-fab-small');
     document.body.appendChild(fab);
 
     // Panel
@@ -2508,9 +2518,13 @@
   }
 
   function bindEvents(fab, panel) {
-    // FAB — simple click to open/close, drag to reposition
+    // FAB — single tap toggles the panel, double tap toggles FAB size,
+    // drag repositions. A 250ms tap-debounce window distinguishes single
+    // from double — that's the cost of supporting both gestures with the
+    // same surface (browsers don't fire reliable dblclick on touch).
     let fabDragging = false;
     let fabStartX = 0, fabStartY = 0, fabOx = 0, fabOy = 0;
+    let fabTapTimer = null;
 
     // Pointer events unify mouse + touch + pen so this works on desktop
     // browsers AND inside the Torn PDA WebView with no platform branching.
@@ -2546,14 +2560,24 @@
           settings.fabY = parseInt(fab.style.top);
           settings.posX = null; settings.posY = null;
           saveSettings();
+        } else if (fabTapTimer) {
+          // Second tap inside the 250ms window — treat as double-tap and
+          // toggle the FAB size instead of toggling the panel.
+          clearTimeout(fabTapTimer);
+          fabTapTimer = null;
+          toggleFabSize(fab);
         } else {
-          // Simple tap/click — toggle panel
-          if (panel.classList.contains('tmit-hidden')) {
-            openPanel(fab, panel);
-          } else {
-            panel.classList.add('tmit-hidden');
-            suspendBackgroundWork();
-          }
+          // First tap — defer the panel toggle so a follow-up tap can
+          // upgrade the gesture to double-tap.
+          fabTapTimer = setTimeout(() => {
+            fabTapTimer = null;
+            if (panel.classList.contains('tmit-hidden')) {
+              openPanel(fab, panel);
+            } else {
+              panel.classList.add('tmit-hidden');
+              suspendBackgroundWork();
+            }
+          }, 250);
         }
         fabDragging = false;
       };
@@ -3471,6 +3495,21 @@
       settings.posY = cT;
       saveSettings();
     }
+  }
+
+  // FAB size toggle. Double-tap on the FAB switches between the default
+  // (84px desktop / 64px mobile) and a compact half-size (42px / 36px).
+  // The actual dimensions live in CSS — this function just swaps the
+  // `tmit-fab-small` class and persists the choice. Setting the class
+  // BEFORE re-clamping means clampFabPos sees the new bounding rect, so
+  // a small FAB at a saved-coord-near-the-edge gets nudged correctly.
+  function toggleFabSize(fab) {
+    if (!fab) return;
+    const goingSmall = !fab.classList.contains('tmit-fab-small');
+    fab.classList.toggle('tmit-fab-small', goingSmall);
+    settings.fabSize = goingSmall ? 'small' : 'normal';
+    saveSettings();
+    clampFabPos(fab, true);
   }
 
   // FAB clamp. Mirrors clampPanelPos but allows the FAB to sit flush with
