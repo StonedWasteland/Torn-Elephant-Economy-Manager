@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.6.3
+// @version      6.6.4
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -3540,10 +3540,120 @@
     });
   }
 
+  // ── Debug overlay ─────────────────────────────────────────────────────────
+  //
+  // Activated by adding ?teem_debug=1 to any torn.com URL. Paints a
+  // high-contrast fixed-position box at the top of the viewport showing
+  // exactly what the browser thinks the FAB is doing — useful on FF
+  // Android / PDA where there's no devtools to inspect the DOM. Tap Copy
+  // to grab the readout, paste it back to the developer.
+  function maybeShowDebugOverlay() {
+    if (!/[?&]teem_debug=1/.test(window.location.search)) return;
+    // Defer so buildUI/bindEvents and the first layout pass have run.
+    setTimeout(() => {
+      const fab  = document.getElementById('tmit-fab');
+      const rect = fab ? fab.getBoundingClientRect() : null;
+      const cs   = fab ? window.getComputedStyle(fab) : null;
+      const lines = [
+        'TEEM DEBUG — v6.6.4',
+        '----------------------------------------',
+        'fab in DOM: ' + (fab ? 'YES' : 'NO'),
+      ];
+      if (fab) {
+        lines.push(
+          'fab parent: ' + (fab.parentNode?.tagName || 'null'),
+          'fab offsetParent: ' + (fab.offsetParent?.tagName || 'null (not rendered!)'),
+          'fab classList: ' + (fab.className || '(empty)'),
+          'fab.style.cssText: ' + (fab.style.cssText || '(empty)'),
+          '--- getBoundingClientRect ---',
+          'rect.x: '      + rect.x.toFixed(1),
+          'rect.y: '      + rect.y.toFixed(1),
+          'rect.width: '  + rect.width.toFixed(1),
+          'rect.height: ' + rect.height.toFixed(1),
+          '--- computed style ---',
+          'position: '   + cs.position,
+          'top: '        + cs.top,
+          'left: '       + cs.left,
+          'right: '      + cs.right,
+          'bottom: '     + cs.bottom,
+          'width: '      + cs.width,
+          'height: '     + cs.height,
+          'display: '    + cs.display,
+          'visibility: ' + cs.visibility,
+          'opacity: '    + cs.opacity,
+          'zIndex: '     + cs.zIndex,
+          'transform: '  + cs.transform,
+        );
+      }
+      lines.push(
+        '--- settings ---',
+        'fabX: '     + settings.fabX,
+        'fabY: '     + settings.fabY,
+        'fabSize: '  + (settings.fabSize ?? '(unset)'),
+        'posX: '     + settings.posX,
+        'posY: '     + settings.posY,
+        '--- viewport ---',
+        'innerWidth: '       + window.innerWidth,
+        'innerHeight: '      + window.innerHeight,
+        'screen.width: '     + screen.width,
+        'screen.height: '    + screen.height,
+        'devicePixelRatio: ' + window.devicePixelRatio,
+        'mobile @media: '    + window.matchMedia('(max-width: 768px)').matches,
+        'IS_PDA: '            + IS_PDA,
+        'IS_MOBILE_VIEWPORT: ' + IS_MOBILE_VIEWPORT,
+        'UA: ' + (navigator.userAgent || '').slice(0, 140),
+      );
+      const text = lines.join('\n');
+
+      const box = document.createElement('div');
+      box.id = 'tmit-debug-overlay';
+      box.style.cssText =
+        'position:fixed;top:8px;left:8px;right:8px;max-height:calc(100vh - 16px);' +
+        'overflow:auto;z-index:2147483647;background:#000;color:#0f0;' +
+        'border:3px solid #f0f;padding:8px;font-family:monospace;font-size:11px;' +
+        'line-height:1.4;white-space:pre-wrap;word-break:break-all;';
+      const pre = document.createElement('div');
+      pre.textContent = text;
+      box.appendChild(pre);
+
+      const btnRow = document.createElement('div');
+      btnRow.style.cssText = 'margin-top:8px;display:flex;gap:6px;';
+      const copyBtn = document.createElement('button');
+      copyBtn.textContent = 'Copy';
+      copyBtn.style.cssText = 'background:#0f0;color:#000;border:none;padding:8px 16px;' +
+        'font-family:monospace;font-size:12px;cursor:pointer;font-weight:bold;flex:1;';
+      copyBtn.addEventListener('click', () => {
+        try {
+          if (navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(text).then(
+              () => { copyBtn.textContent = 'Copied!'; },
+              () => { copyBtn.textContent = 'Copy failed — long-press text above'; }
+            );
+          } else {
+            copyBtn.textContent = 'Clipboard API unavailable — long-press text above';
+          }
+        } catch(e) {
+          copyBtn.textContent = 'Copy error: ' + e.message;
+        }
+      });
+      const closeBtn = document.createElement('button');
+      closeBtn.textContent = 'Close';
+      closeBtn.style.cssText = 'background:#f0f;color:#000;border:none;padding:8px 16px;' +
+        'font-family:monospace;font-size:12px;cursor:pointer;font-weight:bold;';
+      closeBtn.addEventListener('click', () => box.remove());
+      btnRow.appendChild(copyBtn);
+      btnRow.appendChild(closeBtn);
+      box.appendChild(btnRow);
+
+      document.body.appendChild(box);
+    }, 500);
+  }
+
   // ── Init ──────────────────────────────────────────────────────────────────────
 
   function init() {
     buildUI();
+    maybeShowDebugOverlay();
 
     // ── Diagnostics ─────────────────────────────────────────────────────
     // These help isolate the source of any periodic UI freezes. They log
