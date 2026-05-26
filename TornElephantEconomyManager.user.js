@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.5.7
+// @version      6.5.8
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -923,7 +923,10 @@
        phones, or desktop windows resized small). Panel becomes near-fullscreen
        so the existing tab UI is usable on a phone screen. */
     @media (max-width: 768px){
-      #tmit-fab{width:64px;height:64px;bottom:18px;right:18px;border-radius:12px;}
+      /* bottom:80px (not 18px) so Firefox Android's bottom URL bar can't
+         hide the FAB. The URL bar overlays the viewport up to ~56px from
+         the bottom on most FF Android builds; 80px gives clear separation. */
+      #tmit-fab{width:64px;height:64px;bottom:80px;right:18px;border-radius:12px;}
       #tmit-panel{width:calc(100vw - 16px) !important;max-width:520px;max-height:calc(100vh - 100px);left:8px !important;right:auto !important;bottom:auto !important;}
       .tmit-onboard-card{width:calc(100vw - 32px);max-width:340px;}
       .tmit-help::after{width:min(220px, calc(100vw - 40px));}
@@ -1935,7 +1938,13 @@
     fab.id = 'tmit-fab';
     // Inline styles guarantee visibility even if the GM_addStyle stylesheet
     // fails to load or is blocked — the FAB must never be invisible.
-    fab.style.cssText = 'position:fixed;bottom:28px;right:28px;width:84px;height:84px;'
+    // NOTE: position (bottom/right) is intentionally NOT inline so the
+    // @media(max-width:768px) rule can override it on mobile. Otherwise
+    // an inline `bottom:28px` wins specificity-wise over the @media rule,
+    // and on Firefox Android the URL bar (which lives at the bottom of
+    // the viewport) hides the FAB. The base GM_addStyle rule sets the
+    // desktop position; the @media rule lifts it on narrow viewports.
+    fab.style.cssText = 'position:fixed;width:84px;height:84px;'
       + 'border-radius:14px;background:#000;'
       + 'border:2px solid #c9a227;cursor:pointer;'
       + 'z-index:2147483000;box-shadow:0 0 14px rgba(151,2,173,0.6),'
