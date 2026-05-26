@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.6.0
+// @version      6.6.1
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -3500,16 +3500,21 @@
   // FAB size toggle. Double-tap on the FAB switches between the default
   // (84px desktop / 64px mobile) and a compact half-size (42px / 36px).
   // The actual dimensions live in CSS — this function just swaps the
-  // `tmit-fab-small` class and persists the choice. Setting the class
-  // BEFORE re-clamping means clampFabPos sees the new bounding rect, so
-  // a small FAB at a saved-coord-near-the-edge gets nudged correctly.
+  // `tmit-fab-small` class and persists the choice. We pass the TARGET
+  // size to clampFabPos because the `transition:all 0.3s` rule on #tmit-fab
+  // means getBoundingClientRect would return the in-progress animated
+  // size, and a FAB enlarging at the viewport edge would spend 300ms half
+  // off-screen (visible bug: bottom of FAB cut off after enlarging from
+  // bottom-of-screen position).
   function toggleFabSize(fab) {
     if (!fab) return;
     const goingSmall = !fab.classList.contains('tmit-fab-small');
     fab.classList.toggle('tmit-fab-small', goingSmall);
     settings.fabSize = goingSmall ? 'small' : 'normal';
     saveSettings();
-    clampFabPos(fab, true);
+    const narrow = window.innerWidth <= 768;
+    const targetSize = goingSmall ? (narrow ? 36 : 42) : (narrow ? 64 : 84);
+    clampFabPos(fab, true, { w: targetSize, h: targetSize });
   }
 
   // FAB clamp. Mirrors clampPanelPos but allows the FAB to sit flush with
@@ -3517,14 +3522,24 @@
   // the corner. Called after restoring a saved fabX/fabY and on resize.
   // If left/top aren't set (FAB is still using the default right/bottom
   // inline anchor), nothing to clamp.
-  function clampFabPos(fab, persist) {
+  // The optional `sizeOverride` arg ({w, h}) is used by toggleFabSize:
+  // during the CSS size transition, getBoundingClientRect returns the
+  // mid-animation size, so callers that know the target size pass it in
+  // explicitly to avoid clamping against a stale rect.
+  function clampFabPos(fab, persist, sizeOverride) {
     if (!fab) return;
     let left = parseInt(fab.style.left, 10);
     let top  = parseInt(fab.style.top,  10);
     if (Number.isNaN(left) || Number.isNaN(top)) return;
-    const rect = fab.getBoundingClientRect();
-    const maxLeft = Math.max(0, window.innerWidth  - rect.width);
-    const maxTop  = Math.max(0, window.innerHeight - rect.height);
+    let w, h;
+    if (sizeOverride) {
+      w = sizeOverride.w; h = sizeOverride.h;
+    } else {
+      const rect = fab.getBoundingClientRect();
+      w = rect.width; h = rect.height;
+    }
+    const maxLeft = Math.max(0, window.innerWidth  - w);
+    const maxTop  = Math.max(0, window.innerHeight - h);
     const cL = Math.min(maxLeft, Math.max(0, left));
     const cT = Math.min(maxTop,  Math.max(0, top));
     if (cL === left && cT === top) return;
