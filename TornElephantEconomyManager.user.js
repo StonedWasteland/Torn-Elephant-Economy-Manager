@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.5.6
+// @version      6.5.7
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -3606,14 +3606,19 @@
         if (panel && !panel.classList.contains('tmit-hidden')) {
           clampPanelPos(panel, true);
         }
-        // FAB: on narrow viewports, drop any saved left/top so the default
-        // bottom-right inline anchor takes over (matches what we do on init).
-        // On wide viewports, clamp to the new bounds if it's been dragged.
+        // FAB: on narrow viewports, clear ALL FOUR sides so the @media
+        // rule's bottom-right defaults take over. Just clearing left/top
+        // would leave behind right:auto + bottom:auto from a previous
+        // drag — the FAB would then have no anchor at all and render
+        // off-screen (this is exactly the v6.5.6 disappearing-on-mobile
+        // bug). On wide viewports, clamp to the new bounds if dragged.
         const fab = document.getElementById('tmit-fab');
         if (fab) {
           if (window.innerWidth <= 768) {
-            fab.style.left = '';
-            fab.style.top  = '';
+            fab.style.left   = '';
+            fab.style.top    = '';
+            fab.style.right  = '';
+            fab.style.bottom = '';
           } else {
             clampFabPos(fab, true);
           }
