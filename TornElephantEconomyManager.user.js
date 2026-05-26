@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.6.1
+// @version      6.6.2
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -2525,11 +2525,19 @@
     let fabDragging = false;
     let fabStartX = 0, fabStartY = 0, fabOx = 0, fabOy = 0;
     let fabTapTimer = null;
+    // Re-entrancy guard against Firefox Android firing pointerdown twice
+    // for a single tap (touch → compat-mouse). Without this, the second
+    // pointerdown lands inside the 250ms tap window of the first, the
+    // double-tap detector trips on every tap, and the FAB ping-pongs
+    // between sizes until the user can't find it.
+    let fabPointerActive = false;
 
     // Pointer events unify mouse + touch + pen so this works on desktop
     // browsers AND inside the Torn PDA WebView with no platform branching.
     fab.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (fabPointerActive) return;
+      fabPointerActive = true;
       fabDragging = false;
       fabStartX = e.clientX;
       fabStartY = e.clientY;
@@ -2555,6 +2563,7 @@
         document.removeEventListener('pointermove', onMove);
         document.removeEventListener('pointerup',   onUp);
         document.removeEventListener('pointercancel', onUp);
+        fabPointerActive = false;
         if (fabDragging) {
           settings.fabX = parseInt(fab.style.left);
           settings.fabY = parseInt(fab.style.top);
@@ -3690,15 +3699,18 @@
           settings.posY = null;
           settings.fabX = null;
           settings.fabY = null;
+          settings.fabSize = 'normal';
           saveSettings();
           const panel = document.getElementById('tmit-panel');
           const fab   = document.getElementById('tmit-fab');
           if (fab) {
             // Drop any inline left/top so the default `bottom:28px;right:28px`
             // from the inline cssText takes over. Mobile @media kicks in too
-            // because there's nothing inline overriding it now.
+            // because there's nothing inline overriding it now. Also wipe
+            // the small-size class so the FAB returns to its full footprint.
             fab.style.left = '';
             fab.style.top  = '';
+            fab.classList.remove('tmit-fab-small');
           }
           if (panel && fab) {
             // Force the "first-open" branch in openPanel() to re-compute
