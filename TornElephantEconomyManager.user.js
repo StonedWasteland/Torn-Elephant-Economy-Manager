@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.6.6
+// @version      6.6.7
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -949,6 +949,30 @@
 
   // ── API calls ─────────────────────────────────────────────────────────────────
 
+  // v6.6.7 — Rate-limit cooldown. Torn allows 100 API calls/min PER KEY,
+  // shared across every script using that key (TornTools, BSP, TECH, etc.).
+  // When TEEM or another tool exhausts the quota the API returns
+  // `{ error: { code: 5, error: "Too many requests" } }`. We catch that
+  // in _gmFetch, set a 60s cooldown, and every TEEM call site
+  // (poll, fetchAllItems, fetchLivePrices) checks isRateLimited() before
+  // firing — so TEEM stops adding fuel to the fire while throttled.
+  // Persisted to GM storage so a Torn page navigation mid-cooldown
+  // doesn't reset the timer.
+  const RATE_LIMIT_COOLDOWN_SEC = 60;
+  let rateLimitedUntil = load('rateLimitedUntil', 0);
+  function isRateLimited() {
+    return rateLimitedUntil && Math.floor(Date.now() / 1000) < rateLimitedUntil;
+  }
+  function rateLimitRemainingSec() {
+    if (!rateLimitedUntil) return 0;
+    return Math.max(0, rateLimitedUntil - Math.floor(Date.now() / 1000));
+  }
+  function markRateLimited() {
+    rateLimitedUntil = Math.floor(Date.now() / 1000) + RATE_LIMIT_COOLDOWN_SEC;
+    store('rateLimitedUntil', rateLimitedUntil);
+    try { setStatus('err', `Rate-limited · ${RATE_LIMIT_COOLDOWN_SEC}s`); } catch(e) {}
+  }
+
   // apiGet with a custom timeout
   // Core HTTP helper — uses Promise.race to guarantee timeout fires
   // even if GM_xmlhttpRequest ignores the timeout field (some browsers/versions do)
@@ -959,7 +983,18 @@
         url,
         timeout:   15000,
         onload:    (r) => {
-          try { resolve(JSON.parse(r.responseText)); }
+          try {
+            const data = JSON.parse(r.responseText);
+            // v6.6.7 — peek at parsed payload for Torn's rate-limit code
+            // BEFORE handing the data back. We still resolve normally so
+            // existing call-site error handling (`data._error`, `data.error`)
+            // keeps working; the side effect is that the cooldown timer
+            // now reflects reality and downstream gates can short-circuit.
+            if (data && data.error && data.error.code === 5) {
+              markRateLimited();
+            }
+            resolve(data);
+          }
           catch(e) { reject(new Error('JSON parse failed')); }
         },
         onerror:   () => reject(new Error('Network error')),
@@ -1003,6 +1038,13 @@
   // Fetch all items — metadata + market_value fallback prices
   // Cached for 6h in GM storage — most page loads skip this entirely
   async function fetchAllItems(apiKey) {
+    // v6.6.7 — skip the catalog fetch while throttled. fetchAllItems is
+    // already TTL-cached (6h) so a skip almost always returns cached data
+    // anyway; the only effect is we don't fire a doomed request.
+    if (isRateLimited()) {
+      if (lastMetadataFetch > 0) return {};
+      throw new Error(`Rate-limited · retry in ${rateLimitRemainingSec()}s`);
+    }
     const now = Date.now();
     // The RW temp seed (rw_* keys with market_value:0) only exists so the
     // War Gear tab has names to show before the first real poll. It must
@@ -1155,6 +1197,12 @@
 
   // Fetch live prices for priority list in batches of 5
   async function fetchLivePrices(apiKey) {
+    // v6.6.7 — fetchLivePrices is the heaviest call site in TEEM (up to
+    // MAX_LIVE_ITEMS=50 individual market lookups per poll). Bail early
+    // when throttled so we don't deepen the cooldown. Also re-check
+    // between batches in case the cooldown was set by another call
+    // mid-loop (e.g. concurrent TornTools poll burning the same key).
+    if (isRateLimited()) return {};
     const ids = buildPriorityList();
     if (!ids.length) return {};
     const live = {};
@@ -1162,6 +1210,7 @@
     const deadline = Date.now() + 35000;
     for (let i = 0; i < ids.length; i += BATCH) {
       if (Date.now() > deadline) break;
+      if (isRateLimited()) break;
       const batch = ids.slice(i, i + BATCH);
       const results = await Promise.all(batch.map(id => fetchLivePrice(apiKey, id)));
       batch.forEach((id, j) => { if (results[j] > 0) live[id] = results[j]; });
@@ -1670,6 +1719,13 @@
 
   async function poll(force = false) {
     if (!settings.apiKey) return;
+    // v6.6.7 — back off the entire poll cycle while throttled. pollTimer
+    // keeps firing every settings.pollIntervalSec seconds, so we'll
+    // automatically retry on the first tick after the cooldown elapses.
+    if (isRateLimited()) {
+      setStatus('err', `Rate-limited · retrying ${rateLimitRemainingSec()}s`);
+      return;
+    }
     pollCounter++;
     const _pollStart = performance.now();
     const _sections = {};
@@ -1885,6 +1941,10 @@
 
   async function pollStats() {
     if (!settings.apiKey) return;
+    // v6.6.7 — skip the stats poll while throttled (battlestats is also
+    // a metered Torn API call). Silent failure is the existing pattern
+    // here so we just return.
+    if (isRateLimited()) return;
     try {
       await fetchMyBattleStats(settings.apiKey);
       updateSessionTracker();
