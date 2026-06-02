@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.6.7
+// @version      6.7.0
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -404,7 +404,7 @@
     activeTab: 'all',
     carryCapacity: 10,
     flightType: 'economy',      // economy | airstrip | business | wlt
-    marketPollSec: 120,         // how often to fetch item prices (seconds) — floored at 60 in startPolling
+    marketPollSec: 180,         // how often to fetch item prices (seconds) — floored at 60 in startPolling. v6.6.9 settled at 180s (was 120s through v6.6.7, briefly 240s in v6.6.8) — best balance of spike-alert latency and combined TEEM+TECH budget under Torn's 100/min.
     statsPollSec:  30,          // how often to fetch bars/cooldowns (seconds)
     alertOnDrugClear: false,    // only alert when drug cooldown is clear
     alertOnBoosterClear: false, // only alert when booster cooldown is clear
@@ -419,6 +419,25 @@
   });
 
   function saveSettings() { store('settings', settings); }
+
+  // v6.6.9 — one-shot bump of any prior default market-poll value to 180s.
+  // load() doesn't merge defaults into stored settings, so existing installs
+  // keep whatever was stored even after the default constant changes. Two
+  // prior default values are recognised: 120s (≤ v6.6.7) and 240s (v6.6.8
+  // only). Any other value is assumed to be a deliberate choice and left
+  // alone. New sentinel key — separate from the v6.6.8 attempt so users
+  // who installed v6.6.8 still get corrected.
+  (function migrateMarketPollDefault() {
+    const SENTINEL = SCRIPT_KEY + 'migrated_market_poll_180';
+    try {
+      if (GM_getValue(SENTINEL)) return;
+      if (settings.marketPollSec === 120 || settings.marketPollSec === 240) {
+        settings.marketPollSec = 180;
+        saveSettings();
+      }
+      GM_setValue(SENTINEL, { ts: Date.now() });
+    } catch (e) {}
+  })();
 
   // Structure: { itemId: [ { ts, price, yataPrice }, ... ] }
   let priceHistory = load('priceHistory', {});
@@ -973,10 +992,68 @@
     try { setStatus('err', `Rate-limited · ${RATE_LIMIT_COOLDOWN_SEC}s`); } catch(e) {}
   }
 
+  // ─── CROSS-TAB API CACHE (v6.7.0) ────────────────────────────────────
+  // Tampermonkey runs a separate userscript instance per Torn tab. Without
+  // a shared cache, each tab independently re-fetches the same endpoints,
+  // multiplying the Torn API budget by the number of open tabs. With
+  // poll-cycle work already taking 60s+ on a bloated install, multi-tab
+  // amplification is what's pushing us into the 100/min rate limit.
+  //
+  // GM_setValue is shared across all tabs of the same userscript, so the
+  // cache routes a freshness check through it: before fetching, check if
+  // any tab cached this URL within the TTL window. If yes, return the
+  // cached payload and skip the network call entirely.
+  //
+  // Cache key strips the api key (`key`), analytics comment (`comment`),
+  // and any cache-buster (`_`) so identical "logical" calls from different
+  // tabs share a key. Errors (anything with a `data.error` field, including
+  // Torn's `error.code === 5` rate-limit) are NEVER cached — caching a
+  // rate-limit response would propagate it to every tab for the full TTL.
+  //
+  // Hard eviction window is 24 h so long-TTL endpoints (catalog @ 6 h)
+  // get full cross-tab dedup without unbounded blob growth.
+  const XTCACHE_KEY              = 'xtcache';
+  const XTCACHE_DEFAULT_TTL_MS   = 45000;
+  const XTCACHE_HARD_EVICT_MS    = 24 * 60 * 60 * 1000;
+  const XTCACHE_STRIP_PARAMS     = ['_', 'key', 'comment'];
+
+  function xtCacheKey(url) {
+    try {
+      const u = new URL(url);
+      for (const p of XTCACHE_STRIP_PARAMS) u.searchParams.delete(p);
+      return u.origin + u.pathname + (u.search ? u.search : '');
+    } catch (e) {
+      return url;
+    }
+  }
+  function xtCacheRead() { return load(XTCACHE_KEY, {}) || {}; }
+  function xtCacheGet(key, ttl) {
+    const all = xtCacheRead();
+    const entry = all[key];
+    if (!entry || typeof entry.ts !== 'number') return null;
+    if ((Date.now() - entry.ts) > ttl) return null;
+    return entry.data;
+  }
+  function xtCacheSet(key, data) {
+    const all = xtCacheRead();
+    all[key] = { ts: Date.now(), data: data };
+    // Opportunistic eviction keeps the blob bounded across long sessions.
+    const cutoff = Date.now() - XTCACHE_HARD_EVICT_MS;
+    for (const k of Object.keys(all)) {
+      if (!all[k] || typeof all[k].ts !== 'number' || all[k].ts < cutoff) delete all[k];
+    }
+    store(XTCACHE_KEY, all);
+  }
+
   // apiGet with a custom timeout
   // Core HTTP helper — uses Promise.race to guarantee timeout fires
   // even if GM_xmlhttpRequest ignores the timeout field (some browsers/versions do)
-  function _gmFetch(url) {
+  //
+  // v6.7.0 — wraps the actual fetch with the cross-tab cache. Cache hits
+  // resolve immediately with the previously-fetched payload; misses fall
+  // through to the network. apiGet and apiGetWithTimeout both inherit the
+  // dedup transparently because they call _gmFetch.
+  function _gmFetchRaw(url) {
     return new Promise((resolve, reject) => {
       GM_xmlhttpRequest({
         method:    'GET',
@@ -1000,6 +1077,27 @@
         onerror:   () => reject(new Error('Network error')),
         ontimeout: () => reject(new Error('Request timed out')),
       });
+    });
+  }
+
+  function _gmFetch(url, opts) {
+    const ttl = (opts && typeof opts.crossTabTtl === 'number') ? opts.crossTabTtl : XTCACHE_DEFAULT_TTL_MS;
+    const key = ttl > 0 ? xtCacheKey(url) : null;
+
+    if (key) {
+      const hit = xtCacheGet(key, ttl);
+      if (hit !== null && hit !== undefined) return Promise.resolve(hit);
+    }
+
+    return _gmFetchRaw(url).then((data) => {
+      // Don't cache error responses. A cached rate-limit (code 5) would
+      // propagate the throttle to every tab for the full TTL — exactly
+      // what we're trying to fix. Same logic for any other API error.
+      const isError = data && (data.error || data._error);
+      if (key && !isError) {
+        try { xtCacheSet(key, data); } catch (e) { /* storage error — non-fatal */ }
+      }
+      return data;
     });
   }
 
@@ -1958,7 +2056,7 @@
 
     // Floor the market poll at 60s — anything faster invites the
     // freeze/CPU-load issues we've spent days chasing. Default is 120s.
-    const marketMs = Math.max(60, settings.marketPollSec ?? 120) * 1000;
+    const marketMs = Math.max(60, settings.marketPollSec ?? 180) * 1000;
     const statsMs  = Math.max(10, settings.statsPollSec  ?? 30) * 1000;
 
     // Full market poll (prices, travel, signals)
