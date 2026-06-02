@@ -2,7 +2,7 @@
 
 > A Tampermonkey userscript for [Torn City](https://www.torn.com) that brings live market signals, travel profit rankings, war gear pricing, and a personal crime $/hour tracker into a single overlay — without ever leaving the game.
 
-Designed to run alongside [TornTools](https://www.torntools.com/).
+Designed to run alongside [TornTools](https://chromewebstore.google.com/detail/torntools/hjpaapdjcgbmeikfnahipphknonhlhib?hl=en).
 
 ---
 
