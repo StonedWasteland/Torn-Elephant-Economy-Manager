@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.7.0
+// @version      6.7.1
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
-// @updateURL    https://raw.githubusercontent.com/StonedWasteland/Torn-Elephant-Economy-Manager/main/TornElephantEconomyManager.user.js
+// @updateURL    https://raw.githubusercontent.com/StonedWasteland/Torn-Elephant-Economy-Manager/main/TornElephantEconomyManager.meta.js
 // @downloadURL  https://raw.githubusercontent.com/StonedWasteland/Torn-Elephant-Economy-Manager/main/TornElephantEconomyManager.user.js
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -992,7 +992,7 @@
     try { setStatus('err', `Rate-limited · ${RATE_LIMIT_COOLDOWN_SEC}s`); } catch(e) {}
   }
 
-  // ─── CROSS-TAB API CACHE (v6.7.0) ────────────────────────────────────
+  // ─── CROSS-TAB API CACHE (v6.7.1) ────────────────────────────────────
   // Tampermonkey runs a separate userscript instance per Torn tab. Without
   // a shared cache, each tab independently re-fetches the same endpoints,
   // multiplying the Torn API budget by the number of open tabs. With
@@ -1049,7 +1049,7 @@
   // Core HTTP helper — uses Promise.race to guarantee timeout fires
   // even if GM_xmlhttpRequest ignores the timeout field (some browsers/versions do)
   //
-  // v6.7.0 — wraps the actual fetch with the cross-tab cache. Cache hits
+  // v6.7.1 — wraps the actual fetch with the cross-tab cache. Cache hits
   // resolve immediately with the previously-fetched payload; misses fall
   // through to the network. apiGet and apiGetWithTimeout both inherit the
   // dedup transparently because they call _gmFetch.

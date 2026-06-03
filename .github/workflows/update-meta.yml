@@ -1,0 +1,51 @@
+name: Update meta.js
+
+# Auto-regenerate TornElephantEconomyManager.meta.js from the metadata
+# block in TornElephantEconomyManager.user.js. Tampermonkey clients
+# hit the .meta.js URL for version checks, so it must stay in sync
+# with the .user.js header. This runs on every push to main, but only
+# if the .user.js file actually changed (avoids self-triggering when
+# the bot commits .meta.js back).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'TornElephantEconomyManager.user.js'
+
+permissions:
+  contents: write
+
+jobs:
+  update-meta:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          # Use the default GITHUB_TOKEN; persist credentials so the
+          # later push step can authenticate without a PAT.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata block to .meta.js
+        run: |
+          # sed pulls everything from the opening UserScript marker
+          # through the closing one inclusive. The user.js file's
+          # metadata block is the canonical source of truth.
+          sed -n '/\/\/ ==UserScript==/,/\/\/ ==\/UserScript==/p' \
+            TornElephantEconomyManager.user.js \
+            > TornElephantEconomyManager.meta.js
+
+      - name: Commit and push if meta.js changed
+        run: |
+          # Only commit if the regenerated file actually differs.
+          # No-op if the .user.js change didn't touch the header.
+          if git diff --quiet TornElephantEconomyManager.meta.js; then
+            echo "meta.js is already in sync; nothing to commit."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add TornElephantEconomyManager.meta.js
+          git commit -m "Auto-update TornElephantEconomyManager.meta.js [skip ci]"
+          git push
