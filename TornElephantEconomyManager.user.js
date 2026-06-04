@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.7.1
+// @version      6.7.2
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -23,7 +23,8 @@
   try {
 
 
-  const SCRIPT_KEY   = 'tmit_';
+  const SCRIPT_KEY     = 'tmit_';
+  const SCRIPT_VERSION = '6.7.2';
 
   // Torn PDA (mobile) runs userscripts inside a Flutter WebView. We detect it
   // so we can skip browser-only APIs (Notification) and switch the layout to
@@ -738,6 +739,7 @@
     .tmit-header{background:linear-gradient(90deg,rgba(50,0,66,1) 0%,rgba(18,0,28,1) 60%,rgba(8,0,14,1) 100%);border-bottom:1px solid rgba(151,2,173,0.35);padding:11px 16px;display:flex;align-items:center;justify-content:space-between;cursor:move;flex-shrink:0;position:relative;}
     .tmit-header::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent 0%,#c9a227 30%,#ffe066 50%,#c9a227 70%,transparent 100%);opacity:0.7;}
     .tmit-title{font-family:'Cinzel',serif;font-size:14px;font-weight:700;color:#c9a227;letter-spacing:0.06em;display:flex;align-items:center;gap:8px;text-shadow:0 0 12px rgba(201,162,39,0.4);}
+    .tmit-version{font-family:system-ui,sans-serif;font-size:10px;font-weight:600;color:#9702ad;letter-spacing:0.04em;margin-left:2px;text-shadow:none;text-transform:lowercase;}
     .tmit-title-icon{font-size:16px;}
     .tmit-header-right{display:flex;align-items:center;gap:8px;}
     .tmit-status-pill{font-size:10px;padding:2px 8px;border-radius:20px;background:rgba(151,2,173,0.08);border:1px solid rgba(151,2,173,0.25);color:#c9a227;font-family:monospace;}
@@ -2135,6 +2137,7 @@
         <div class="tmit-title">
           <div style="width:28px;height:28px;flex-shrink:0;background:url('${TEEM_ELEPHANT_DATAURL}') center / contain no-repeat;"></div>
           Elephant Economy Manager
+          <small class="tmit-version">v${SCRIPT_VERSION}</small>
         </div>
         <div class="tmit-header-right">
           <span class="tmit-status-pill" id="tmit-status">Loading\u2026</span>
