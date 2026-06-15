@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.7.2
+// @version      6.7.4
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -24,7 +24,7 @@
 
 
   const SCRIPT_KEY     = 'tmit_';
-  const SCRIPT_VERSION = '6.7.2';
+  const SCRIPT_VERSION = '6.7.4';
 
   // Torn PDA (mobile) runs userscripts inside a Flutter WebView. We detect it
   // so we can skip browser-only APIs (Notification) and switch the layout to
@@ -779,7 +779,13 @@
     .tmit-list::-webkit-scrollbar{width:4px;}
     .tmit-list::-webkit-scrollbar-track{background:transparent;}
     .tmit-list::-webkit-scrollbar-thumb{background:rgba(151,2,173,0.25);border-radius:2px;}
-    .tmit-tab-panel{scrollbar-width:thin;scrollbar-color:rgba(151,2,173,0.5) rgba(255,255,255,0.04);}
+    /* v6.7.4 — Tab panels are flex children of #tmit-panel and get
+       display:flex set by switchTab(). Without an explicit direction the
+       browser defaults to row, which laid out section title + header grid
+       + data list as three side-by-side columns instead of stacking. The
+       row content itself was rendering correctly — just into a flex
+       column that was only ~80px wide. */
+    .tmit-tab-panel{flex-direction:column;scrollbar-width:thin;scrollbar-color:rgba(151,2,173,0.5) rgba(255,255,255,0.04);}
     .tmit-tab-panel::-webkit-scrollbar{width:5px;}
     .tmit-tab-panel::-webkit-scrollbar-track{background:rgba(255,255,255,0.04);border-radius:3px;}
     .tmit-tab-panel::-webkit-scrollbar-thumb{background:rgba(151,2,173,0.5);border-radius:3px;}
@@ -862,7 +868,7 @@
     .tmit-result-val.icy{color:#3dd6c8;}
     .tmit-result-val.green{color:#50dc82;}
     .tmit-war-tracker{margin-top:4px;}
-    .tmit-war-row{display:grid;grid-template-columns:1fr 80px 80px 70px 55px;padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.04);align-items:center;font-size:11px;border-radius:3px;margin-bottom:1px;}
+    .tmit-war-row{display:grid;grid-template-columns:1fr 80px 80px 70px 55px;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.04);align-items:center;font-size:11px;border-radius:3px;margin-bottom:1px;}
     .tmit-war-row:hover{background:rgba(151,2,173,0.05);}
     .tmit-war-row.yellow-item{border-left:2px solid #ffe066;}
     .tmit-war-row.orange-item{border-left:2px solid #e8621a;}
@@ -871,6 +877,36 @@
     .tmit-war-price{color:#a840c0;font-family:monospace;font-size:10px;text-align:right;}
     .tmit-war-bb{color:#ffe066;font-family:monospace;font-size:10px;text-align:right;}
     .tmit-war-chg{font-family:monospace;font-size:10px;font-weight:700;text-align:right;}
+    /* v6.7.3 — War Gear sparkline + signal pill row. Sit in a meta row
+       directly under the type, so the existing 5-column grid is preserved
+       (no layout shifts in the right-side cells). Sparkline is an inline
+       SVG sized to fit naturally inside the name cell. */
+    .tmit-war-info{display:flex;flex-direction:column;gap:2px;overflow:hidden;min-width:0;}
+    .tmit-war-meta{display:flex;align-items:center;gap:8px;margin-top:3px;
+      min-height:14px;}
+    .tmit-war-spark{display:inline-flex;align-items:center;flex:1;
+      max-width:140px;min-width:50px;opacity:0.85;}
+    .tmit-war-spark svg{display:block;width:100%;height:14px;}
+    .tmit-war-spark.empty{color:#5f4a78;font-size:9px;font-style:italic;
+      opacity:0.6;}
+    /* War Gear signal badge — compact variant of the main-tab .tmit-signal-badge.
+       Smaller font + denser padding so it fits in the meta row without pushing
+       the sparkline. */
+    .tmit-war-sig{display:inline-flex;align-items:center;gap:3px;
+      font-family:monospace;font-size:9px;font-weight:700;letter-spacing:0.5px;
+      padding:1px 5px;border-radius:3px;line-height:1.4;}
+    .tmit-war-sig.BUY  {background:rgba(80,220,130,0.15);color:#50dc82;
+      border:1px solid rgba(80,220,130,0.35);}
+    .tmit-war-sig.SELL {background:rgba(255,64,64,0.15);color:#ff8080;
+      border:1px solid rgba(255,64,64,0.35);}
+    .tmit-war-sig.HOLD {background:rgba(255,224,102,0.12);color:#ffe066;
+      border:1px solid rgba(255,224,102,0.30);}
+    .tmit-war-sig.WATCH{background:rgba(128,176,255,0.12);color:#80b0ff;
+      border:1px solid rgba(128,176,255,0.30);}
+    .tmit-war-sig-dots{display:inline-flex;gap:2px;}
+    .tmit-war-sig-dot{width:4px;height:4px;border-radius:50%;
+      background:rgba(255,255,255,0.18);}
+    .tmit-war-sig-dot.filled{background:currentColor;}
     .tmit-travel-row{display:grid;grid-template-columns:24px 1fr 90px 80px 70px;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.04);align-items:center;cursor:pointer;border-radius:3px;transition:background 0.12s;}
     .tmit-travel-row:hover{background:rgba(151,2,173,0.06);}
     .tmit-travel-row.rank1{border-left:2px solid #ffe066;background:rgba(201,162,39,0.05);}
@@ -3211,26 +3247,69 @@
 
   // ── War Gear Tab ──────────────────────────────────────────────────────────
 
+  // v6.7.3 — Inline SVG sparkline for the War Gear tab. Takes a price
+  // history array (same shape stored in priceHistory[itemId]) and renders a
+  // small polyline showing the last `days` of price movement. Returns ''
+  // when there isn't enough data to draw a meaningful line (< 2 valid
+  // datapoints in the window) so the caller can render a "no data"
+  // placeholder.
+  //
+  // Color codes the line by trend: green when the last datapoint is at or
+  // above the first in the window (uptrend/flat), red when below. SVG uses
+  // a fixed viewBox with non-scaling stroke; the parent .tmit-war-spark
+  // sets width via CSS (flex-grown) and a fixed 14px height.
+  function buildWarSparkline(history, days) {
+    if (!Array.isArray(history) || history.length < 2) return '';
+    const cutoff = Date.now() - days * 86400000;
+    const win = history.filter(h => h && h.ts >= cutoff
+      && ((h.price && h.price > 0) || (h.yataPrice && h.yataPrice > 0)));
+    if (win.length < 2) return '';
+    const prices = win.map(h => h.price || h.yataPrice);
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const range = max - min;
+    const VB_W = 100, VB_H = 14;
+    const stepX = VB_W / (prices.length - 1);
+    const points = prices.map((p, i) => {
+      const x = i * stepX;
+      // Flat line edge case (all-equal prices) — draw a centered
+      // horizontal line so the cell still reads as "data present".
+      const y = range > 0
+        ? VB_H - ((p - min) / range) * (VB_H - 2) - 1
+        : VB_H / 2;
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+    const trending = prices[prices.length - 1] >= prices[0];
+    const color = trending ? '#50dc82' : '#ff6b6b';
+    return `<svg viewBox="0 0 ${VB_W} ${VB_H}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><polyline points="${points}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
+  }
+
   function renderWarTab() {
     const listEl = document.getElementById('tmit-war-tracker-list');
     if (!listEl) return;
 
-    // Build war item list from itemMeta merged with analysisCache for price + changePct
-    const priceMap     = {};
-    const changePctMap = {};
-    for (const r of analysisCache) {
-      priceMap[r.name]     = r.currentPrice;
-      changePctMap[r.name] = r.changePct ?? 0;
-    }
+    // v6.7.3 — Widened the analysisCache pull from a thin
+    // (price + changePct) name-keyed map to the full row keyed by name, so
+    // each war item can render the BUY/SELL signal pill + confidence dots
+    // (and any future per-row analysis fields) without re-walking the cache.
+    const rowByName = {};
+    for (const r of analysisCache) rowByName[r.name] = r;
 
-    const warItems = Object.values(itemMeta)
-      .filter(m => isRWItem(m.name, m.type))
-      .map(m => ({
-        name:         m.name,
-        type:         m.type,
-        currentPrice: priceMap[m.name] ?? m.market_value ?? 0,
-        changePct:    changePctMap[m.name] ?? 0,
-      }));
+    const warItems = Object.entries(itemMeta)
+      .filter(([, m]) => isRWItem(m.name, m.type))
+      .map(([idStr, m]) => {
+        const r = rowByName[m.name];
+        return {
+          itemId:       parseInt(idStr, 10),
+          name:         m.name,
+          type:         m.type,
+          currentPrice: r ? r.currentPrice : (m.market_value ?? 0),
+          changePct:    r ? (r.changePct ?? 0) : 0,
+          signal:       r ? r.signal : null,
+          confidence:   r ? (r.confidence ?? 0) : 0,
+          thinData:     r ? !!r.thinData : true,
+        };
+      });
 
     if (warItems.length === 0) {
       listEl.innerHTML = `<div class="tmit-state-msg" style="padding:16px 0;">
@@ -3266,10 +3345,36 @@
                       : rarity === 'yellow' ? '<span style="color:#ffe066;font-size:8px">\u25cf</span> '
                       : '';
 
+      // v6.7.3 \u2014 Signal pill + confidence dots. Reuses the same signal
+      // values that drive the main Market tab's badges. Null signal = no
+      // analysis yet (item has no price history in the active window);
+      // render a muted placeholder so the meta row still aligns.
+      let sigPill;
+      if (r.signal) {
+        const confDots = [1, 2, 3].map(i =>
+          `<span class="tmit-war-sig-dot${i <= r.confidence ? ' filled' : ''}"></span>`
+        ).join('');
+        sigPill = `<span class="tmit-war-sig ${r.signal}" title="${r.signal} \u00b7 confidence ${r.confidence}/3${r.thinData ? ' (thin data)' : ''}">${r.signal}<span class="tmit-war-sig-dots">${confDots}</span></span>`;
+      } else {
+        sigPill = `<span class="tmit-war-sig WATCH" style="opacity:0.55" title="No price history yet for this item">\u2014</span>`;
+      }
+
+      // v6.7.3 \u2014 7-day price sparkline. priceHistory keys are stringified
+      // (Object.keys returns strings even for numeric assignments).
+      const hist = priceHistory[r.itemId] || priceHistory[String(r.itemId)] || [];
+      const sparkSvg = buildWarSparkline(hist, 7);
+      const sparkCell = sparkSvg
+        ? `<span class="tmit-war-spark" title="7d price trend">${sparkSvg}</span>`
+        : `<span class="tmit-war-spark empty" title="Need more poll cycles for a 7d trend">no 7d data</span>`;
+
       return `<div class="tmit-war-row ${rarity ? rarity+'-item' : ''}">
-        <div>
+        <div class="tmit-war-info">
           <div class="tmit-war-name" title="${r.name}">${rarityDot}${r.name}</div>
           <div style="font-size:9px;color:#9886b8">${r.type}${weapType ? ' \u00b7 '+weapType : ''}</div>
+          <div class="tmit-war-meta">
+            ${sigPill}
+            ${sparkCell}
+          </div>
         </div>
         <div class="tmit-war-price" style="text-align:right">$${r.currentPrice >= 1_000_000
           ? (r.currentPrice/1_000_000).toFixed(1)+'M'
