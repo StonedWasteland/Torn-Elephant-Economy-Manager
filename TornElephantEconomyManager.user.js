@@ -24,7 +24,7 @@
 
 
   const SCRIPT_KEY     = 'tmit_';
-  const SCRIPT_VERSION = '6.7.4';
+  const SCRIPT_VERSION = '6.8.0';
 
   // Torn PDA (mobile) runs userscripts inside a Flutter WebView. We detect it
   // so we can skip browser-only APIs (Notification) and switch the layout to
@@ -557,6 +557,23 @@
   let dollarsPerBB     = load('bbPerDollar', 7000000);
   let userInventory   = {};  // { itemId: { name, quantity, uid } } — refreshed each poll
 
+  // ── Bazaar undercut tracker (v6.8.0) ──────────────────────────────────────
+  // Lightweight snapshot of the cheapest Bazaar listing per item, populated
+  // two ways:
+  //   1. Background poll for watchlist items only (every BAZAAR_POLL_EVERY
+  //      market cycles, capped at BAZAAR_WATCHLIST_CAP items)
+  //   2. On-demand when the user clicks the 💰 button on any row
+  // Stored as { itemId: { ts, cost, quantity } } — latest snapshot only,
+  // no history. Entries silently expire after BAZAAR_TTL_MS for rendering;
+  // we don't actively prune storage (~30 bytes per entry, negligible).
+  let bazaarPrices = load('bazaarPrices', {});
+  const BAZAAR_POLL_EVERY     = 5;                  // every 5th poll cycle
+  const BAZAAR_WATCHLIST_CAP  = 15;                 // hard ceiling on auto-poll
+  const BAZAAR_TTL_MS         = 30 * 60 * 1000;     // 30-min staleness cutoff
+  const BAZAAR_MIN_UNDERCUT_PCT = 1;                // hide pill if < 1% below market
+  let _bazaarInFlight = new Set();                  // dedupe concurrent on-demand clicks
+  function saveBazaarPrices() { try { store('bazaarPrices', bazaarPrices); } catch(e) {} }
+
   // Crime tracker — snapshots of crimes + personalstats
   // taken on poll. Deltas between snapshots produce attempts/hour and
   // $/hour rates so we can recommend the top 3 crimes for the user's
@@ -907,6 +924,27 @@
     .tmit-war-sig-dot{width:4px;height:4px;border-radius:50%;
       background:rgba(255,255,255,0.18);}
     .tmit-war-sig-dot.filled{background:currentColor;}
+    /* v6.8.0 - Bazaar undercut tracker */
+    .tmit-bazaar-pill{display:inline-flex;align-items:center;gap:3px;
+      font-family:monospace;font-size:10px;font-weight:700;
+      padding:1px 6px;border-radius:3px;line-height:1.4;
+      background:rgba(255,201,77,0.13);color:#ffc94d;
+      border:1px solid rgba(255,201,77,0.35);white-space:nowrap;}
+    .tmit-bazaar-pill.compact{font-size:9px;padding:1px 5px;}
+    .tmit-war-bazaar-btn{background:none;border:none;cursor:pointer;
+      font-size:11px;padding:0 2px;opacity:0.9;color:#ffc94d;
+      line-height:1;transition:opacity 0.15s,transform 0.15s;}
+    .tmit-war-bazaar-btn:hover{opacity:1;transform:scale(1.15);}
+    .tmit-war-bazaar-btn:disabled{cursor:default;opacity:0.4;}
+    .tmit-bazaar-scan-btn{background:rgba(255,201,77,0.08);
+      border:1px solid rgba(255,201,77,0.35);color:#ffc94d;
+      border-radius:5px;padding:4px 10px;font-size:10px;font-weight:700;
+      cursor:pointer;font-family:'Inter',sans-serif;letter-spacing:0.04em;
+      transition:background 0.15s,border-color 0.15s;flex-shrink:0;}
+    .tmit-bazaar-scan-btn:hover{background:rgba(255,201,77,0.18);
+      border-color:rgba(255,201,77,0.6);}
+    .tmit-bazaar-scan-btn:disabled{cursor:default;opacity:0.55;
+      background:rgba(255,201,77,0.04);}
     .tmit-travel-row{display:grid;grid-template-columns:24px 1fr 90px 80px 70px;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.04);align-items:center;cursor:pointer;border-radius:3px;transition:background 0.12s;}
     .tmit-travel-row:hover{background:rgba(151,2,173,0.06);}
     .tmit-travel-row.rank1{border-left:2px solid #ffe066;background:rgba(201,162,39,0.05);}
@@ -1353,6 +1391,113 @@
       if (i + BATCH < ids.length) await new Promise(r => setTimeout(r, 150));
     }
     return live;
+  }
+
+  // ── Bazaar undercut fetch (v6.8.0) ─────────────────────────────────────────
+  //
+  // `/market/{id}?selections=bazaar` is a v1 endpoint (no v2 equivalent yet)
+  // that returns an array of the cheapest player-Bazaar listings for an item.
+  // Each listing has `cost` and `quantity`. Torn intentionally hides
+  // player_id to discourage scraping individual stores — fine for our use
+  // case (we only need "is there anything cheaper than Item Market?").
+  //
+  // The fetch is single-item-at-a-time like fetchLivePrice. We pick the
+  // lowest cost across all listings as the headline Bazaar price.
+
+  async function fetchBazaarPrice(apiKey, itemId) {
+    try {
+      const data = await apiGetWithTimeout(
+        `https://api.torn.com/market/${itemId}?selections=bazaar&key=${apiKey}&comment=TEEM`,
+        6000
+      );
+      if (!data || data._error || data.error) return null;
+      const listings = Array.isArray(data.bazaar) ? data.bazaar : null;
+      if (!listings || !listings.length) return null;
+      let cheapest = null;
+      for (const l of listings) {
+        const cost = l && (l.cost ?? l.price);
+        if (typeof cost !== 'number' || cost <= 0) continue;
+        if (!cheapest || cost < cheapest.cost) {
+          cheapest = { cost, quantity: l.quantity ?? l.amount ?? 0 };
+        }
+      }
+      if (!cheapest) return null;
+      return { ts: Date.now(), cost: cheapest.cost, quantity: cheapest.quantity };
+    } catch (e) { return null; }
+  }
+
+  // Batched fetch — mirrors fetchLivePrices' 5-at-a-time + 150ms gap pattern
+  // so a watchlist sweep (or "Scan all" click) doesn't slam the API. Honors
+  // the rate-limit gate between batches.
+  async function fetchBazaarBatch(apiKey, itemIds) {
+    if (isRateLimited() || !apiKey || !itemIds?.length) return {};
+    const result = {};
+    const BATCH = 5;
+    const deadline = Date.now() + 35000;
+    for (let i = 0; i < itemIds.length; i += BATCH) {
+      if (Date.now() > deadline) break;
+      if (isRateLimited()) break;
+      const batch = itemIds.slice(i, i + BATCH);
+      const results = await Promise.all(batch.map(id => fetchBazaarPrice(apiKey, id)));
+      batch.forEach((id, j) => { if (results[j]) result[id] = results[j]; });
+      if (i + BATCH < itemIds.length) await new Promise(r => setTimeout(r, 150));
+    }
+    return result;
+  }
+
+  function bazaarIsFresh(itemId) {
+    const b = bazaarPrices[itemId];
+    return !!b && (Date.now() - b.ts) < BAZAAR_TTL_MS;
+  }
+
+  // On-demand fetch triggered by the 💰 button. Three short-circuits:
+  //   - cached fresh (< 30 min) → no API call, just rerender
+  //   - already in-flight from a previous click → ignore
+  //   - rate-limited → bail with notice
+  async function fetchBazaarOnDemand(itemId, btnEl) {
+    if (!settings.apiKey) { showTeemNotice('Add a Torn API key first', 'err'); return; }
+    if (isRateLimited()) { showTeemNotice(`Rate-limited · retry in ${rateLimitRemainingSec()}s`, 'err'); return; }
+    if (_bazaarInFlight.has(itemId)) return;
+    if (bazaarIsFresh(itemId)) {
+      showTeemNotice('Bazaar data still fresh (< 30 min old)');
+      return;
+    }
+    _bazaarInFlight.add(itemId);
+    let prevLabel;
+    if (btnEl) { prevLabel = btnEl.textContent; btnEl.textContent = '…'; btnEl.style.opacity = '0.6'; }
+    try {
+      const result = await fetchBazaarPrice(settings.apiKey, itemId);
+      if (result) {
+        bazaarPrices[itemId] = result;
+        saveBazaarPrices();
+        showTeemNotice('Bazaar updated', 'ok');
+        if (settings.activeTab === 'war') renderWarTab();
+        else renderList();
+      } else {
+        showTeemNotice('No Bazaar listings found');
+      }
+    } finally {
+      _bazaarInFlight.delete(itemId);
+      if (btnEl) { btnEl.textContent = prevLabel ?? '💰'; btnEl.style.opacity = ''; }
+    }
+  }
+
+  // Render helper — produces the inline pill HTML for a row when we have a
+  // meaningful Bazaar undercut. Empty string when nothing to show, so callers
+  // can splice it into the row template unconditionally.
+  function buildBazaarPill(itemId, marketPrice, opts) {
+    const b = bazaarPrices[itemId];
+    if (!b || !b.cost || !(marketPrice > 0)) return '';
+    const diffPct = ((b.cost - marketPrice) / marketPrice) * 100;
+    if (diffPct > -BAZAAR_MIN_UNDERCUT_PCT) return ''; // no meaningful undercut
+    const fmt = b.cost >= 1_000_000_000 ? `$${(b.cost / 1e9).toFixed(2)}B`
+              : b.cost >= 1_000_000     ? `$${(b.cost / 1e6).toFixed(1)}M`
+              : `$${b.cost.toLocaleString()}`;
+    const ageMin = Math.floor((Date.now() - b.ts) / 60000);
+    const ageTxt = ageMin < 1 ? 'just now' : ageMin + 'm ago';
+    const qty = b.quantity ? ` · qty ${b.quantity}` : '';
+    const cls = opts?.compact ? 'tmit-bazaar-pill compact' : 'tmit-bazaar-pill';
+    return `<span class="${cls}" title="Bazaar undercut · ${ageTxt}${qty}">💰 ${fmt} (${diffPct.toFixed(0)}%)</span>`;
   }
 
   // ── Crime tracker ─────────────────────────────────────────────────────────
@@ -1918,6 +2063,31 @@
       // Step 4: Fetch live prices for priority items
       const livePrices = await fetchLivePrices(settings.apiKey);
 
+      // Step 4b: Background Bazaar sweep (v6.8.0). Only watchlist items, only
+      // every BAZAAR_POLL_EVERY-th cycle, capped at BAZAAR_WATCHLIST_CAP, and
+      // skipped entirely if recently fetched (the 30-min TTL means a fresh
+      // cache entry doesn't need refreshing). High-priced + War-Gear items
+      // are user-triggered via the 💰 button to keep the background bill
+      // close to zero — see fetchBazaarOnDemand.
+      if (
+        watchlist.size > 0 &&
+        pollCounter % BAZAAR_POLL_EVERY === 0 &&
+        !isRateLimited()
+      ) {
+        const stale = [...watchlist]
+          .filter(id => Number.isFinite(id) && !bazaarIsFresh(id))
+          .slice(0, BAZAAR_WATCHLIST_CAP);
+        if (stale.length) {
+          const fresh = await fetchBazaarBatch(settings.apiKey, stale);
+          let touched = false;
+          for (const [id, snap] of Object.entries(fresh)) {
+            bazaarPrices[id] = snap;
+            touched = true;
+          }
+          if (touched) saveBazaarPrices();
+        }
+      }
+
       // Also fetch YATA travel stock + foreign buy prices for the travel tab.
       // YATA shape (as of 2026-05): { stocks: { mex: { stocks: [ {id, quantity, cost}, ... ] }, ... } }
       // We populate two caches in parallel keyed by TEEM-internal country code:
@@ -2244,7 +2414,13 @@
 
       <!-- War Gear Tab -->
       <div id="tmit-war-panel" class="tmit-tab-panel" style="display:none;flex:1;overflow-y:auto;padding:12px;">
-        <div class="tmit-section-title">\u2694 War Gear Price Tracker</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+          <div class="tmit-section-title" style="margin:0;padding:0;border:none;">\u2694 War Gear Price Tracker</div>
+          <button id="tmit-bazaar-scan-war" class="tmit-bazaar-scan-btn"
+            title="Fetch Bazaar prices for every War Gear item (one burst, ~30-90 API calls). Each lookup cached 30 min so re-clicks are free.">
+            \ud83d\udcb0 Scan all
+          </button>
+        </div>
         <div style="display:grid;grid-template-columns:1fr 80px 80px 70px 55px;padding:4px 8px;background:rgba(0,0,0,0.4);border:1px solid rgba(201,162,39,0.12);border-radius:4px 4px 0 0;margin-bottom:1px;">
           <div class="tmit-col-hdr">Item Name</div>
           <div class="tmit-col-hdr" style="text-align:right">Price</div>
@@ -2936,6 +3112,50 @@
       }
     });
 
+    // Bazaar on-demand buttons (Market + War Gear rows) and the "Scan all"
+    // button at the top of the War Gear tab. All three go through
+    // fetchBazaarOnDemand / fetchBazaarBatch, which respect the 30-min
+    // cache + the existing rate-limit gate.
+    panel.addEventListener('click', async (e) => {
+      const bazBtn = e.target.closest('.tmit-bazaar-btn, .tmit-war-bazaar-btn');
+      if (bazBtn) {
+        e.stopPropagation();
+        const id = parseInt(bazBtn.dataset.id);
+        if (Number.isFinite(id)) fetchBazaarOnDemand(id, bazBtn);
+        return;
+      }
+      const scanBtn = e.target.closest('#tmit-bazaar-scan-war');
+      if (scanBtn) {
+        if (!settings.apiKey) { showTeemNotice('Add a Torn API key first', 'err'); return; }
+        if (isRateLimited())  { showTeemNotice(`Rate-limited · retry in ${rateLimitRemainingSec()}s`, 'err'); return; }
+        const ids = Object.keys(itemMeta)
+          .filter(k => !String(k).startsWith('rw_'))
+          .map(k => parseInt(k))
+          .filter(id => {
+            const m = itemMeta[id];
+            return m && isRWItem(m.name, m.type) && !bazaarIsFresh(id);
+          });
+        if (!ids.length) {
+          showTeemNotice('All War Gear Bazaar data already fresh (< 30 min)', 'ok');
+          return;
+        }
+        scanBtn.disabled = true;
+        const prev = scanBtn.textContent;
+        scanBtn.textContent = `💰 Scanning ${ids.length}…`;
+        try {
+          const fresh = await fetchBazaarBatch(settings.apiKey, ids);
+          const count = Object.keys(fresh).length;
+          Object.assign(bazaarPrices, fresh);
+          if (count) saveBazaarPrices();
+          showTeemNotice(`Bazaar scan complete · ${count} updates`, count ? 'ok' : null);
+          if (settings.activeTab === 'war') renderWarTab();
+        } finally {
+          scanBtn.disabled = false;
+          scanBtn.textContent = prev;
+        }
+      }
+    });
+
     // Export button
     panel.querySelector('#tmit-btn-export')?.addEventListener('click', exportCurrentView);
 
@@ -3367,6 +3587,15 @@
         ? `<span class="tmit-war-spark" title="7d price trend">${sparkSvg}</span>`
         : `<span class="tmit-war-spark empty" title="Need more poll cycles for a 7d trend">no 7d data</span>`;
 
+      // v6.8.0 \u2014 Bazaar pill + per-row check button.
+      // Pill only renders when there's a meaningful undercut; button is
+      // always available (one click \u2192 fetchBazaarOnDemand).
+      const bazPill = buildBazaarPill(r.itemId, r.currentPrice, { compact: true });
+      const bazFresh = bazaarIsFresh(r.itemId);
+      const bazBtn = `<button class="tmit-war-bazaar-btn" data-id="${r.itemId}"
+        title="Check Bazaar price (1 API call \u00b7 30-min cache)"
+        style="opacity:${bazFresh ? '0.5' : '1'};">\ud83d\udcb0</button>`;
+
       return `<div class="tmit-war-row ${rarity ? rarity+'-item' : ''}">
         <div class="tmit-war-info">
           <div class="tmit-war-name" title="${r.name}">${rarityDot}${r.name}</div>
@@ -3374,6 +3603,8 @@
           <div class="tmit-war-meta">
             ${sigPill}
             ${sparkCell}
+            ${bazPill}
+            ${bazBtn}
           </div>
         </div>
         <div class="tmit-war-price" style="text-align:right">$${r.currentPrice >= 1_000_000
@@ -3462,13 +3693,14 @@
       const watchedCls = isPinned ? ' tmit-watched' : '';
       const badgeTitle = isPinned ? 'Click to remove from watchlist' : 'Click to add to watchlist';
 
+      const bazaarPill = buildBazaarPill(r.itemId, r.currentPrice, { compact: true });
       return `
         <div class="${finalClass}" data-item-id="${r.itemId}">
           <div>
             <div class="tmit-item-name">
               ${spikeIcon ? `<span class="tmit-spike-icon">${spikeIcon}</span>` : ''}${r.name}
             </div>
-            <div class="tmit-item-type">${r.type}</div>
+            <div class="tmit-item-type">${r.type}${bazaarPill ? ' \u00b7 ' + bazaarPill : ''}</div>
           </div>
           <div class="tmit-price">$${r.currentPrice.toLocaleString()}</div>
           <div class="tmit-change ${changeClass}">${changeSign}${r.changePct}%</div>
@@ -3480,6 +3712,8 @@
             <button class="tmit-row-btn tmit-pin-row" data-id="${r.itemId}"
               title="${isPinned ? 'Remove from watchlist' : 'Add to watchlist'}"
               style="color:${isPinned ? '#c9a227' : 'rgba(201,162,39,0.3)'};">\u2605</button>
+            <button class="tmit-row-btn tmit-bazaar-btn" data-id="${r.itemId}"
+              title="Check Bazaar price (1 API call \u00b7 30-min cache)" style="color:#ffc94d;">\ud83d\udcb0</button>
             <button class="tmit-row-btn tmit-buy-btn" data-id="${r.itemId}" data-name="${r.name}" data-cat="${r.type}"
               title="Buy on market" style="color:#3dd6c8;">\ud83d\uded2</button>
             <button class="tmit-row-btn tmit-sell-btn" data-id="${r.itemId}" data-name="${r.name}"
