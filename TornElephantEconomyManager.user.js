@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.8.2
+// @version      6.8.3
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -24,7 +24,7 @@
 
 
   const SCRIPT_KEY     = 'tmit_';
-  const SCRIPT_VERSION = '6.8.2';
+  const SCRIPT_VERSION = '6.8.3';
 
   // Torn PDA (mobile) runs userscripts inside a Flutter WebView. We detect it
   // so we can skip browser-only APIs (Notification) and switch the layout to
@@ -2286,15 +2286,18 @@
       const srcLabel  = liveCount > 0 ? `\u26a1 ${liveCount} live` : '~ Avg';
       setStatus('ok', `${srcLabel} \u00b7 ${new Date().toLocaleTimeString()}`);
 
-      // Fetch inventory + crime data in a single user/ call. Crimes throttled
-      // to every 5 min so the response stays small most of the time.
+      // v6.8.3 — split this into two endpoints:
+      //   1. Inventory still comes from v1 /user/?selections=inventory
+      //      (no v2 equivalent for the inventory shape we consume)
+      //   2. Crimes 2.0 nested shape (offenses + skills + version:"v2")
+      //      only comes from v2 /v2/user/personalstats?cat=crimes. The
+      //      v1 selections=personalstats endpoint returns the flat legacy
+      //      fields like `criminaloffenses` but NOT the nested object,
+      //      which is why every v6.8.0-v6.8.2 install saw a single lumped
+      //      "Criminal Offenses" row instead of the per-category breakdown.
       try {
-        const wantCrimes = (Date.now() - lastCrimeFetch) > CRIME_FETCH_INTERVAL_MS;
-        const sels = wantCrimes
-          ? 'inventory,crimes,personalstats'
-          : 'inventory';
         const inv = await apiGet(
-          `https://api.torn.com/user/?selections=${sels}&key=${settings.apiKey}&comment=TEEM`
+          `https://api.torn.com/user/?selections=inventory&key=${settings.apiKey}&comment=TEEM`
         );
         if (inv?.inventory) {
           userInventory = {};
@@ -2303,13 +2306,25 @@
             if (id) userInventory[id] = { name: item.name ?? '', quantity: item.quantity ?? 1 };
           }
         }
-        if (wantCrimes && !inv?.error) {
-          appendCrimeSnapshot(inv);
-          lastCrimeFetch = Date.now();
-          const panelEl2 = document.getElementById('tmit-panel');
-          if (panelEl2 && !panelEl2.classList.contains('tmit-hidden')
-              && settings.activeTab === 'crimes') {
-            try { renderCrimesTab(); } catch(e) {}
+      } catch(e) { /* optional */ }
+
+      // Crime fetch — throttled to every 5 min via lastCrimeFetch. Separate
+      // try/catch so an inventory hiccup doesn't skip the crime poll.
+      try {
+        const wantCrimes = (Date.now() - lastCrimeFetch) > CRIME_FETCH_INTERVAL_MS;
+        if (wantCrimes && !isRateLimited()) {
+          const crimeData = await apiGetWithTimeout(
+            `https://api.torn.com/v2/user/personalstats?cat=crimes&key=${settings.apiKey}&comment=TEEM`,
+            6000
+          );
+          if (crimeData && !crimeData._error && !crimeData.error) {
+            appendCrimeSnapshot(crimeData);
+            lastCrimeFetch = Date.now();
+            const panelEl2 = document.getElementById('tmit-panel');
+            if (panelEl2 && !panelEl2.classList.contains('tmit-hidden')
+                && settings.activeTab === 'crimes') {
+              try { renderCrimesTab(); } catch(e) {}
+            }
           }
         }
       } catch(e) { /* optional */ }
