@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.8.1
+// @version      6.8.2
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -24,7 +24,7 @@
 
 
   const SCRIPT_KEY     = 'tmit_';
-  const SCRIPT_VERSION = '6.8.1';
+  const SCRIPT_VERSION = '6.8.2';
 
   // Torn PDA (mobile) runs userscripts inside a Flutter WebView. We detect it
   // so we can skip browser-only APIs (Notification) and switch the layout to
@@ -1723,12 +1723,32 @@
     // v6.8.1 — prefer `s.offenses` (Crimes 2.0 categories) and fall back
     // to legacy `s.crimes` for snapshots taken before the v6.8.1 upgrade
     // (they age out of the 24h window naturally).
+    //
+    // v6.8.2 — once ANY v2 snapshot appears in the window, hide legacy v1
+    // wildcard keys (criminaloffenses, etc) so they don't dominate the
+    // recent-attempts sort while the 24h transition is in progress. The
+    // pre-6.8.1 snapshots in the window still carry old `crimes` blobs
+    // with single-counter keys; without this, "Criminal Offenses" wins
+    // the Top 3 sort for a full day post-upgrade just because it has the
+    // longest history of accumulated wildcard hits.
+    const v2OffenseKeys = new Set();
+    let hasV2InWindow = false;
+    for (const s of window) {
+      if (s.schema === 'v2' && s.offenses) {
+        hasV2InWindow = true;
+        for (const k of Object.keys(s.offenses)) v2OffenseKeys.add(k);
+      }
+    }
+
     const perCrime = [];
     let totalAttempts = 0;
     const crimeKeys = new Set();
     for (const s of window) {
       const src = s.offenses || s.crimes || {};
-      for (const k of Object.keys(src)) crimeKeys.add(k);
+      for (const k of Object.keys(src)) {
+        if (hasV2InWindow && !v2OffenseKeys.has(k)) continue;
+        crimeKeys.add(k);
+      }
     }
 
     for (const k of crimeKeys) {
@@ -1777,7 +1797,10 @@
       }
       return {};
     })();
-    const schema = window[window.length - 1]?.schema || 'v1';
+    // v6.8.2 — if any window snapshot is v2, treat the whole window as v2
+    // so the UI flips to "Categories" + Skill Ladder immediately on first
+    // v2 poll, not after the latest one happens to be v2.
+    const schema = hasV2InWindow ? 'v2' : 'v1';
 
     // Money delta — find first/last snapshot that has a non-null money
     // total. Same defense against the v6.2.x parser-upgrade jump.
