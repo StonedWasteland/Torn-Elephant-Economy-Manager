@@ -24,7 +24,7 @@
 
 
   const SCRIPT_KEY     = 'tmit_';
-  const SCRIPT_VERSION = '6.8.0';
+  const SCRIPT_VERSION = '6.8.1';
 
   // Torn PDA (mobile) runs userscripts inside a Flutter WebView. We detect it
   // so we can skip browser-only APIs (Notification) and switch the layout to
@@ -1515,32 +1515,66 @@
   function appendCrimeSnapshot(data) {
     if (!data) return;
     const ps = data.personalstats ?? {};
+    const pc = ps.crimes;
 
-    // Crimes 2.0 moved per-crime counters around. Pull from every plausible
-    // location and merge — later sources win on key collisions, but in
-    // practice the keys don't overlap between locations.
-    const merged = {
-      ...flattenCrimeCounts(data.crimes),
-      ...flattenCrimeCounts(ps.crimes),
-    };
+    // v6.8.1 — Crimes 2.0 detection. Migrated personalstats shape:
+    //   personalstats.crimes = {
+    //     offenses: { theft, fraud, vandalism, ..., total },
+    //     skills:   { shoplifting:0..100, pickpocketing:0..100, ... },
+    //     total, version: "v2"
+    //   }
+    // Pre-migration accounts fall through to the legacy wildcard branch
+    // below so old shapes keep working without surfacing the wrong shape.
+    const isV2 = pc && typeof pc === 'object' && pc.version === 'v2'
+      && pc.offenses && typeof pc.offenses === 'object';
 
-    // Also harvest any flat `<verb>success`/`<verb>fails`-style keys directly
-    // from personalstats (the pre-Crimes-2.0 shape; some accounts still see
-    // these). Examples: criminaloffenses, theftsuccess, mugged, etc.
-    for (const [k, v] of Object.entries(ps)) {
-      if (typeof v !== 'number') continue;
-      const kl = k.toLowerCase();
-      if (kl.startsWith('crim') || kl.endsWith('success') || kl.endsWith('fails')
-          || kl === 'mugged' || kl === 'pickpocket' || kl === 'shoplift'
-          || kl === 'thefts'  || kl === 'frauds'     || kl === 'autotheft'
-          || kl === 'forgeries' || kl === 'hustling') {
-        if (merged[k] === undefined) merged[k] = v;
+    let merged = {};
+    let skills = {};
+    let totalCount = 0;
+    let schema = 'v1';
+
+    if (isV2) {
+      schema = 'v2';
+      for (const [k, v] of Object.entries(pc.offenses)) {
+        if (k === 'total') continue;
+        if (typeof v === 'number') merged[k] = v;
       }
+      if (pc.skills && typeof pc.skills === 'object') {
+        for (const [k, v] of Object.entries(pc.skills)) {
+          if (typeof v === 'number') skills[k] = v;
+        }
+      }
+      totalCount = typeof pc.total === 'number'
+        ? pc.total
+        : (typeof pc.offenses.total === 'number' ? pc.offenses.total : 0);
+    } else {
+      // Legacy v1 — keep old wildcard behavior. Stored in `merged` so
+      // the downstream snap structure is identical regardless of schema.
+      merged = {
+        ...flattenCrimeCounts(data.crimes),
+        ...flattenCrimeCounts(ps.crimes),
+      };
+      for (const [k, v] of Object.entries(ps)) {
+        if (typeof v !== 'number') continue;
+        const kl = k.toLowerCase();
+        if (kl.startsWith('crim') || kl.endsWith('success') || kl.endsWith('fails')
+            || kl === 'mugged' || kl === 'pickpocket' || kl === 'shoplift'
+            || kl === 'thefts'  || kl === 'frauds'     || kl === 'autotheft'
+            || kl === 'forgeries' || kl === 'hustling') {
+          if (merged[k] === undefined) merged[k] = v;
+        }
+      }
+      totalCount = merged.total ?? merged.criminaloffenses ?? 0;
     }
 
+    // Money attribution. Crimes 2.0 doesn't expose per-category money in
+    // personalstats.crimes anymore, but a legacy money_mugged etc. may
+    // still appear on older accounts. We keep the field for compatibility
+    // but the rebuilt Crimes tab no longer leans on the bogus per-attempt
+    // share split — that produced wildly wrong $/hr numbers.
     const moneyFromCrime =
-      (ps.crimes && typeof ps.crimes === 'object'
-        ? (ps.crimes.money_mugged ?? ps.crimes.money_earned ?? 0)
+      (pc && typeof pc === 'object'
+        ? (pc.money_mugged ?? pc.money_earned ?? 0)
         : 0)
       || ps.moneymugged
       || ps.money_mugged
@@ -1548,9 +1582,14 @@
       || 0;
 
     const snap = {
-      ts:     Date.now(),
-      crimes: merged,
-      money:  moneyFromCrime || null,
+      ts:        Date.now(),
+      offenses:  merged,                // per-category attempts (v2) or legacy flat counts
+      skills,                           // sub-crime skill levels 0..100 (v2 only, {} on v1)
+      total:     totalCount,            // aggregate count from API
+      money:     moneyFromCrime || null,
+      schema,                           // 'v2' or 'v1'
+      // Backwards-compat alias so old in-flight rows keep working.
+      crimes:    merged,
     };
 
     // Diagnostic: log the shape when we find nothing useful, so the user
@@ -1640,6 +1679,17 @@
     disposal:                 'Disposal',
     computercrimes:           'Computer Crimes',
     computer_crimes:          'Computer Crimes',
+    // ── Crimes 2.0 — top-level "offenses" categories (v6.8.1) ──
+    vandalism:                'Vandalism',
+    theft:                    'Theft',
+    illicit_services:         'Illicit Services',
+    cybercrime:               'Cybercrime',
+    extortion:                'Extortion',
+    illegal_production:       'Illegal Production',
+    organized_crimes:         'Organized Crimes',
+    // ── Crimes 2.0 — sub-crime "skills" ──
+    card_skimming:            'Card Skimming',
+    cardskimming:             'Card Skimming',
   };
   function prettifyCrimeKey(key) {
     const lc = String(key).toLowerCase();
@@ -1669,40 +1719,65 @@
     // it actually appears, not the global first/last — otherwise a key that
     // gets newly tracked mid-window produces a fake gigantic delta against
     // the implicit 0 baseline.
+    //
+    // v6.8.1 — prefer `s.offenses` (Crimes 2.0 categories) and fall back
+    // to legacy `s.crimes` for snapshots taken before the v6.8.1 upgrade
+    // (they age out of the 24h window naturally).
     const perCrime = [];
     let totalAttempts = 0;
     const crimeKeys = new Set();
     for (const s of window) {
-      for (const k of Object.keys(s.crimes || {})) crimeKeys.add(k);
+      const src = s.offenses || s.crimes || {};
+      for (const k of Object.keys(src)) crimeKeys.add(k);
     }
 
     for (const k of crimeKeys) {
       let firstVal = null, firstTs = 0, lastVal = null, lastTs = 0;
       for (const s of window) {
-        const v = s.crimes?.[k];
+        const src = s.offenses || s.crimes || {};
+        const v = src[k];
         if (typeof v !== 'number') continue;
         if (firstVal === null) { firstVal = v; firstTs = s.ts; }
         lastVal = v; lastTs = s.ts;
       }
-      if (firstVal === null || lastVal === null || lastTs === firstTs) continue;
+      if (firstVal === null || lastVal === null) continue;
       const delta = Math.max(0, lastVal - firstVal);
-      if (delta <= 0) continue;
+      // Two distinct "no recent activity" cases we both want to keep
+      // visible in the All Crimes list (just with attempts=0):
+      //   1. Only one snapshot contains the key (lastTs === firstTs)
+      //   2. Key appears in multiple snapshots but value never changed
+      // Without keeping these, an active category that's idle for an hour
+      // would silently vanish from the list. Only the "Top 3" sort cares
+      // about recent attempts; the full list shows all-time too.
       const keyHours = (lastTs - firstTs) / 3_600_000;
-      if (keyHours <= 0) continue;
-      totalAttempts += delta;
+      if (delta > 0 && keyHours > 0) totalAttempts += delta;
       perCrime.push({
         key:           k,
         name:          prettifyCrimeKey(k),
         attempts:      delta,
-        attemptsPerHr: delta / keyHours,
+        attemptsPerHr: keyHours > 0 ? delta / keyHours : 0,
         totalAllTime:  lastVal,
         keyHours,
       });
     }
-    perCrime.sort((a, b) => b.attempts - a.attempts);
-    // Share = portion of recent crime time spent on this one. Used as a
-    // proxy for $-allocation when we can't get per-crime money directly.
+    // Sort by recent attempts desc, then by all-time desc as tiebreaker.
+    perCrime.sort((a, b) =>
+      (b.attempts - a.attempts) || (b.totalAllTime - a.totalAllTime)
+    );
     for (const c of perCrime) c.share = totalAttempts > 0 ? c.attempts / totalAttempts : 0;
+
+    // Latest skills snapshot (Crimes 2.0 only). Skills don't trend — they're
+    // a 0..100 cap-tracking number — so we just surface the most recent
+    // snapshot's values for the UI's "skill ladder" section.
+    const latestSkills = (() => {
+      for (let i = window.length - 1; i >= 0; i--) {
+        if (window[i].skills && Object.keys(window[i].skills).length > 0) {
+          return window[i].skills;
+        }
+      }
+      return {};
+    })();
+    const schema = window[window.length - 1]?.schema || 'v1';
 
     // Money delta — find first/last snapshot that has a non-null money
     // total. Same defense against the v6.2.x parser-upgrade jump.
@@ -1719,12 +1794,12 @@
       if (moneyDelta > 0 && moneyHours > 0) moneyPerHr = Math.round(moneyDelta / moneyHours);
     }
 
-    // Spread the money across crimes by share — best-effort attribution
-    // since the Torn API doesn't return per-crime money breakdowns.
-    if (moneyPerHr) {
-      for (const c of perCrime) c.moneyPerHr = Math.round(moneyPerHr * c.share);
-    }
-
+    // v6.8.1 — dropped the per-attempt money-share split. Crimes 2.0
+    // doesn't expose per-category money, so distributing the aggregate by
+    // attempt share produced wildly wrong $/hr numbers (a maxed-out user
+    // doing 60 cheap shoplifts/hr looked the same as one nailing 1 burglary
+    // worth millions). The tab now leans on attempts + skill levels, and
+    // shows the aggregate moneyPerHr only as a single sanity-check line.
     return {
       perCrime,
       totalAttempts,
@@ -1732,6 +1807,8 @@
       moneyPerHr,
       windowHours,
       sampleCount: window.length,
+      skills: latestSkills,
+      schema,
     };
   }
 
@@ -3380,8 +3457,11 @@
       // wrong fields from the API response. Surface that explicitly with
       // copy-paste-ready debug info.
       const last       = crimeSnapshots[crimeSnapshots.length - 1];
-      const keyCount   = last?.crimes ? Object.keys(last.crimes).length : 0;
-      const sampleKeys = last?.crimes ? Object.keys(last.crimes).slice(0, 6).join(', ') : '\u2014';
+      const src        = (last?.offenses && Object.keys(last.offenses).length)
+        ? last.offenses
+        : (last?.crimes || {});
+      const keyCount   = Object.keys(src).length;
+      const sampleKeys = keyCount ? Object.keys(src).slice(0, 6).join(', ') : '\u2014';
       bestEl.innerHTML = '';
       listEl.innerHTML = `<div class="tmit-state-msg" style="padding:18px 0;text-align:left;font-size:11px;line-height:1.7;">
         <div style="text-align:center;font-size:24px;margin-bottom:8px;">\ud83d\udd0d</div>
@@ -3401,37 +3481,62 @@
     } else {
       const top3 = rates.perCrime.slice(0, 3);
       bestEl.innerHTML = `
-        <div class="tmit-section-title" style="margin:0 0 6px;">\u26a1 Your Top 3 Crimes (last ${rates.windowHours.toFixed(1)}h)</div>
+        <div class="tmit-section-title" style="margin:0 0 6px;">\u26a1 Your Top 3 ${rates.schema === 'v2' ? 'Categories' : 'Crimes'} (last ${rates.windowHours.toFixed(1)}h)</div>
         ${top3.length === 0
           ? '<div style="font-size:11px;color:#9886b8;padding:6px 0;">No crime activity detected in window.</div>'
           : `<div style="display:flex;flex-direction:column;gap:6px;">
               ${top3.map((c, i) => {
                 const medal = i === 0 ? '\ud83e\udd47' : i === 1 ? '\ud83e\udd48' : '\ud83e\udd49';
                 const rankCol = i === 0 ? '#ffe066' : i === 1 ? '#c0c0c0' : '#cd7f32';
-                const moneyLine = c.moneyPerHr
-                  ? `<span style="color:#50dc82;font-weight:700;">${fmtM(c.moneyPerHr)}/hr</span>`
-                  : `<span style="color:#9886b8;">\u2014</span>`;
-                return `<div style="display:grid;grid-template-columns:28px 1fr 90px 70px;gap:8px;
+                return `<div style="display:grid;grid-template-columns:28px 1fr 90px 80px;gap:8px;
                           align-items:center;padding:7px 10px;background:rgba(0,0,0,0.3);
                           border:1px solid rgba(201,162,39,0.18);border-left:3px solid ${rankCol};
                           border-radius:6px;">
                   <div style="font-size:16px;text-align:center;">${medal}</div>
                   <div>
                     <div style="font-size:12px;color:#e8caf5;font-weight:600;">${c.name}</div>
-                    <div style="font-size:9px;color:#9886b8;">${c.attempts} attempts \u00b7 ${c.attemptsPerHr.toFixed(1)}/hr \u00b7 ${(c.share*100).toFixed(0)}% of crime time</div>
+                    <div style="font-size:9px;color:#9886b8;">${c.attempts} attempts \u00b7 ${(c.share*100).toFixed(0)}% of recent activity</div>
                   </div>
-                  <div style="text-align:right;font-family:monospace;font-size:11px;">${moneyLine}</div>
+                  <div style="text-align:right;font-family:monospace;font-size:12px;color:#ffe066;font-weight:700;">${c.attemptsPerHr.toFixed(1)}/hr</div>
                   <div style="text-align:right;font-family:monospace;font-size:10px;color:#c9a227;">${c.totalAllTime.toLocaleString()} all-time</div>
                 </div>`;
               }).join('')}
             </div>
             ${rates.moneyPerHr
               ? `<div style="margin-top:8px;font-size:10px;color:#a08fc0;text-align:center;">
-                  Total crime money rate: <b style="color:#50dc82;">${fmtM(rates.moneyPerHr)}/hr</b>
-                  \u00b7 Distributed by attempt share (Torn doesn't expose per-crime money directly)
+                  Aggregate crime money rate: <b style="color:#50dc82;">${fmtM(rates.moneyPerHr)}/hr</b>
+                  \u00b7 Torn doesn't expose per-category money in Crimes 2.0
                 </div>`
-              : '<div style="margin-top:8px;font-size:10px;color:#a08fc0;text-align:center;">No money delta detected \u2014 need a longer window to estimate $/hr.</div>'}
+              : `<div style="margin-top:8px;font-size:10px;color:#9886b8;text-align:center;">Crimes 2.0 doesn't expose per-category money \u2014 attempts are the source of truth.</div>`}
           `}
+        ${(rates.schema === 'v2' && rates.skills && Object.keys(rates.skills).length > 0)
+          ? `<div class="tmit-section-title" style="margin:14px 0 6px;">\ud83c\udfaf Skill Ladder</div>
+             <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px;">
+               ${Object.entries(rates.skills)
+                  .filter(([, v]) => typeof v === 'number')
+                  .sort((a, b) => b[1] - a[1])
+                  .slice(0, 8)
+                  .map(([k, v]) => {
+                    const pct = Math.max(0, Math.min(100, v));
+                    const isMax = v >= 100;
+                    const barCol = isMax ? '#ffe066' : pct >= 75 ? '#50dc82' : pct >= 40 ? '#c9a227' : '#9886b8';
+                    return `<div style="padding:5px 8px;background:rgba(0,0,0,0.25);
+                              border:1px solid rgba(201,162,39,0.12);border-radius:5px;">
+                      <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;
+                                 color:#e8caf5;margin-bottom:3px;">
+                        <span style="font-weight:600;">${prettifyCrimeKey(k)}</span>
+                        <span style="font-family:monospace;color:${barCol};font-weight:700;">${v}${isMax ? ' \u2605' : ''}</span>
+                      </div>
+                      <div style="height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;">
+                        <div style="height:100%;width:${pct}%;background:${barCol};border-radius:2px;"></div>
+                      </div>
+                    </div>`;
+                  }).join('')}
+             </div>
+             <div style="margin-top:6px;font-size:9px;color:#9886b8;text-align:center;">
+               Skills cap at 100. \u2605 marks maxed sub-crimes.
+             </div>`
+          : ''}
       `;
 
       if (rates.perCrime.length === 0) {
@@ -3440,26 +3545,26 @@
         </div>`;
       } else {
         const rows = rates.perCrime.map(c => {
-          const moneyLabel = c.moneyPerHr
-            ? `<span style="color:#50dc82;">${fmtM(c.moneyPerHr)}/hr</span>`
-            : '<span style="color:#9886b8;">\u2014</span>';
-          return `<div style="display:grid;grid-template-columns:1fr 70px 70px 60px;
+          const rateLabel = c.attemptsPerHr > 0
+            ? `${c.attemptsPerHr.toFixed(1)}/hr`
+            : `<span style="color:#5f4a78;">idle</span>`;
+          return `<div style="display:grid;grid-template-columns:1fr 70px 70px 90px;
                     padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.04);
                     align-items:center;font-size:11px;">
             <div style="color:#e8caf5;">${c.name}</div>
             <div style="text-align:right;font-family:monospace;">${c.attempts}</div>
-            <div style="text-align:right;font-family:monospace;">${c.attemptsPerHr.toFixed(1)}/hr</div>
-            <div style="text-align:right;font-family:monospace;">${moneyLabel}</div>
+            <div style="text-align:right;font-family:monospace;">${rateLabel}</div>
+            <div style="text-align:right;font-family:monospace;color:#c9a227;">${c.totalAllTime.toLocaleString()}</div>
           </div>`;
         });
-        listEl.innerHTML = `<div style="display:grid;grid-template-columns:1fr 70px 70px 60px;
+        listEl.innerHTML = `<div style="display:grid;grid-template-columns:1fr 70px 70px 90px;
             padding:4px 8px;background:rgba(0,0,0,0.4);border:1px solid rgba(201,162,39,0.12);
             border-radius:4px 4px 0 0;margin-bottom:1px;font-size:9px;font-weight:700;
             letter-spacing:0.05em;color:#b481cc;text-transform:uppercase;">
-            <div>Crime</div>
-            <div style="text-align:right">Attempts</div>
+            <div>${rates.schema === 'v2' ? 'Category' : 'Crime'}</div>
+            <div style="text-align:right">Recent</div>
             <div style="text-align:right">Rate</div>
-            <div style="text-align:right">$/hr</div>
+            <div style="text-align:right">All-time</div>
           </div>` + rows.join('');
       }
     }
