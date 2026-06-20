@@ -33,10 +33,6 @@
     !!window.flutter_inappwebview ||
     /Torn ?PDA/i.test(navigator.userAgent || '')
   );
-  // Treat any narrow viewport as "mobile" for layout, even outside PDA — this
-  // also covers desktop users who resize the window very small.
-  const IS_MOBILE_VIEWPORT = (typeof window !== 'undefined') && window.innerWidth <= 768;
-
   // Poll intervals are user-configurable via settings — see startPolling()
   // Tiered history retention — keeps long-term trends without storage bloat
   // Resolution tiers per snapshot age:
@@ -1849,8 +1845,67 @@
     }
   }
 
+  // YATA travel-stock endpoint. Returns { stocks, prices } keyed by
+  // TEEM-internal country code. `stocks[code][itemId]` is the raw
+  // available quantity reported by YATA; `prices[code][itemId]` is the
+  // current foreign buy cost (used as the live override for drug prices
+  // in calcTravelProfit). Returns null on network/parse failure so the
+  // caller can leave the existing caches untouched rather than wiping
+  // them with empty objects.
+  async function fetchYataTravelStock() {
+    try {
+      const travelData = await apiGet('https://yata.life/api/v1/travel/export/?format=json');
+      const countries = travelData?.stocks;
+      if (!countries || travelData.error) return null;
+      const stocks = {};
+      const prices = {};
+      for (const [yataCode, countryData] of Object.entries(countries)) {
+        const teemCode = YATA_TO_TEEM[yataCode];
+        if (!teemCode) continue;
+        stocks[teemCode] = {};
+        prices[teemCode] = {};
+        const items = Array.isArray(countryData?.stocks) ? countryData.stocks : [];
+        for (const it of items) {
+          if (typeof it?.id !== 'number') continue;
+          if (typeof it.quantity === 'number') stocks[teemCode][it.id] = it.quantity;
+          if (typeof it.cost     === 'number') prices[teemCode][it.id] = it.cost;
+        }
+      }
+      if (Object.keys(stocks).length === 0) return null;
+      return { stocks, prices };
+    } catch(e) {
+      return null;
+    }
+  }
+
   function getTimeframeMs(label) {
     return TIMEFRAMES.find(t => t.label === label)?.ms ?? TIMEFRAMES[2].ms;
+  }
+
+  // Centralise the analysisCache row shape so the three call sites
+  // (thin-data early return, full analysis return, runAnalysis no-history
+  // fallback) can't drift apart. Pass computed fields via `fields` to
+  // override defaults.
+  function makeAnalysisRow(itemId, tornPrice, yataPrice, currentPrice, fields) {
+    return {
+      itemId: parseInt(itemId),
+      name: itemMeta[itemId]?.name ?? `Item #${itemId}`,
+      type: itemMeta[itemId]?.type ?? 'Unknown',
+      currentPrice,
+      tornPrice,
+      yataPrice,
+      changePct: 0,
+      volatility: 0,
+      trendPct: 0,
+      signal: 'WATCH',
+      confidence: 0,
+      isSpike: false,
+      isBigSpike: false,
+      dataPoints: 0,
+      dataSources: (tornPrice ? 1 : 0) + (yataPrice ? 1 : 0),
+      thinData: false,
+      ...fields,
+    };
   }
 
   function analyzeItem(itemId, currentPrice, yataPrice, timeframeMs) {
@@ -1860,24 +1915,10 @@
     if (history.length < 2) {
       const effectivePrice = currentPrice || yataPrice || itemMeta[itemId]?.market_value || 0;
       if (!effectivePrice) return null;
-      return {
-        itemId: parseInt(itemId),
-        name: itemMeta[itemId]?.name ?? `Item #${itemId}`,
-        type: itemMeta[itemId]?.type ?? 'Unknown',
-        currentPrice: effectivePrice,
-        tornPrice: currentPrice,
-        yataPrice,
-        changePct: 0,
-        volatility: 0,
-        trendPct: 0,
-        signal: 'WATCH',
-        confidence: 0,
-        isSpike: false,
-        isBigSpike: false,
+      return makeAnalysisRow(itemId, currentPrice, yataPrice, effectivePrice, {
         dataPoints: history.length,
-        dataSources: (currentPrice ? 1 : 0) + (yataPrice ? 1 : 0),
         thinData: true,
-      };
+      });
     }
 
     const now = Date.now();
@@ -1944,15 +1985,7 @@
     const isBigSpike = trustworthy && Math.abs(changePct) > 50;
 
     // Data source confidence
-    const dataSources = (currentPrice ? 1 : 0) + (yataPrice ? 1 : 0);
-
-    return {
-      itemId: parseInt(itemId),
-      name: itemMeta[itemId]?.name ?? `Item #${itemId}`,
-      type: itemMeta[itemId]?.type ?? 'Unknown',
-      currentPrice: effectivePrice,
-      tornPrice: currentPrice,
-      yataPrice,
+    return makeAnalysisRow(itemId, currentPrice, yataPrice, effectivePrice, {
       changePct: Math.round(changePct * 10) / 10,
       volatility: Math.round(volatility * 10) / 10,
       trendPct: Math.round(trendPct * 100) / 100,
@@ -1961,8 +1994,7 @@
       isSpike,
       isBigSpike,
       dataPoints: effectiveWindow.length,
-      dataSources,
-    };
+    });
   }
 
   function runAnalysis() {
@@ -1986,24 +2018,9 @@
       const yataPrice = lastYataPrices[id] ?? 0;
       if (!mv && !yataPrice) continue;
       const effectivePrice = mv || yataPrice;
-      results.push({
-        itemId: id,
-        name: meta.name ?? `Item #${id}`,
-        type: meta.type ?? 'Unknown',
-        currentPrice: effectivePrice,
-        tornPrice: mv,
-        yataPrice,
-        changePct: 0,
-        volatility: 0,
-        trendPct: 0,
-        signal: 'WATCH',
-        confidence: 0,
-        isSpike: false,
-        isBigSpike: false,
-        dataPoints: 0,
-        dataSources: (mv ? 1 : 0) + (yataPrice ? 1 : 0),
+      results.push(makeAnalysisRow(idStr, mv, yataPrice, effectivePrice, {
         thinData: true,
-      });
+      }));
     }
 
     // Sort
@@ -2098,6 +2115,18 @@
     return '$';
   }
 
+  // Add every numeric key of `source` to `set`. Optional `skipFn(key)` lets
+  // a caller drop keys before the numeric parse — used by the recordIds
+  // build in poll() to skip the temp `rw_*` seed entries in itemMeta that
+  // aren't real Torn item IDs.
+  function addNumericKeys(set, source, skipFn) {
+    for (const k of Object.keys(source)) {
+      if (skipFn && skipFn(k)) continue;
+      const n = parseInt(k);
+      if (Number.isFinite(n)) set.add(n);
+    }
+  }
+
   async function poll(force = false) {
     if (!settings.apiKey) return;
     // v6.6.7 — back off the entire poll cycle while throttled. pollTimer
@@ -2108,13 +2137,6 @@
       return;
     }
     pollCounter++;
-    const _pollStart = performance.now();
-    const _sections = {};
-    const _sec = (label) => {
-      const now = performance.now();
-      _sections[label] = now;
-      return now;
-    };
 
     try {
       // Only show loading spinner if no cached data is displayed yet
@@ -2188,37 +2210,15 @@
         }
       }
 
-      // Also fetch YATA travel stock + foreign buy prices for the travel tab.
-      // YATA shape (as of 2026-05): { stocks: { mex: { stocks: [ {id, quantity, cost}, ... ] }, ... } }
-      // We populate two caches in parallel keyed by TEEM-internal country code:
-      //   yataStockCache       -> raw available quantity per item
-      //   yataTravelPriceCache -> current foreign buy cost per item (used for drugs)
-      try {
-        const travelData = await apiGet('https://yata.life/api/v1/travel/export/?format=json');
-        const countries = travelData?.stocks;
-        if (countries && !travelData.error) {
-          const stockRes = {};
-          const priceRes = {};
-          for (const [yataCode, countryData] of Object.entries(countries)) {
-            const teemCode = YATA_TO_TEEM[yataCode];
-            if (!teemCode) continue;
-            stockRes[teemCode] = {};
-            priceRes[teemCode] = {};
-            const items = Array.isArray(countryData?.stocks) ? countryData.stocks : [];
-            for (const it of items) {
-              if (typeof it?.id !== 'number') continue;
-              if (typeof it.quantity === 'number') stockRes[teemCode][it.id] = it.quantity;
-              if (typeof it.cost     === 'number') priceRes[teemCode][it.id] = it.cost;
-            }
-          }
-          if (Object.keys(stockRes).length > 0) {
-            yataStockCache = stockRes;
-            yataTravelPriceCache = priceRes;
-          }
-        }
-      } catch(e) { /* silent fail */ }
+      // Travel-stock + foreign buy prices for the travel tab. Helper
+      // returns null on failure so we leave the existing caches in place
+      // rather than blanking them on a transient YATA hiccup.
+      const travelStock = await fetchYataTravelStock();
+      if (travelStock) {
+        yataStockCache       = travelStock.stocks;
+        yataTravelPriceCache = travelStock.prices;
+      }
 
-      _sec('beforeSnapshots');
       // Record price snapshots.
       // Iterate the union of itemMeta + livePrices + yataPrices keys so we
       // record snapshots even when torn/items has failed and itemMeta is
@@ -2228,19 +2228,9 @@
       // Priority: live listing > YATA > market_value
       // market_value is recorded only if it changed since last snapshot.
       const recordIds = new Set();
-      for (const k of Object.keys(itemMeta)) {
-        if (String(k).startsWith('rw_')) continue;
-        const n = parseInt(k);
-        if (Number.isFinite(n)) recordIds.add(n);
-      }
-      for (const k of Object.keys(livePrices)) {
-        const n = parseInt(k);
-        if (Number.isFinite(n)) recordIds.add(n);
-      }
-      for (const k of Object.keys(yataPrices)) {
-        const n = parseInt(k);
-        if (Number.isFinite(n)) recordIds.add(n);
-      }
+      addNumericKeys(recordIds, itemMeta, k => String(k).startsWith('rw_'));
+      addNumericKeys(recordIds, livePrices);
+      addNumericKeys(recordIds, yataPrices);
 
       for (const id of recordIds) {
         const meta      = itemMeta[id];
@@ -2329,33 +2319,16 @@
         }
       } catch(e) { /* optional */ }
 
-      _sec('beforeAnalyze');
       recomputeTravel();
       // Always refresh analysisCache so the next poll's priority list and
       // spike alerts stay accurate. But skip the expensive DOM render and
       // travel-tab render unless the panel is actually visible — that's
       // what was making the script periodically hammer the main thread.
       runAnalysis();
-      _sec('afterAnalyze');
       const panelEl = document.getElementById('tmit-panel');
       if (panelEl && !panelEl.classList.contains('tmit-hidden')) {
         renderList();
         if (settings.activeTab === 'travel') renderTravelTab();
-      }
-      _sec('end');
-
-      // Log per-section timings only if poll took noticeable time. Tags
-      // each section so we can see WHERE the time went, not just that the
-      // poll was slow overall.
-      const totalDur = performance.now() - _pollStart;
-      if (totalDur > 200) {
-        const parts = [];
-        let prev = _pollStart;
-        for (const [k, t] of Object.entries(_sections)) {
-          parts.push(`${k}=${Math.round(t - prev)}ms`);
-          prev = t;
-        }
-        console.warn(`[TEEM poll] ${Math.round(totalDur)}ms total \u2014 ${parts.join(', ')}`);
       }
     } catch(e) { setStatus('err', e.message.slice(0, 50)); }
   }
