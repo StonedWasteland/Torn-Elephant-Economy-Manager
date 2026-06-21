@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.8.3
+// @version      6.9.1
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -24,7 +24,7 @@
 
 
   const SCRIPT_KEY     = 'tmit_';
-  const SCRIPT_VERSION = '6.8.3';
+  const SCRIPT_VERSION = '6.9.1';
 
   // Torn PDA (mobile) runs userscripts inside a Flutter WebView. We detect it
   // so we can skip browser-only APIs (Notification) and switch the layout to
@@ -200,6 +200,51 @@
   // Resolved at runtime: { 'Xanax': 206, 'LSD': 197, ... }
   let travelItemIdMap = {};
 
+  // ── Foreign Battle Gear (Phase 2 of Travelling 2.0, starts 2026-06-23) ────
+  // Weapons and armor can no longer fly with players. Instead each country
+  // sells a small curated loadout of melee / temp / armor for use abroad
+  // only. Source: Torn newspaper article 2902. Keyed by TEEM country code,
+  // resolved to item IDs at runtime so live YATA stock + price data can be
+  // pulled per item.
+  const FOREIGN_BATTLE_ITEMS = {
+    arg: { melee: ['Macana'],
+           temp:  ['Tear Gas', 'Throwing Knife'],
+           armor: ['Liquid Body Armor'] },
+    can: { melee: ['Ice Pick'],
+           temp:  [],
+           armor: ['Safety Boots'] },
+    cay: { melee: ['Diamond Bladed Knife', 'Naval Cutlass'],
+           temp:  ['Trout'],
+           armor: [] },
+    chi: { melee: ['Katana', 'Twin Tiger Hooks', 'Guandao', 'Bo Staff', 'Wushu Double Axes'],
+           temp:  ['Fireworks'],
+           armor: [] },
+    haw: { melee: [],
+           temp:  ['HEG'],
+           armor: [] },
+    jap: { melee: ['Kodachi', 'Metal Nunchucks', 'Chain Whip', 'Wooden Nunchaku', 'Sai', 'Kama'],
+           temp:  ['Ninja Star'],
+           armor: ['Flexible Body Armor'] },
+    mex: { melee: ['Leather Bullwhip', 'Axe', 'Ninja Claws', 'Samurai Sword'],
+           temp:  ['Claymore Mine'],
+           armor: ['Kevlar Gloves', 'Outer Tactical Vest', 'Flak Jacket'] },
+    saf: { melee: ['Spear', 'Knuckle Dusters'],
+           temp:  ['Smoke Grenade'],
+           armor: ['Combat Helmet', 'Combat Vest', 'Combat Gloves', 'Combat Pants', 'Combat Boots'] },
+    swi: { melee: ['Swiss Army Knife'],
+           temp:  ['Flash Grenade'],
+           armor: [] },
+    uae: { melee: ['Handbag'],
+           temp:  [],
+           armor: [] },
+    uk:  { melee: ['Frying Pan', 'Cricket Bat', 'Claymore Sword', 'Flail'],
+           temp:  ['Grenade', 'Stick Grenade'],
+           armor: ['WWII Helmet'] },
+  };
+
+  // Resolved at runtime: { 'Spear': 12, 'Handbag': 34, ... }
+  let foreignBattleItemIdMap = {};
+
   // Flight type multipliers (applied to base one-way travel time)
   const FLIGHT_MULTIPLIERS = {
     economy:  1.0,
@@ -219,6 +264,21 @@
     travelItemIdMap = {};
     for (const [idStr, item] of Object.entries(tornItems)) {
       if (item?.name && needed.has(item.name.toLowerCase())) { travelItemIdMap[item.name] = parseInt(idStr); }
+    }
+  }
+
+  function resolveForeignBattleItemIds(tornItems) {
+    const needed = new Set();
+    for (const c of Object.values(FOREIGN_BATTLE_ITEMS)) {
+      for (const cat of ['melee', 'temp', 'armor']) {
+        for (const name of c[cat]) needed.add(name.toLowerCase());
+      }
+    }
+    foreignBattleItemIdMap = {};
+    for (const [idStr, item] of Object.entries(tornItems)) {
+      if (item?.name && needed.has(item.name.toLowerCase())) {
+        foreignBattleItemIdMap[item.name] = parseInt(idStr);
+      }
     }
   }
 
@@ -956,6 +1016,34 @@
     .tmit-travel-stock.yata{color:#50dc82;}
     .tmit-travel-stock.assumed{color:#b481cc;}
     .tmit-travel-detail-card{background:rgba(0,0,0,0.3);border:1px solid rgba(151,2,173,0.18);border-radius:6px;padding:10px 12px;}
+    /* v6.9.0 — Foreign Battle Gear cards. One card per country with
+       per-category sections + per-item stock dots. Compact layout so all
+       11 countries fit on a typical screen with light scrolling. */
+    .tmit-fbg-card{background:rgba(0,0,0,0.3);border:1px solid rgba(151,2,173,0.2);border-radius:6px;padding:8px 10px;margin-bottom:8px;}
+    .tmit-fbg-head{display:flex;align-items:center;gap:8px;padding-bottom:6px;border-bottom:1px solid rgba(151,2,173,0.18);margin-bottom:6px;}
+    /* v6.9.1 — Windows browsers don't ship a flag-emoji font, so 🇲🇽 renders
+       as raw "MX" letters and looks broken. Drop the emoji and render the
+       ISO 2-letter code in a styled gold chip so it looks intentional on
+       every platform. */
+    .tmit-fbg-flag{display:inline-block;background:rgba(201,162,39,0.18);
+      border:1px solid rgba(201,162,39,0.4);color:#ffe066;
+      font-family:monospace;font-size:10px;font-weight:700;
+      padding:2px 5px;border-radius:3px;letter-spacing:0.05em;}
+    .tmit-fbg-country{font-family:'Cinzel',serif;font-size:12px;font-weight:700;color:#ffe066;flex:1;letter-spacing:0.04em;}
+    .tmit-fbg-summary{font-family:monospace;font-size:10px;color:#b481cc;}
+    .tmit-fbg-cat{margin-bottom:5px;}
+    .tmit-fbg-cat:last-child{margin-bottom:0;}
+    .tmit-fbg-cat-label{font-size:9px;font-weight:700;color:#c9a227;letter-spacing:0.08em;text-transform:uppercase;margin:2px 0 3px;}
+    .tmit-fbg-item{display:grid;grid-template-columns:10px 1fr 110px 80px;gap:6px;align-items:center;padding:3px 4px;border-radius:3px;font-size:11px;}
+    .tmit-fbg-item:hover{background:rgba(151,2,173,0.05);}
+    .tmit-fbg-name{color:#e8caf5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .tmit-fbg-stock{font-family:monospace;font-size:10px;text-align:right;color:#b481cc;}
+    .tmit-fbg-price{font-family:monospace;font-size:10px;text-align:right;color:#a840c0;}
+    .tmit-fbg-dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+    .tmit-fbg-dot.green {background:#50dc82;box-shadow:0 0 5px rgba(80,220,130,0.6);}
+    .tmit-fbg-dot.yellow{background:#ffe066;box-shadow:0 0 5px rgba(255,224,102,0.5);}
+    .tmit-fbg-dot.red   {background:#ff6060;box-shadow:0 0 5px rgba(255,96,96,0.5);}
+    .tmit-fbg-dot.gray  {background:rgba(151,2,173,0.3);}
     .tmit-session-bar{padding:4px 12px;background:rgba(0,0,0,0.4);border-bottom:1px solid rgba(151,2,173,0.1);display:flex;gap:12px;align-items:center;font-size:10px;font-family:monospace;flex-shrink:0;}
     .tmit-session-item{display:flex;align-items:center;gap:4px;color:#b481cc;}
     .tmit-session-val{color:#a840c0;font-weight:600;}
@@ -2174,13 +2262,13 @@
       for (const m of Object.values(itemMeta)) { if (m.type) seenTypes.add(m.type); }
 
       // Step 3: Resolve travel IDs — skip temp seeded entries (no real numeric ID)
-      resolveTravelItemIds(
-        Object.fromEntries(
-          Object.entries(itemMeta)
-            .filter(([id]) => !String(id).startsWith('rw_'))
-            .map(([id, m]) => [id, { name: m.name, type: m.type }])
-        )
+      const resolvableItems = Object.fromEntries(
+        Object.entries(itemMeta)
+          .filter(([id]) => !String(id).startsWith('rw_'))
+          .map(([id, m]) => [id, { name: m.name, type: m.type }])
       );
+      resolveTravelItemIds(resolvableItems);
+      resolveForeignBattleItemIds(resolvableItems);
 
       // Step 4: Fetch live prices for priority items
       const livePrices = await fetchLivePrices(settings.apiKey);
@@ -2456,6 +2544,7 @@
         <div class="tmit-tab" data-tab="watchlist">\u2b50 Watch <span class="tmit-tab-count" id="tmit-watch-count">0</span></div>
         <div class="tmit-tab" data-tab="war">\u2694 War Gear</div>
         <div class="tmit-tab" data-tab="travel">\u2708 Travel</div>
+        <div class="tmit-tab" data-tab="fbg">\ud83c\udf0d Foreign Battle Gear</div>
         <div class="tmit-tab" data-tab="crimes">\ud83c\udfaf Crimes</div>
       </div>
 
@@ -2583,6 +2672,32 @@
         <div class="tmit-section-title" style="margin-top:14px;">\ud83d\udccb Trip Details</div>
         <div id="tmit-travel-detail" style="font-size:11px;color:#ab9bce;padding:6px 0;">
           Click a destination above to see trip details.
+        </div>
+      </div>
+
+      <!-- Foreign Battle Gear Tab -->
+      <div id="tmit-fbg-panel" class="tmit-tab-panel" style="display:none;flex:1;overflow-y:auto;padding:12px;">
+        <div class="tmit-section-title">🌍 Foreign Battle Gear Availability</div>
+        <div style="font-size:10px;color:#a08fc0;margin-bottom:8px;line-height:1.6;">
+          From <b style="color:#ffe066;">June 23rd 2026</b>, weapons and armor can't fly with you abroad. Each country sells a small loadout of melee / temp / armor you can buy on arrival and equip locally.
+        </div>
+        <div style="font-size:10px;color:#ffe066;background:rgba(201,162,39,0.06);border:1px solid rgba(201,162,39,0.22);border-radius:5px;padding:6px 9px;margin-bottom:8px;line-height:1.6;">
+          <b>Stock data is empty until Phase 2 launches</b> — YATA only tracks items currently sold abroad. Once Tuesday Jun 23rd hits, dots will start showing live in-stock counts (green / yellow / red) for items YATA picks up.
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
+          <input type="text" id="tmit-fbg-search" class="tmit-search" placeholder="Find a weapon (e.g. Spear, Grenade)…" style="flex:1;">
+          <select id="tmit-fbg-cat-filter" class="tmit-select">
+            <option value="all">All gear</option>
+            <option value="melee">Melee only</option>
+            <option value="temp">Temp only</option>
+            <option value="armor">Armor only</option>
+          </select>
+        </div>
+        <div id="tmit-fbg-list">
+          <div class="tmit-state-msg" style="padding:16px 0;">
+            <div class="tmit-state-icon" style="font-size:20px">🌍</div>
+            Waiting for item catalog + YATA stock data. Hit ↻ to force a refresh.
+          </div>
         </div>
       </div>
 
@@ -2774,6 +2889,11 @@
               <div class="tab-icon">\u2694</div>
               <div class="tab-name">War Gear</div>
               <div class="tab-desc">Live market prices for ranked war weapons & armor, with BB trade-in values.</div>
+            </div>
+            <div class="tmit-onboard-tab-card">
+              <div class="tab-icon">\ud83c\udf0d</div>
+              <div class="tab-name">Foreign Battle Gear</div>
+              <div class="tab-desc">Per-country weapons/armor/temps available abroad during Phase 2, with live YATA stock.</div>
             </div>
             <div class="tmit-onboard-tab-card">
               <div class="tab-icon">\ud83c\udfaf</div>
@@ -3153,6 +3273,14 @@
       searchDebounce = setTimeout(renderList, 200);
     });
 
+    // Foreign Battle Gear filters (debounced search + immediate dropdown)
+    let fbgSearchDebounce;
+    panel.querySelector('#tmit-fbg-search')?.addEventListener('input', () => {
+      clearTimeout(fbgSearchDebounce);
+      fbgSearchDebounce = setTimeout(renderForeignBattleTab, 200);
+    });
+    panel.querySelector('#tmit-fbg-cat-filter')?.addEventListener('change', renderForeignBattleTab);
+
     // Budget / min pct filters
     panel.querySelector('#tmit-budget-input').addEventListener('change', (e) => {
       settings.maxBudget = parseInt(e.target.value) || 0;
@@ -3339,6 +3467,7 @@
     const listEl     = document.getElementById('tmit-list');
     const warPanel    = document.getElementById('tmit-war-panel');
     const travelPanel = document.getElementById('tmit-travel-panel');
+    const fbgPanel    = document.getElementById('tmit-fbg-panel');
     const crimePanel  = document.getElementById('tmit-crimes-panel');
 
     // Defensive: any old setting that still says 'quick' or 'arb' (now-
@@ -3352,6 +3481,7 @@
     if (listEl)       listEl.style.display      = isMarket ? '' : 'none';
     if (warPanel)     warPanel.style.display    = tab === 'war'    ? 'flex' : 'none';
     if (travelPanel)  travelPanel.style.display = tab === 'travel' ? 'flex' : 'none';
+    if (fbgPanel)     fbgPanel.style.display    = tab === 'fbg'    ? 'flex' : 'none';
     if (crimePanel)   crimePanel.style.display  = tab === 'crimes' ? 'flex' : 'none';
 
     // Update active tab highlight
@@ -3362,6 +3492,7 @@
     if (isMarket)              renderList();
     else if (tab === 'war')    renderWarTab();
     else if (tab === 'travel') renderTravelTab();
+    else if (tab === 'fbg')    renderForeignBattleTab();
     else if (tab === 'crimes') renderCrimesTab();
   }
 
@@ -3442,6 +3573,143 @@
         </div>`;
       });
     });
+  }
+
+  // ── Foreign Battle Gear Tab (v6.9.0) ──────────────────────────────────────
+  //
+  // Renders the per-country combat-gear availability table introduced by
+  // Phase 2 of Travelling 2.0 (Torn newspaper article 2902, effective
+  // 2026-06-23). Pulls live stock + price from the same YATA caches the
+  // Travel tab uses (yataStockCache, yataTravelPriceCache) — no extra API
+  // budget. Sort prioritises countries that currently have any gear in
+  // stock so empty shelves drop to the bottom.
+
+  // ISO 3166-1 alpha-2 codes mapped from TEEM's internal 3-letter codes.
+  // Used by the FBG tab in place of flag emojis (which render as raw
+  // letters on Windows browsers without an emoji font that supports
+  // regional indicators).
+  const FBG_ISO_CODE = {
+    mex: 'MX', cay: 'KY', can: 'CA', haw: 'HI', uk:  'GB',
+    arg: 'AR', swi: 'CH', jap: 'JP', chi: 'CN', uae: 'AE', saf: 'ZA',
+  };
+
+  function renderForeignBattleTab() {
+    const listEl = document.getElementById('tmit-fbg-list');
+    if (!listEl) return;
+
+    // Quick country lookup: code -> { name, flagEmoji }
+    const countryByCode = {};
+    for (const c of COUNTRIES) countryByCode[c.code] = c;
+
+    const search = (document.getElementById('tmit-fbg-search')?.value || '').toLowerCase().trim();
+    const catFilter = document.getElementById('tmit-fbg-cat-filter')?.value || 'all';
+
+    const catLabels = {
+      melee: '⚔︎ Melee',
+      temp:  '💥 Temporary',
+      armor: '🛡 Armor',
+    };
+
+    // Build one row per country with filtered + scored items
+    const cards = [];
+    for (const [code, gear] of Object.entries(FOREIGN_BATTLE_ITEMS)) {
+      const country  = countryByCode[code];
+      if (!country) continue;
+      const stockMap = yataStockCache?.[code]       || {};
+      const priceMap = yataTravelPriceCache?.[code] || {};
+
+      const sections = [];
+      let inStockCount = 0;
+      let totalItems   = 0;
+      let matchedAny   = false;
+
+      for (const cat of ['melee', 'temp', 'armor']) {
+        if (catFilter !== 'all' && catFilter !== cat) continue;
+        const names = gear[cat] || [];
+        if (!names.length) continue;
+        const items = [];
+        for (const name of names) {
+          totalItems++;
+          if (search && !name.toLowerCase().includes(search)) continue;
+          matchedAny = true;
+          const itemId = foreignBattleItemIdMap[name] || null;
+          const stockQty = itemId != null ? stockMap[itemId] : undefined;
+          const price    = itemId != null ? priceMap[itemId] : undefined;
+
+          let dotClass, stockLabel;
+          if (typeof stockQty !== 'number') {
+            dotClass = 'gray';   stockLabel = 'no YATA data';
+          } else if (stockQty === 0) {
+            dotClass = 'red';    stockLabel = 'EMPTY';
+          } else if (stockQty < 5) {
+            dotClass = 'yellow'; stockLabel = 'low: ' + stockQty;
+            inStockCount++;
+          } else {
+            dotClass = 'green';  stockLabel = stockQty + ' in stock';
+            inStockCount++;
+          }
+
+          const priceLabel = (typeof price === 'number' && price > 0)
+            ? '$' + price.toLocaleString()
+            : '—';
+
+          items.push(
+            '<div class="tmit-fbg-item">'
+            + '<span class="tmit-fbg-dot ' + dotClass + '"></span>'
+            + '<span class="tmit-fbg-name">' + name + '</span>'
+            + '<span class="tmit-fbg-stock">' + stockLabel + '</span>'
+            + '<span class="tmit-fbg-price">' + priceLabel + '</span>'
+            + '</div>'
+          );
+        }
+        if (items.length) {
+          sections.push(
+            '<div class="tmit-fbg-cat">'
+            + '<div class="tmit-fbg-cat-label">' + catLabels[cat] + '</div>'
+            + items.join('')
+            + '</div>'
+          );
+        }
+      }
+
+      // Drop the whole card if a search filter knocked everything out
+      if (search && !matchedAny) continue;
+      // Drop the whole card if the category filter left it empty
+      if (!sections.length) continue;
+
+      cards.push({
+        code,
+        inStockCount,
+        totalItems,
+        html:
+          '<div class="tmit-fbg-card">'
+          + '<div class="tmit-fbg-head">'
+          + '<span class="tmit-fbg-flag">' + (FBG_ISO_CODE[code] || code.toUpperCase()) + '</span>'
+          + '<span class="tmit-fbg-country">' + country.name + '</span>'
+          + '<span class="tmit-fbg-summary">' + inStockCount + ' / ' + totalItems + ' in stock</span>'
+          + '</div>'
+          + sections.join('')
+          + '</div>',
+      });
+    }
+
+    if (!cards.length) {
+      listEl.innerHTML = '<div class="tmit-state-msg" style="padding:18px 0;">'
+        + '<div class="tmit-state-icon">🔍</div>'
+        + (search
+            ? 'No foreign battle gear matches “' + search + '”.'
+            : 'No foreign battle gear available for the selected filter.')
+        + '</div>';
+      return;
+    }
+
+    // Most-stocked countries first, then alphabetical tiebreaker
+    cards.sort((a, b) =>
+      (b.inStockCount - a.inStockCount)
+      || countryByCode[a.code].name.localeCompare(countryByCode[b.code].name)
+    );
+
+    listEl.innerHTML = cards.map(c => c.html).join('');
   }
 
   // ── Crimes Tab ─────────────────────────────────────────────────────────────
@@ -4385,13 +4653,13 @@
       if (Object.keys(priceHistory).length > 0) {
         // Resolve travel IDs from cached itemMeta before recomputing travel
         if (Object.keys(itemMeta).length > 0) {
-          resolveTravelItemIds(
-            Object.fromEntries(
-              Object.entries(itemMeta)
-                .filter(([id]) => !String(id).startsWith('rw_'))
-                .map(([id, m]) => [id, { name: m.name, type: m.type }])
-            )
+          const cachedItems = Object.fromEntries(
+            Object.entries(itemMeta)
+              .filter(([id]) => !String(id).startsWith('rw_'))
+              .map(([id, m]) => [id, { name: m.name, type: m.type }])
           );
+          resolveTravelItemIds(cachedItems);
+          resolveForeignBattleItemIds(cachedItems);
         }
         runAnalysis();
         renderList();
