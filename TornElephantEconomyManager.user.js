@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.10.0
+// @version      6.10.1
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -24,7 +24,7 @@
 
 
   const SCRIPT_KEY     = 'tmit_';
-  const SCRIPT_VERSION = '6.10.0';
+  const SCRIPT_VERSION = '6.10.1';
 
   // Torn PDA (mobile) runs userscripts inside a Flutter WebView. We detect it
   // so we can skip browser-only APIs (Notification) and switch the layout to
@@ -89,26 +89,29 @@
   // have no fixed vendor — their abroad cost is whatever the foreign market is
   // currently asking, which we read live from YATA per poll. If YATA is down,
   // those entries are skipped (no fiction).
-  // Travel times = one-way economy flight in minutes.
+  // Travel times = one-way economy flight in minutes. v6.10.1 reduced
+  // every entry by 5.26% to match Phase 2 of Travelling 2.0 (article 2904
+  // confirms a 16-min cut on Johannesburg's 4h57m baseline). Values rounded
+  // to the nearest minute since Torn displays minute granularity.
   // `capacity` = max units available per restock cycle, used as an upper bound
   // independent of YATA's reported live quantity.
   const COUNTRIES = [
     {
-      name: 'Mexico', code: 'mex', flagEmoji: '\ud83c\uddf2\ud83c\uddfd', travelTime: 20,
+      name: 'Mexico', code: 'mex', flagEmoji: '\ud83c\uddf2\ud83c\uddfd', travelTime: 19,
       items: [
         { itemName: 'Jaguar Plushie', buyPrice: 10000, capacity: 400  },
         { itemName: 'Dahlia',         buyPrice: 300,   capacity: 1000 },
       ]
     },
     {
-      name: 'Cayman Islands', code: 'cay', flagEmoji: '\ud83c\uddf0\ud83c\uddfe', travelTime: 57,
+      name: 'Cayman Islands', code: 'cay', flagEmoji: '\ud83c\uddf0\ud83c\uddfe', travelTime: 54,
       items: [
         { itemName: 'Stingray Plushie', buyPrice: 400,  capacity: 400  },
         { itemName: 'Banana Orchid',    buyPrice: 4000, capacity: 1000 },
       ]
     },
     {
-      name: 'Canada', code: 'can', flagEmoji: '\ud83c\udde8\ud83c\udde6', travelTime: 41,
+      name: 'Canada', code: 'can', flagEmoji: '\ud83c\udde8\ud83c\udde6', travelTime: 39,
       items: [
         { itemName: 'Wolverine Plushie', buyPrice: 30,  capacity: 400  },
         { itemName: 'Crocus',            buyPrice: 600, capacity: 1000 },
@@ -116,14 +119,14 @@
       ]
     },
     {
-      name: 'Hawaii', code: 'haw', flagEmoji: '\ud83c\udf3a', travelTime: 121,
+      name: 'Hawaii', code: 'haw', flagEmoji: '\ud83c\udf3a', travelTime: 115,
       items: [
         { itemName: 'Orchid',         buyPrice: 700,      capacity: 1000 },
         { itemName: 'Large Suitcase', buyPrice: 10000000, capacity: 100  },
       ]
     },
     {
-      name: 'United Kingdom', code: 'uk', flagEmoji: '\ud83c\uddec\ud83c\udde7', travelTime: 159,
+      name: 'United Kingdom', code: 'uk', flagEmoji: '\ud83c\uddec\ud83c\udde7', travelTime: 151,
       items: [
         { itemName: 'Red Fox Plushie', buyPrice: 1000, capacity: 400  },
         { itemName: 'Nessie Plushie',  buyPrice: 200,  capacity: 400  },
@@ -132,7 +135,7 @@
       ]
     },
     {
-      name: 'Argentina', code: 'arg', flagEmoji: '\ud83c\udde6\ud83c\uddf7', travelTime: 189,
+      name: 'Argentina', code: 'arg', flagEmoji: '\ud83c\udde6\ud83c\uddf7', travelTime: 179,
       items: [
         { itemName: 'Monkey Plushie', buyPrice: 400,   capacity: 400  },
         { itemName: 'Ceibo Flower',   buyPrice: 500,   capacity: 1000 },
@@ -141,7 +144,7 @@
       ]
     },
     {
-      name: 'Switzerland', code: 'swi', flagEmoji: '\ud83c\udde8\ud83c\udded', travelTime: 169,
+      name: 'Switzerland', code: 'swi', flagEmoji: '\ud83c\udde8\ud83c\udded', travelTime: 160,
       items: [
         { itemName: 'Chamois Plushie', buyPrice: 400,   capacity: 400  },
         { itemName: 'Edelweiss',       buyPrice: 900,   capacity: 1000 },
@@ -150,7 +153,7 @@
       ]
     },
     {
-      name: 'Japan', code: 'jap', flagEmoji: '\ud83c\uddef\ud83c\uddf5', travelTime: 225,
+      name: 'Japan', code: 'jap', flagEmoji: '\ud83c\uddef\ud83c\uddf5', travelTime: 213,
       items: [
         { itemName: 'Cherry Blossom', buyPrice: 500, capacity: 1000 },
         { itemName: 'Xanax',                         capacity: 100  },
@@ -158,7 +161,7 @@
       ]
     },
     {
-      name: 'China', code: 'chi', flagEmoji: '\ud83c\udde8\ud83c\uddf3', travelTime: 219,
+      name: 'China', code: 'chi', flagEmoji: '\ud83c\udde8\ud83c\uddf3', travelTime: 207,
       items: [
         { itemName: 'Panda Plushie', buyPrice: 400,  capacity: 400  },
         { itemName: 'Peony',         buyPrice: 5000, capacity: 1000 },
@@ -167,14 +170,14 @@
       ]
     },
     {
-      name: 'UAE', code: 'uae', flagEmoji: '\ud83c\udde6\ud83c\uddea', travelTime: 259,
+      name: 'UAE', code: 'uae', flagEmoji: '\ud83c\udde6\ud83c\uddea', travelTime: 245,
       items: [
         { itemName: 'Camel Plushie',     buyPrice: 14000, capacity: 400  },
         { itemName: 'Tribulus Omanense', buyPrice: 6000,  capacity: 1000 },
       ]
     },
     {
-      name: 'South Africa', code: 'saf', flagEmoji: '\ud83c\uddff\ud83c\udde6', travelTime: 297,
+      name: 'South Africa', code: 'saf', flagEmoji: '\ud83c\uddff\ud83c\udde6', travelTime: 281,
       items: [
         { itemName: 'Lion Plushie',   buyPrice: 400,  capacity: 400  },
         { itemName: 'African Violet', buyPrice: 2000, capacity: 1000 },
@@ -498,6 +501,24 @@
     } catch (e) {}
   })();
 
+  // v6.10.1 — Phase 2 of Travelling 2.0 doubled the base carry capacity
+  // from 5 to 10. Existing users who accepted the old base default during
+  // onboarding still have carryCapacity ≤ 5; bump them to the new base
+  // so the Travel tab math doesn't underestimate by half. Users with
+  // 6+ likely had a suitcase bonus stacked on the old base — leave them
+  // alone so we don't clobber their actual number.
+  (function migrateCarryCapacityPhase2() {
+    const SENTINEL = SCRIPT_KEY + 'migrated_phase2_carry';
+    try {
+      if (GM_getValue(SENTINEL)) return;
+      if ((settings.carryCapacity ?? 0) <= 5) {
+        settings.carryCapacity = 10;
+        saveSettings();
+      }
+      GM_setValue(SENTINEL, { ts: Date.now() });
+    } catch (e) {}
+  })();
+
   // Structure: { itemId: [ { ts, price, yataPrice }, ... ] }
   let priceHistory = load('priceHistory', {});
 
@@ -759,17 +780,20 @@
       );
       if (data.error) return null;
 
-      let base = 5;
+      // v6.10.1 — Phase 2 of Travelling 2.0 doubled the base from 5 to 10
+      // and reduced suitcase bonuses: Small +1 (was +2), Medium +2 (was +3),
+      // Large +3 (was +4). Per article 2904 published 2026-06-23.
+      let base = 10;
 
-      // Business Class / WLT / Airstrip upgrade gives 15 base
-      // Check inventory for suitcases
+      // Check inventory for suitcases — only the largest applies
       const inv = Object.values(data.inventory ?? {});
-      const hasMedSuitcase  = inv.some(i => i.name === 'Medium Suitcase');
+      const hasSmallSuitcase = inv.some(i => i.name === 'Small Suitcase');
+      const hasMedSuitcase   = inv.some(i => i.name === 'Medium Suitcase');
       const hasLargeSuitcase = inv.some(i => i.name === 'Large Suitcase');
 
-      // Suitcase bonuses (only the largest applies)
-      if (hasLargeSuitcase) base += 4;
-      else if (hasMedSuitcase) base += 2;
+      if (hasLargeSuitcase)      base += 3;
+      else if (hasMedSuitcase)   base += 2;
+      else if (hasSmallSuitcase) base += 1;
 
       // Faction Excursion special — up to +10
       const factionPerks = data.faction_perks ?? data.perks?.faction ?? [];
@@ -785,7 +809,7 @@
       // Lingerie Store 3* job special (+2) — can't reliably detect, skip
       // Cruise Line Agency 3*/10* (+2/+3) — same
 
-      return Math.max(5, base);
+      return Math.max(10, base);
     } catch(e) {
       return null;
     }
@@ -2789,10 +2813,10 @@
       <div id="tmit-fbg-panel" class="tmit-tab-panel" style="display:none;flex:1;overflow-y:auto;padding:12px;">
         <div class="tmit-section-title">🌍 Foreign Battle Gear Availability</div>
         <div style="font-size:10px;color:#a08fc0;margin-bottom:8px;line-height:1.6;">
-          From <b style="color:#ffe066;">June 23rd 2026</b>, weapons and armor can't fly with you abroad. Each country sells a small loadout of melee / temp / armor you can buy on arrival and equip locally.
+          <b style="color:#50dc82;">Phase 2 is LIVE</b> (since 2026-06-23). Weapons and armor can't fly with you abroad. Each country sells a small loadout of melee / temp / armor you can buy on arrival, use locally, and <b style="color:#ffe066;">sell back at 75% of purchase price</b> (Black Market is 100%) — so effective "rental" is ~25% of the sticker price.
         </div>
         <div style="font-size:10px;color:#ffe066;background:rgba(201,162,39,0.06);border:1px solid rgba(201,162,39,0.22);border-radius:5px;padding:6px 9px;margin-bottom:8px;line-height:1.6;">
-          <b>Stock data is empty until Phase 2 launches</b> — YATA only tracks items currently sold abroad. Once Tuesday Jun 23rd hits, dots will start showing live in-stock counts (green / yellow / red) for items YATA picks up.
+          Stock dots populate as YATA picks up the new Phase 2 items. Sold-back items also re-enter local stock, so a high-tier item might appear at a destination unexpectedly.
         </div>
         <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
           <input type="text" id="tmit-fbg-search" class="tmit-search" placeholder="Find a weapon (e.g. Spear, Grenade)…" style="flex:1;">
@@ -2984,7 +3008,7 @@
           <div class="tmit-onboard-step-title">Step 2 of 4 \u2014 Your Carry Capacity</div>
           <div class="tmit-onboard-step-body">
             How many items can you carry per trip? Check your <b>Travel page in-game</b> for the exact number.<br><br>
-            Common sources of capacity: base (5) + suitcase (+2/+4) + faction Excursion (+1\u201310) + property airstrip (+10) + job specials (+2\u20135).
+            Common sources of capacity: base (10) + suitcase (+1/+2/+3) + faction Excursion (+1\u201310) + property airstrip (+10) + job specials (+2\u20135).
           </div>
           <div class="tmit-onboard-capacity-row" style="align-items:flex-start;flex-direction:column;gap:8px;">
             <div style="display:flex;align-items:center;gap:10px;">
