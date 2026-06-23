@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.9.1
+// @version      6.10.0
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -24,7 +24,7 @@
 
 
   const SCRIPT_KEY     = 'tmit_';
-  const SCRIPT_VERSION = '6.9.1';
+  const SCRIPT_VERSION = '6.10.0';
 
   // Torn PDA (mobile) runs userscripts inside a Flutter WebView. We detect it
   // so we can skip browser-only APIs (Notification) and switch the layout to
@@ -467,6 +467,8 @@
     alertOnBoosterClear: false, // only alert when booster cooldown is clear
     alertRequireStock: false,   // only alert when YATA confirms stock
     spikeAlertEnabled: true,    // pulse the FAB on 30%+ price spikes
+    watchlistAlertEnabled: false, // v6.10.0 — pulse FAB when any watchlist item moves past threshold
+    watchlistAlertThreshold: 15,  // percent move that triggers the watchlist alert
     minimized: false,
     posX: null,
     posY: null,
@@ -597,6 +599,20 @@
   // Both are populated together by the YATA travel-export fetch (poll()).
   let yataStockCache = null;
   let yataTravelPriceCache = null;
+
+  // ── Torn Stock Market (v6.10.0) ──────────────────────────────────────────
+  // stockCatalog: { [stock_id]: { name, acronym, current_price, market_cap,
+  //                              total_shares, benefit, ... } } from
+  //                              torn/?selections=stocks
+  // userStocks:   { [stock_id]: { total_shares, transactions, dividend,
+  //                              benefit, ... } } from user/?selections=stocks
+  // Both refreshed on a separate cadence from the item-market poll because
+  // stock data changes slowly (Torn updates prices every minute, dividends
+  // pay weekly). lastStocksFetch gates that cadence.
+  let stockCatalog = load('stockCatalog', null);
+  let userStocks   = load('userStocks', null);
+  let lastStocksFetch = 0;
+  const STOCKS_FETCH_INTERVAL_MS = 5 * 60 * 1000;  // 5 min
 
   function saveWatchlist() { store('watchlist', [...watchlist]); }
 
@@ -807,6 +823,10 @@
     .tmit-alert-badge.type-weapon{background:radial-gradient(circle at 35% 35%,#ffc080 0%,#ff6a00 55%,#7a2500 100%);box-shadow:0 0 8px rgba(255,106,0,0.7),inset 0 1px 1px rgba(255,255,255,0.4);}
     .tmit-alert-badge.type-armor{background:radial-gradient(circle at 35% 35%,#b0c8ff 0%,#5078d0 55%,#1a2a60 100%);box-shadow:0 0 8px rgba(80,120,208,0.7),inset 0 1px 1px rgba(255,255,255,0.4);}
     .tmit-alert-badge.type-special{background:radial-gradient(circle at 35% 35%,#ffffff 0%,#e0e0ff 55%,#7080a0 100%);box-shadow:0 0 8px rgba(200,200,255,0.7),inset 0 1px 1px rgba(255,255,255,0.4);}
+    /* v6.10.0 — Watchlist-alert badge: TEEM brand purple. Distinct from the
+       gold big-spike badge so users know the alert came from THEIR watchlist
+       (with their personal threshold) vs. a 50%+ market-wide spike. */
+    .tmit-alert-badge.type-watchlist{background:radial-gradient(circle at 35% 35%,#cc40f0 0%,#9702ad 55%,#4a0058 100%);box-shadow:0 0 8px rgba(151,2,173,0.8),inset 0 1px 1px rgba(255,255,255,0.4);color:#fff !important;}
     #tmit-panel{position:fixed;bottom:90px;right:28px;width:520px;max-height:620px;background:linear-gradient(180deg,rgba(50,0,66,0.97) 0%,rgba(18,0,28,0.99) 40%,rgba(7,0,10,1) 100%);border:1px solid #9702ad;border-top:3px solid #c9a227;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,0.8),0 0 50px rgba(151,2,173,0.12),0 24px 80px rgba(0,0,0,0.9),inset 0 1px 0 rgba(201,162,39,0.15);z-index:999998;display:flex;flex-direction:column;overflow:hidden;font-family:'Inter',sans-serif;color:#f0d5f8;transition:opacity 0.2s,transform 0.2s;}
     #tmit-panel.tmit-hidden{display:none !important;}
     .tmit-header{background:linear-gradient(90deg,rgba(50,0,66,1) 0%,rgba(18,0,28,1) 60%,rgba(8,0,14,1) 100%);border-bottom:1px solid rgba(151,2,173,0.35);padding:11px 16px;display:flex;align-items:center;justify-content:space-between;cursor:move;flex-shrink:0;position:relative;}
@@ -1966,6 +1986,40 @@
     }
   }
 
+  // ── Stock market fetch (v6.10.0) ──────────────────────────────────────────
+  //
+  // Two endpoints together:
+  //   1. torn/?selections=stocks — full stock catalog (current_price, name,
+  //      acronym, benefit/bonus info). Public, doesn't change much within a
+  //      few minutes.
+  //   2. user/?selections=stocks — your holdings (total_shares,
+  //      transactions[].bought_price/shares, dividend, benefit progress).
+  //
+  // Returns { catalog, holdings } on success, null on failure. Caller in
+  // poll() merges into module state and persists to GM storage so the
+  // Stocks tab can render instantly on next page load.
+  async function fetchStocks(apiKey) {
+    if (isRateLimited()) return null;
+    try {
+      const [catData, userData] = await Promise.all([
+        apiGetWithTimeout(
+          `https://api.torn.com/torn/?selections=stocks&key=${apiKey}&comment=TEEM`, 8000
+        ),
+        apiGetWithTimeout(
+          `https://api.torn.com/user/?selections=stocks&key=${apiKey}&comment=TEEM`, 8000
+        ),
+      ]);
+      if (!catData || catData._error || catData.error)   return null;
+      if (!userData || userData._error || userData.error) return null;
+      const catalog  = catData.stocks  ?? null;
+      const holdings = userData.stocks ?? {};
+      if (!catalog) return null;
+      return { catalog, holdings };
+    } catch(e) {
+      return null;
+    }
+  }
+
   function getTimeframeMs(label) {
     return TIMEFRAMES.find(t => t.label === label)?.ms ?? TIMEFRAMES[2].ms;
   }
@@ -2128,12 +2182,34 @@
     // setting (treat undefined as enabled so existing users keep the
     // default). The badge color reflects the item-type of the biggest spike
     // so the user can tell at a glance whether it's drugs, weapons, etc.
+    //
+    // v6.10.0 — also fire a watchlist-flavored alert (purple "watch" badge)
+    // when any watchlist item passes the user-configured threshold. Big
+    // spikes win over watchlist alerts so a 60% move on a non-watchlist item
+    // still gets the gold treatment; a 20% move on Xanax (in watchlist)
+    // gets the purple treatment.
     const bigSpikes = results.filter(r => r.isBigSpike);
-    const wantAlert = settings.spikeAlertEnabled !== false && bigSpikes.length > 0;
     const fab = document.getElementById('tmit-fab');
     const badge = document.getElementById('tmit-alert-badge');
 
-    if (wantAlert) {
+    const wantBigSpike = settings.spikeAlertEnabled !== false && bigSpikes.length > 0;
+
+    let watchlistHit = null;
+    if (settings.watchlistAlertEnabled) {
+      const threshold = Math.max(1, settings.watchlistAlertThreshold ?? 15);
+      // Find the biggest watchlist mover past the threshold (skip thin-data
+      // rows so we don't fire on items with only a single snapshot).
+      let best = null;
+      for (const r of results) {
+        if (r.thinData) continue;
+        if (!watchlist.has(r.itemId)) continue;
+        if (Math.abs(r.changePct) < threshold) continue;
+        if (!best || Math.abs(r.changePct) > Math.abs(best.changePct)) best = r;
+      }
+      watchlistHit = best;
+    }
+
+    if (wantBigSpike) {
       // Pick the spike with the largest absolute move — that's the type
       // we want to advertise on the badge.
       const top = bigSpikes.reduce(
@@ -2151,6 +2227,18 @@
         badge.dataset.typeClass = typeClass;
         badge.textContent = badgeIconForType(top.type);
         badge.title = `${top.name} ${top.changePct > 0 ? '+' : ''}${top.changePct}%`;
+      }
+    } else if (watchlistHit) {
+      const typeClass = 'type-watchlist';
+      if (!alertActive) {
+        alertActive = true;
+        fab?.classList.add('tmit-alert');
+      }
+      if (badge && badge.dataset.typeClass !== typeClass) {
+        badge.className = 'tmit-alert-badge ' + typeClass;
+        badge.dataset.typeClass = typeClass;
+        badge.textContent = '★'; // ★ — watchlist star
+        badge.title = `Watchlist: ${watchlistHit.name} ${watchlistHit.changePct > 0 ? '+' : ''}${watchlistHit.changePct}%`;
       }
     } else if (alertActive) {
       alertActive = false;
@@ -2407,6 +2495,27 @@
         }
       } catch(e) { /* optional */ }
 
+      // Stocks fetch — throttled to every 5 min via lastStocksFetch. Two
+      // endpoints but Promise.all'd so cost is one round-trip latency.
+      try {
+        const wantStocks = (Date.now() - lastStocksFetch) > STOCKS_FETCH_INTERVAL_MS;
+        if (wantStocks && !isRateLimited()) {
+          const s = await fetchStocks(settings.apiKey);
+          if (s) {
+            stockCatalog = s.catalog;
+            userStocks   = s.holdings;
+            lastStocksFetch = Date.now();
+            try { store('stockCatalog', stockCatalog); } catch(e) {}
+            try { store('userStocks',   userStocks);   } catch(e) {}
+            const panelEl3 = document.getElementById('tmit-panel');
+            if (panelEl3 && !panelEl3.classList.contains('tmit-hidden')
+                && settings.activeTab === 'stocks') {
+              try { renderStocksTab(); } catch(e) {}
+            }
+          }
+        }
+      } catch(e) { /* optional */ }
+
       recomputeTravel();
       // Always refresh analysisCache so the next poll's priority list and
       // spike alerts stay accurate. But skip the expensive DOM render and
@@ -2545,6 +2654,7 @@
         <div class="tmit-tab" data-tab="war">\u2694 War Gear</div>
         <div class="tmit-tab" data-tab="travel">\u2708 Travel</div>
         <div class="tmit-tab" data-tab="fbg">\ud83c\udf0d Foreign Battle Gear</div>
+        <div class="tmit-tab" data-tab="stocks">\ud83d\udcc8 Stocks</div>
         <div class="tmit-tab" data-tab="crimes">\ud83c\udfaf Crimes</div>
       </div>
 
@@ -2701,6 +2811,21 @@
         </div>
       </div>
 
+      <!-- Stocks Tab -->
+      <div id="tmit-stocks-panel" class="tmit-tab-panel" style="display:none;flex:1;overflow-y:auto;padding:12px;">
+        <div class="tmit-section-title">📈 Torn Stock Market</div>
+        <div style="font-size:10px;color:#a08fc0;margin-bottom:8px;line-height:1.6;">
+          Your live holdings — cost basis, current value, profit/loss, and weekly dividend rate. Sorted by current value. Updates every 5 minutes alongside the market poll.
+        </div>
+        <div id="tmit-stocks-summary" style="margin-bottom:8px;"></div>
+        <div id="tmit-stocks-list">
+          <div class="tmit-state-msg" style="padding:16px 0;">
+            <div class="tmit-state-icon" style="font-size:20px">📈</div>
+            Waiting for first stock fetch. Hit ↻ to force a refresh.
+          </div>
+        </div>
+      </div>
+
       <!-- Crimes Tab -->
       <div id="tmit-crimes-panel" class="tmit-tab-panel" style="display:none;flex:1;overflow-y:auto;padding:12px;">
         <div class="tmit-section-title">\ud83c\udfaf Crime Tracker</div>
@@ -2771,10 +2896,21 @@
         <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c9a227;margin-bottom:6px;margin-top:4px;">
           Alerts
         </div>
-        <label style="display:flex;align-items:center;gap:8px;font-size:11px;color:#d8c8f0;cursor:pointer;margin-bottom:10px;padding:6px 8px;background:rgba(0,0,0,0.25);border:1px solid rgba(151,2,173,0.15);border-radius:5px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:11px;color:#d8c8f0;cursor:pointer;margin-bottom:6px;padding:6px 8px;background:rgba(0,0,0,0.25);border:1px solid rgba(151,2,173,0.15);border-radius:5px;">
           <input type="checkbox" id="tmit-spike-alert" ${settings.spikeAlertEnabled !== false ? 'checked' : ''}
             style="accent-color:#c9a227;cursor:pointer;">
           <span style="flex:1;">Show a coin badge on the elephant for huge spikes <span style="color:#a08fc0;font-size:10px;">(50%+ price moves; color-coded by item type)</span></span>
+        </label>
+
+        <label style="display:flex;align-items:center;gap:8px;font-size:11px;color:#d8c8f0;cursor:pointer;margin-bottom:10px;padding:6px 8px;background:rgba(0,0,0,0.25);border:1px solid rgba(151,2,173,0.15);border-radius:5px;">
+          <input type="checkbox" id="tmit-watchlist-alert" ${settings.watchlistAlertEnabled ? 'checked' : ''}
+            style="accent-color:#9702ad;cursor:pointer;">
+          <span style="flex:1;">Alert when a <b style="color:#cc40f0;">watchlist</b> item moves \u00b1
+            <input type="number" id="tmit-watchlist-alert-threshold"
+              value="${settings.watchlistAlertThreshold ?? 15}" min="1" max="100"
+              style="width:42px;background:rgba(0,0,0,0.4);border:1px solid rgba(151,2,173,0.3);border-radius:3px;color:#e8caf5;font-family:monospace;font-size:11px;padding:1px 4px;outline:none;text-align:center;">
+            % or more <span style="color:#a08fc0;font-size:10px;">(purple badge; over your selected timeframe)</span>
+          </span>
         </label>
 
         <button class="tmit-btn-save" id="tmit-btn-save" style="width:100%;">\ud83d\udcbe Save All Settings</button>
@@ -2894,6 +3030,11 @@
               <div class="tab-icon">\ud83c\udf0d</div>
               <div class="tab-name">Foreign Battle Gear</div>
               <div class="tab-desc">Per-country weapons/armor/temps available abroad during Phase 2, with live YATA stock.</div>
+            </div>
+            <div class="tmit-onboard-tab-card">
+              <div class="tab-icon">\ud83d\udcc8</div>
+              <div class="tab-name">Stocks</div>
+              <div class="tab-desc">Your stock holdings \u2014 cost basis, current value, P&amp;L, and weekly dividend rate per stock.</div>
             </div>
             <div class="tmit-onboard-tab-card">
               <div class="tab-icon">\ud83c\udfaf</div>
@@ -3408,6 +3549,19 @@
           document.getElementById('tmit-fab')?.classList.remove('tmit-alert');
         }
       }
+      if (e.target.id === 'tmit-watchlist-alert') {
+        settings.watchlistAlertEnabled = e.target.checked;
+        saveSettings();
+        if (!e.target.checked && alertActive) {
+          alertActive = false;
+          document.getElementById('tmit-fab')?.classList.remove('tmit-alert');
+        }
+      }
+      if (e.target.id === 'tmit-watchlist-alert-threshold') {
+        const v = parseInt(e.target.value);
+        settings.watchlistAlertThreshold = Number.isFinite(v) && v >= 1 ? Math.min(100, v) : 15;
+        saveSettings();
+      }
     });
 
     // Travel capacity change
@@ -3468,6 +3622,7 @@
     const warPanel    = document.getElementById('tmit-war-panel');
     const travelPanel = document.getElementById('tmit-travel-panel');
     const fbgPanel    = document.getElementById('tmit-fbg-panel');
+    const stocksPanel = document.getElementById('tmit-stocks-panel');
     const crimePanel  = document.getElementById('tmit-crimes-panel');
 
     // Defensive: any old setting that still says 'quick' or 'arb' (now-
@@ -3482,6 +3637,7 @@
     if (warPanel)     warPanel.style.display    = tab === 'war'    ? 'flex' : 'none';
     if (travelPanel)  travelPanel.style.display = tab === 'travel' ? 'flex' : 'none';
     if (fbgPanel)     fbgPanel.style.display    = tab === 'fbg'    ? 'flex' : 'none';
+    if (stocksPanel)  stocksPanel.style.display = tab === 'stocks' ? 'flex' : 'none';
     if (crimePanel)   crimePanel.style.display  = tab === 'crimes' ? 'flex' : 'none';
 
     // Update active tab highlight
@@ -3493,6 +3649,7 @@
     else if (tab === 'war')    renderWarTab();
     else if (tab === 'travel') renderTravelTab();
     else if (tab === 'fbg')    renderForeignBattleTab();
+    else if (tab === 'stocks') renderStocksTab();
     else if (tab === 'crimes') renderCrimesTab();
   }
 
@@ -3710,6 +3867,153 @@
     );
 
     listEl.innerHTML = cards.map(c => c.html).join('');
+  }
+
+  // ── Stocks Tab (v6.10.0) ──────────────────────────────────────────────────
+  //
+  // Holdings-focused view. For each stock the user owns, we show:
+  //   - Acronym + name
+  //   - Total shares held
+  //   - Cost basis (sum of shares*bought_price across transactions)
+  //   - Current value (shares * stockCatalog[id].current_price)
+  //   - Profit / loss (value - cost), absolute and %
+  //   - Weekly dividend $/hr (if the stock pays one) — best-effort: Torn
+  //     exposes user.stocks[id].dividend.frequency (seconds between payouts)
+  //     and dividend.increment / total_shares per block. We fall back to
+  //     "—" whenever the shape is unfamiliar so a parser surprise can't
+  //     break the table.
+  //
+  // Top of the tab shows portfolio totals (cost / value / P&L).
+
+  function renderStocksTab() {
+    const summaryEl = document.getElementById('tmit-stocks-summary');
+    const listEl    = document.getElementById('tmit-stocks-list');
+    if (!summaryEl || !listEl) return;
+
+    if (!stockCatalog || !userStocks) {
+      summaryEl.innerHTML = '';
+      listEl.innerHTML = '<div class="tmit-state-msg" style="padding:18px 0;">'
+        + '<div class="tmit-state-icon">📈</div>'
+        + 'Waiting for first stock fetch. Hit ↻ to force a refresh.'
+        + '</div>';
+      return;
+    }
+
+    const holdings = Object.entries(userStocks);
+    if (!holdings.length) {
+      summaryEl.innerHTML = '';
+      listEl.innerHTML = '<div class="tmit-state-msg" style="padding:18px 0;">'
+        + '<div class="tmit-state-icon">📈</div>'
+        + 'No stock holdings detected. Buy some on <a href="https://www.torn.com/stockexchange.php" target="_blank" rel="noopener" style="color:#c9a227;">Torn Stock Exchange</a> and they\'ll show here.'
+        + '</div>';
+      return;
+    }
+
+    let totalCost = 0, totalValue = 0;
+    const rows = [];
+
+    for (const [idStr, holding] of holdings) {
+      const id  = parseInt(idStr);
+      const cat = stockCatalog[id];
+      if (!cat) continue;
+      const shares = holding.total_shares ?? 0;
+      if (!shares) continue;
+      const price  = cat.current_price ?? 0;
+      const value  = shares * price;
+
+      let cost = 0;
+      if (holding.transactions && typeof holding.transactions === 'object') {
+        for (const txn of Object.values(holding.transactions)) {
+          cost += (txn.shares ?? 0) * (txn.bought_price ?? 0);
+        }
+      }
+      const profit    = value - cost;
+      const profitPct = cost > 0 ? (profit / cost) * 100 : 0;
+
+      // Weekly dividend rate. Torn typically exposes dividend.frequency in
+      // seconds and dividend.amount per share. Some shapes use increment
+      // per N shares — defensive guard.
+      let dividendHr = null;
+      const d = holding.dividend;
+      if (d && typeof d.amount === 'number' && typeof d.frequency === 'number'
+          && d.frequency > 0) {
+        const totalDividend = d.amount * shares;
+        const hours = d.frequency / 3600;
+        if (hours > 0) dividendHr = totalDividend / hours;
+      }
+
+      totalCost  += cost;
+      totalValue += value;
+      rows.push({
+        id, cat, shares, price, value, cost, profit, profitPct, dividendHr,
+      });
+    }
+
+    rows.sort((a, b) => b.value - a.value);
+
+    // Summary card
+    const totalProfit    = totalValue - totalCost;
+    const totalProfitPct = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
+    const fmtM = n => {
+      const abs = Math.abs(n);
+      if (abs >= 1_000_000_000) return '$' + (n / 1e9).toFixed(2) + 'B';
+      if (abs >= 1_000_000)     return '$' + (n / 1e6).toFixed(2) + 'M';
+      if (abs >= 1_000)         return '$' + Math.round(n).toLocaleString();
+      return '$' + Math.round(n).toLocaleString();
+    };
+    const profitColor = totalProfit >= 0 ? '#50dc82' : '#ff6060';
+    const profitSign  = totalProfit >= 0 ? '+' : '';
+    summaryEl.innerHTML =
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">'
+      + '<div style="padding:7px 9px;background:rgba(0,0,0,0.3);border:1px solid rgba(201,162,39,0.18);border-radius:5px;">'
+      +   '<div style="font-size:9px;color:#b481cc;text-transform:uppercase;letter-spacing:0.06em;">Cost basis</div>'
+      +   '<div style="font-family:monospace;font-size:14px;color:#e8caf5;font-weight:700;margin-top:2px;">' + fmtM(totalCost) + '</div>'
+      + '</div>'
+      + '<div style="padding:7px 9px;background:rgba(0,0,0,0.3);border:1px solid rgba(201,162,39,0.18);border-radius:5px;">'
+      +   '<div style="font-size:9px;color:#b481cc;text-transform:uppercase;letter-spacing:0.06em;">Current value</div>'
+      +   '<div style="font-family:monospace;font-size:14px;color:#ffe066;font-weight:700;margin-top:2px;">' + fmtM(totalValue) + '</div>'
+      + '</div>'
+      + '<div style="padding:7px 9px;background:rgba(0,0,0,0.3);border:1px solid rgba(201,162,39,0.18);border-radius:5px;">'
+      +   '<div style="font-size:9px;color:#b481cc;text-transform:uppercase;letter-spacing:0.06em;">P&L</div>'
+      +   '<div style="font-family:monospace;font-size:14px;color:' + profitColor + ';font-weight:700;margin-top:2px;">' + profitSign + fmtM(totalProfit) + ' <span style="font-size:10px;">(' + profitSign + totalProfitPct.toFixed(1) + '%)</span></div>'
+      + '</div>'
+      + '</div>';
+
+    // Per-row table
+    if (!rows.length) {
+      listEl.innerHTML = '<div class="tmit-state-msg" style="padding:14px 0;">Holdings detected but couldn\'t match any to the live catalog. Hit ↻ once more.</div>';
+      return;
+    }
+    const header =
+      '<div style="display:grid;grid-template-columns:55px 1fr 80px 100px 100px 80px;'
+      + 'padding:5px 8px;background:rgba(0,0,0,0.4);border:1px solid rgba(201,162,39,0.12);'
+      + 'border-radius:4px 4px 0 0;margin-bottom:1px;font-size:9px;font-weight:700;'
+      + 'letter-spacing:0.05em;color:#b481cc;text-transform:uppercase;">'
+      + '<div>Stock</div>'
+      + '<div>Name</div>'
+      + '<div style="text-align:right">Shares</div>'
+      + '<div style="text-align:right">Value</div>'
+      + '<div style="text-align:right">P&amp;L</div>'
+      + '<div style="text-align:right">Div $/hr</div>'
+      + '</div>';
+    const rowsHtml = rows.map(r => {
+      const profColor = r.profit >= 0 ? '#50dc82' : '#ff6060';
+      const profSign  = r.profit >= 0 ? '+' : '';
+      const divLabel  = r.dividendHr != null && r.dividendHr > 0
+        ? '$' + Math.round(r.dividendHr).toLocaleString()
+        : '—';
+      return '<div style="display:grid;grid-template-columns:55px 1fr 80px 100px 100px 80px;'
+        + 'padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.04);'
+        + 'align-items:center;font-size:11px;">'
+        + '<div style="font-family:monospace;font-weight:700;color:#ffe066;">' + (r.cat.acronym || '?') + '</div>'
+        + '<div style="color:#e8caf5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:8px;" title="' + (r.cat.name || '') + '">' + (r.cat.name || 'Unknown') + '</div>'
+        + '<div style="text-align:right;font-family:monospace;color:#b481cc;">' + r.shares.toLocaleString() + '</div>'
+        + '<div style="text-align:right;font-family:monospace;color:#e8caf5;">' + fmtM(r.value) + '</div>'
+        + '<div style="text-align:right;font-family:monospace;color:' + profColor + ';">' + profSign + fmtM(r.profit) + ' <span style="font-size:9px;">(' + profSign + r.profitPct.toFixed(1) + '%)</span></div>'
+        + '<div style="text-align:right;font-family:monospace;color:#c9a227;">' + divLabel + '</div>'
+        + '</div>';
+    }).join('');
+    listEl.innerHTML = header + rowsHtml;
   }
 
   // ── Crimes Tab ─────────────────────────────────────────────────────────────
