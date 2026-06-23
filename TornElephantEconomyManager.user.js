@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.10.1
+// @version      6.10.2
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -24,7 +24,7 @@
 
 
   const SCRIPT_KEY     = 'tmit_';
-  const SCRIPT_VERSION = '6.10.1';
+  const SCRIPT_VERSION = '6.10.2';
 
   // Torn PDA (mobile) runs userscripts inside a Flutter WebView. We detect it
   // so we can skip browser-only APIs (Notification) and switch the layout to
@@ -4819,6 +4819,137 @@
     });
   }
 
+  // ── Diagnostic: probe Torn API for foreign-shop-stock endpoints (v6.10.2) ──
+  //
+  // Phase 2 of Travelling 2.0 is live but YATA's scraper hasn't picked up the
+  // new shop items yet, so the FBG tab still shows empty stock columns. This
+  // probe hits a list of plausible Torn API endpoints with the user's key to
+  // see if Torn itself exposes the data we need. Run it from the TM menu
+  // dropdown: "TEEM: Probe Torn API for travel endpoints". Results are
+  // displayed in an overlay and copied to clipboard so the user can share
+  // them back — we then build a real integration against whichever endpoint
+  // (if any) returned useful data.
+  async function probeTravelEndpoints() {
+    if (!settings.apiKey) {
+      alert('TEEM probe: no Torn API key set. Add one in Settings first.');
+      return;
+    }
+    // Candidate endpoints — guesses based on Torn's v2 naming conventions
+    // plus historical v1 selections that might still exist. We'll learn
+    // which work from the response shapes.
+    const candidates = [
+      // v2 — most likely to expose new Phase 2 data
+      { label: 'v2 /v2/torn/destinations',                url: 'https://api.torn.com/v2/torn/destinations' },
+      { label: 'v2 /v2/torn/foreignstock',                url: 'https://api.torn.com/v2/torn/foreignstock' },
+      { label: 'v2 /v2/torn/travel',                      url: 'https://api.torn.com/v2/torn/travel' },
+      { label: 'v2 /v2/torn/shops',                       url: 'https://api.torn.com/v2/torn/shops' },
+      { label: 'v2 /v2/torn/travelitems',                 url: 'https://api.torn.com/v2/torn/travelitems' },
+      { label: 'v2 /v2/torn/travel-stock',                url: 'https://api.torn.com/v2/torn/travel-stock' },
+      { label: 'v2 /v2/torn/foreigncountries',            url: 'https://api.torn.com/v2/torn/foreigncountries' },
+      // v1 — older but might still be live
+      { label: 'v1 torn?selections=travel',               url: 'https://api.torn.com/torn/?selections=travel' },
+      { label: 'v1 torn?selections=destinations',         url: 'https://api.torn.com/torn/?selections=destinations' },
+      { label: 'v1 torn?selections=foreignstock',         url: 'https://api.torn.com/torn/?selections=foreignstock' },
+      { label: 'v1 torn?selections=traveldestinations',   url: 'https://api.torn.com/torn/?selections=traveldestinations' },
+      { label: 'v1 torn?selections=cityshops',            url: 'https://api.torn.com/torn/?selections=cityshops' },
+      { label: 'v1 user?selections=travel',               url: 'https://api.torn.com/user/?selections=travel' },
+    ];
+
+    // Show progress modal
+    const overlay = document.createElement('div');
+    overlay.id = 'tmit-probe-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);'
+      + 'z-index:99999999;display:flex;align-items:center;justify-content:center;'
+      + 'font-family:Inter,sans-serif;color:#f0d5f8;';
+    overlay.innerHTML = '<div style="background:#1a0020;border:1px solid #9702ad;'
+      + 'border-top:3px solid #c9a227;border-radius:10px;width:min(720px,calc(100vw - 40px));'
+      + 'max-height:80vh;padding:18px;overflow-y:auto;">'
+      + '<div style="font-family:Cinzel,serif;font-size:15px;color:#c9a227;letter-spacing:0.06em;margin-bottom:10px;">'
+      + '🔍 TEEM API Probe</div>'
+      + '<div id="tmit-probe-status" style="font-size:11px;color:#b481cc;margin-bottom:12px;">'
+      + 'Probing ' + candidates.length + ' endpoints… (uses one API call per probe; will take ~3s)</div>'
+      + '<div id="tmit-probe-results" style="font-family:monospace;font-size:11px;line-height:1.7;"></div>'
+      + '<div style="margin-top:14px;display:flex;gap:8px;">'
+      + '<button id="tmit-probe-copy" disabled style="background:linear-gradient(90deg,#c9a227,#8b6e10);'
+      + 'border:none;border-radius:5px;color:#09000d;font-weight:700;font-size:12px;'
+      + 'padding:7px 16px;cursor:pointer;opacity:0.5;">📋 Copy raw results</button>'
+      + '<button id="tmit-probe-close" style="background:rgba(151,2,173,0.15);border:1px solid rgba(151,2,173,0.4);'
+      + 'border-radius:5px;color:#cc40f0;font-weight:600;font-size:12px;padding:7px 16px;cursor:pointer;">Close</button>'
+      + '</div></div>';
+    document.body.appendChild(overlay);
+    const resultsEl = overlay.querySelector('#tmit-probe-results');
+    const statusEl  = overlay.querySelector('#tmit-probe-status');
+    const copyBtn   = overlay.querySelector('#tmit-probe-copy');
+    overlay.querySelector('#tmit-probe-close').addEventListener('click', () => overlay.remove());
+
+    const results = [];
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i];
+      statusEl.textContent = 'Probing ' + (i + 1) + ' / ' + candidates.length + ': ' + c.label + '…';
+      const url = c.url + (c.url.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(settings.apiKey) + '&comment=TEEM-probe';
+      let entry;
+      try {
+        const data = await _gmFetchRaw(url);
+        if (data && data.error) {
+          entry = { ...c, status: 'err', errCode: data.error.code, errMsg: data.error.error };
+        } else if (data && typeof data === 'object') {
+          const topKeys = Object.keys(data).slice(0, 6);
+          const sample  = JSON.stringify(data).slice(0, 400);
+          entry = { ...c, status: 'ok', topKeys, sample };
+        } else {
+          entry = { ...c, status: 'weird', sample: JSON.stringify(data).slice(0, 200) };
+        }
+      } catch (e) {
+        entry = { ...c, status: 'fail', errMsg: e.message };
+      }
+      results.push(entry);
+
+      // Render this row
+      const color = entry.status === 'ok' ? '#50dc82' : entry.status === 'err' ? '#ff8c42' : '#ff6060';
+      const icon  = entry.status === 'ok' ? '✓' : entry.status === 'err' ? '⚠' : '✗';
+      const detail = entry.status === 'ok'
+        ? '<span style="color:#ffe066;">keys:</span> [' + (entry.topKeys?.join(', ') || '(empty)') + ']'
+        : entry.status === 'err'
+          ? '<span style="color:#a08fc0;">code ' + entry.errCode + ':</span> ' + entry.errMsg
+          : '<span style="color:#a08fc0;">' + (entry.errMsg || '?') + '</span>';
+      resultsEl.insertAdjacentHTML('beforeend',
+        '<div style="padding:3px 0;border-bottom:1px solid rgba(151,2,173,0.1);">'
+        + '<span style="color:' + color + ';font-weight:700;width:18px;display:inline-block;">' + icon + '</span> '
+        + '<span style="color:#e8caf5;">' + c.label + '</span> &mdash; ' + detail
+        + '</div>'
+      );
+
+      await new Promise(r => setTimeout(r, 150)); // pacing — stay under rate limit
+    }
+
+    // Summarize
+    const oks = results.filter(r => r.status === 'ok').length;
+    statusEl.innerHTML = '<b style="color:' + (oks > 0 ? '#50dc82' : '#ff6060') + ';">'
+      + 'Done.</b> ' + oks + ' of ' + results.length + ' endpoints returned data. '
+      + (oks > 0
+        ? 'Hit "Copy raw results" and paste them back to the developer — that tells us which endpoint to integrate.'
+        : 'Looks like Torn doesn\'t expose this data via API. We\'ll need to wait for YATA.');
+
+    copyBtn.disabled = false;
+    copyBtn.style.opacity = '1';
+    copyBtn.addEventListener('click', () => {
+      const payload = '## TEEM API probe results\n\n' + results.map(r => {
+        const lines = ['### ' + r.label, 'URL: ' + r.url, 'Status: ' + r.status];
+        if (r.status === 'ok')  lines.push('Top keys: [' + (r.topKeys?.join(', ') || '') + ']', 'Sample: ' + r.sample);
+        if (r.status === 'err') lines.push('Error ' + r.errCode + ': ' + r.errMsg);
+        if (r.status === 'fail') lines.push('Failure: ' + r.errMsg);
+        return lines.join('\n');
+      }).join('\n\n');
+      navigator.clipboard.writeText(payload).then(() => {
+        copyBtn.textContent = '✓ Copied!';
+        setTimeout(() => { copyBtn.textContent = '📋 Copy raw results'; }, 2000);
+      });
+    });
+
+    // Also dump to console for the record
+    try { console.log('[TEEM Probe] Results:', results); } catch(e) {}
+  }
+
   // ── Init ──────────────────────────────────────────────────────────────────────
 
   function init() {
@@ -4940,6 +5071,9 @@
               openPanel(fab, panel);
             }
           }
+        });
+        GM_registerMenuCommand('TEEM: Probe Torn API for travel endpoints', () => {
+          probeTravelEndpoints();
         });
       } catch(e) {}
     }
