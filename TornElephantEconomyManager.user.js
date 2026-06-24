@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.10.3
+// @version      6.10.4
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -24,7 +24,7 @@
 
 
   const SCRIPT_KEY     = 'tmit_';
-  const SCRIPT_VERSION = '6.10.3';
+  const SCRIPT_VERSION = '6.10.4';
 
   // Torn PDA (mobile) runs userscripts inside a Flutter WebView. We detect it
   // so we can skip browser-only APIs (Notification) and switch the layout to
@@ -5060,26 +5060,61 @@
       const canonical = nameLookup.get(lower);
       if (!canonical) continue;
 
-      // Walk up looking for a sensible container that holds the stock + price too.
-      // Stop after 6 levels — beyond that we usually hit something too big.
+      // Walk up looking for a row-shaped container that holds price + stock.
+      // The Torn travel agency uses a flat <tr>-style table per shop section
+      // (General Store, Arms Dealer, etc.). The stock cell is just a bare
+      // number with no "in stock" suffix, so we use a table-row heuristic:
+      // if we can find a TR ancestor, read its TDs in order — the cell that
+      // is JUST a number (and isn't the price) is the stock count.
       let container = el;
       for (let i = 0; i < 6 && container; i++) {
         container = container.parentElement;
         if (!container) break;
-        const txt = container.textContent || '';
-        const priceMatch = txt.match(/\$\s*([\d,]+)/);
-        const stockMatch = txt.match(/(\d+)\s*(?:in stock|available|left|quantity|qty|x stock)/i)
-          || txt.match(/Stock:\s*(\d+)/i)
-          || txt.match(/Available:\s*(\d+)/i);
-        if (priceMatch || stockMatch) {
+
+        let priceVal = null, stockVal = null;
+        // Strategy 1: table row — read TDs by position
+        const tr = container.closest && container.closest('tr');
+        if (tr) {
+          const tds = tr.querySelectorAll('td');
+          for (const td of tds) {
+            const tdTxt = (td.textContent || '').trim();
+            if (!tdTxt) continue;
+            const pMatch = tdTxt.match(/^\$\s*([\d,]+)$/);
+            if (pMatch) {
+              priceVal = parseInt(pMatch[1].replace(/,/g, ''));
+              continue;
+            }
+            const bareNum = tdTxt.match(/^([\d,]+)$/);
+            if (bareNum) {
+              const n = parseInt(bareNum[1].replace(/,/g, ''));
+              if (n >= 0 && n < 100000) stockVal = n; // sane stock bound
+            }
+          }
+        }
+        // Strategy 2: free-text container — old labelled patterns
+        if (priceVal === null || stockVal === null) {
+          const txt = container.textContent || '';
+          if (priceVal === null) {
+            const m = txt.match(/\$\s*([\d,]+)/);
+            if (m) priceVal = parseInt(m[1].replace(/,/g, ''));
+          }
+          if (stockVal === null) {
+            const m = txt.match(/(\d+)\s*(?:in stock|available|left|quantity|qty|x stock)/i)
+              || txt.match(/Stock:\s*(\d+)/i)
+              || txt.match(/Available:\s*(\d+)/i);
+            if (m) stockVal = parseInt(m[1]);
+          }
+        }
+
+        if (priceVal !== null || stockVal !== null) {
           const itemId = foreignBattleItemIdMap[canonical];
           if (!itemId) {
             unmatched.push(canonical + ' (no item ID yet — needs first market poll)');
             break;
           }
           const entry = { name: canonical, ts: Date.now() };
-          if (priceMatch) entry.price = parseInt(priceMatch[1].replace(/,/g, ''));
-          if (stockMatch) entry.qty   = parseInt(stockMatch[1]);
+          if (priceVal !== null) entry.price = priceVal;
+          if (stockVal !== null) entry.qty   = stockVal;
           found[itemId] = entry;
           break;
         }
@@ -5101,31 +5136,101 @@
     return count;
   }
 
+  // True when the user is on EITHER the Phase 2 travel-booking page (which
+  // includes the Abroad Item Filter) OR a foreign country's travel agency
+  // page. Both expose shop stock; v6.10.3 only matched the second.
+  function isTravelPage() {
+    const href = window.location.href || '';
+    return /\/travelagency\.php/i.test(href)
+        || /\bsid=travel\b/i.test(href);
+  }
+
+  // Verbose one-shot diagnostic. Run from the TM menu "TEEM: Dump foreign
+  // shop scraper diagnostics" when the scraper isn't capturing anything.
+  // Dumps current URL, every country's match attempt, sample container
+  // text, and the raw scrape output to the console so the user can copy +
+  // share back. We then tune scrapeForeignShopDOM from real markup.
+  function dumpForeignShopDiagnostics() {
+    try {
+      console.group('[TEEM scraper] Diagnostic dump');
+      console.log('URL:', window.location.href);
+      console.log('isTravelPage():', isTravelPage());
+      console.log('foreignBattleItemIdMap entries:',
+        Object.keys(foreignBattleItemIdMap || {}).length);
+      console.log('foreignShopSnapshots so far:', foreignShopSnapshots);
+
+      // Try every country's name list against the DOM, regardless of where
+      // the user actually is — Torn's Abroad Item Filter shows all foreign
+      // stock at once when you're booking from Torn.
+      for (const code of Object.keys(FOREIGN_BATTLE_ITEMS)) {
+        const scraped = scrapeForeignShopDOM(code);
+        const n = Object.keys(scraped).length;
+        if (n > 0) {
+          console.log('[TEEM scraper] ' + code.toUpperCase() + ': matched ' + n + ' items', scraped);
+        }
+      }
+
+      // Sample the page for elements whose text looks like a Torn item
+      // listing — useful when no scrape matches happen and we need to
+      // see what markup is actually there.
+      const samples = [];
+      const candidates = document.querySelectorAll('li, tr, [class*="item"], [class*="row"], [class*="abroad"]');
+      let i = 0;
+      for (const el of candidates) {
+        if (i >= 8) break;
+        const txt = (el.textContent || '').trim().slice(0, 200);
+        if (txt.length < 8 || txt.length > 200) continue;
+        // Only sample rows that look shop-ish (price + numbers)
+        if (!/\$\s*[\d,]+/.test(txt)) continue;
+        samples.push({ tag: el.tagName, cls: el.className.slice(0, 80), text: txt });
+        i++;
+      }
+      console.log('[TEEM scraper] Sample shop-ish rows on this page:', samples);
+      console.groupEnd();
+
+      // Pop a visible notice too
+      try { showTeemNotice('Scraper diagnostics dumped to F12 console', 'ok'); } catch(e) {}
+    } catch(e) {
+      try { console.warn('[TEEM scraper] Diagnostic dump failed:', e); } catch(e2) {}
+    }
+  }
+
   // Public entry point — called once per page load from init().
   function setupForeignShopScraper() {
-    if (!/\/travelagency\.php/i.test(window.location.pathname || '')) return;
+    if (!isTravelPage()) return;
+    try { console.log('[TEEM scraper] On travel page — watching DOM for shop content'); } catch(e) {}
 
-    detectCurrentCountryCode().then(code => {
-      if (!code) {
-        try { console.log('[TEEM scraper] Not abroad — skipping shop scrape'); } catch(e) {}
-        return;
-      }
-      try { console.log('[TEEM scraper] User is in', code.toUpperCase(), '— watching travel agency DOM'); } catch(e) {}
+    // Determine the candidate country code. If the user is abroad, that's
+    // the one country to scrape. If they're at Torn on the booking page,
+    // try every country — Torn's Abroad Item Filter mixes them all.
+    detectCurrentCountryCode().then(abroadCode => {
+      const codes = abroadCode ? [abroadCode] : Object.keys(FOREIGN_BATTLE_ITEMS);
+      try {
+        console.log('[TEEM scraper] Country mode:',
+          abroadCode ? ('abroad in ' + abroadCode.toUpperCase())
+                     : 'booking from Torn (will try all ' + codes.length + ' countries)');
+      } catch(e) {}
 
-      let lastCount = 0;
-      let notified = false;
+      const lastCountByCode = {};
+      let notifiedAny = false;
       const tryScrape = () => {
-        const scraped = scrapeForeignShopDOM(code);
-        const count = Object.keys(scraped).length;
-        if (count > lastCount) {
-          const newAdds = commitForeignShopSnapshot(code, scraped);
-          lastCount = count;
-          try { console.log('[TEEM scraper] Captured', newAdds, 'items from', code.toUpperCase(), ':', scraped); } catch(e) {}
-          if (!notified) {
-            notified = true;
-            try { showTeemNotice(`Captured ${newAdds} foreign shop items from ${code.toUpperCase()}`, 'ok'); } catch(e) {}
+        let totalNewThisTick = 0;
+        for (const code of codes) {
+          const scraped = scrapeForeignShopDOM(code);
+          const count = Object.keys(scraped).length;
+          const last  = lastCountByCode[code] || 0;
+          if (count > last) {
+            const newAdds = commitForeignShopSnapshot(code, scraped);
+            lastCountByCode[code] = count;
+            totalNewThisTick += newAdds;
+            try { console.log('[TEEM scraper] Captured', newAdds, 'items from', code.toUpperCase(), ':', scraped); } catch(e) {}
           }
-          // Refresh the FBG tab if it's currently open
+        }
+        if (totalNewThisTick > 0) {
+          if (!notifiedAny) {
+            notifiedAny = true;
+            try { showTeemNotice(`Captured ${totalNewThisTick} foreign shop items`, 'ok'); } catch(e) {}
+          }
           if (settings.activeTab === 'fbg') {
             try { renderForeignBattleTab(); } catch(e) {}
           }
@@ -5264,6 +5369,9 @@
         });
         GM_registerMenuCommand('TEEM: Probe Torn API for travel endpoints', () => {
           probeTravelEndpoints();
+        });
+        GM_registerMenuCommand('TEEM: Dump foreign shop scraper diagnostics', () => {
+          dumpForeignShopDiagnostics();
         });
       } catch(e) {}
     }
