@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.10.2
+// @version      6.10.3
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -24,7 +24,7 @@
 
 
   const SCRIPT_KEY     = 'tmit_';
-  const SCRIPT_VERSION = '6.10.2';
+  const SCRIPT_VERSION = '6.10.3';
 
   // Torn PDA (mobile) runs userscripts inside a Flutter WebView. We detect it
   // so we can skip browser-only APIs (Notification) and switch the layout to
@@ -247,6 +247,39 @@
 
   // Resolved at runtime: { 'Spear': 12, 'Handbag': 34, ... }
   let foreignBattleItemIdMap = {};
+
+  // ── Foreign shop DOM scraper (v6.10.3) ──────────────────────────────────
+  // Torn doesn't expose foreign shop stock via API even at Full Access
+  // (verified via the v6.10.2 probe — torn/?selections=travel returns
+  // error 16). YATA is community-scraped but hadn't caught up to Phase 2
+  // when this shipped. Workaround: when the user is abroad and visits the
+  // travel agency page, scrape the visible shop inventory ourselves.
+  // Stored per-country with timestamps; rendered in the FBG tab as "your
+  // visit Nh ago" — more authoritative than community averages for
+  // countries you personally visit, completely silent for countries you
+  // haven't been to.
+  //
+  // shape: { teemCountryCode: { itemId: { qty, price, ts, name } } }
+  let foreignShopSnapshots = load('foreignShopSnapshots', {});
+  function saveForeignShopSnapshots() {
+    try { store('foreignShopSnapshots', foreignShopSnapshots); } catch(e) {}
+  }
+
+  // Torn's user/?selections=travel returns destination as a human-readable
+  // country name. Map back to our internal 3-letter code.
+  const TORN_DEST_TO_CODE = {
+    'Argentina':      'arg',
+    'Canada':         'can',
+    'Cayman Islands': 'cay',
+    'China':          'chi',
+    'Hawaii':         'haw',
+    'Japan':          'jap',
+    'Mexico':         'mex',
+    'South Africa':   'saf',
+    'Switzerland':    'swi',
+    'UAE':            'uae',
+    'United Kingdom': 'uk',
+  };
 
   // Flight type multipliers (applied to base one-way travel time)
   const FLIGHT_MULTIPLIERS = {
@@ -2816,7 +2849,7 @@
           <b style="color:#50dc82;">Phase 2 is LIVE</b> (since 2026-06-23). Weapons and armor can't fly with you abroad. Each country sells a small loadout of melee / temp / armor you can buy on arrival, use locally, and <b style="color:#ffe066;">sell back at 75% of purchase price</b> (Black Market is 100%) — so effective "rental" is ~25% of the sticker price.
         </div>
         <div style="font-size:10px;color:#ffe066;background:rgba(201,162,39,0.06);border:1px solid rgba(201,162,39,0.22);border-radius:5px;padding:6px 9px;margin-bottom:8px;line-height:1.6;">
-          Stock dots populate as YATA picks up the new Phase 2 items. Sold-back items also re-enter local stock, so a high-tier item might appear at a destination unexpectedly.
+          Stock dots show <b>your own visit data</b> when available (most current) and fall back to YATA when not. Visit the travel agency on any foreign trip and TEEM will auto-capture that country's shelf for you. Sold-back items re-enter local stock, so a high-tier item may appear at a destination unexpectedly.
         </div>
         <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
           <input type="text" id="tmit-fbg-search" class="tmit-search" placeholder="Find a weapon (e.g. Spear, Grenade)…" style="flex:1;">
@@ -3798,6 +3831,7 @@
       if (!country) continue;
       const stockMap = yataStockCache?.[code]       || {};
       const priceMap = yataTravelPriceCache?.[code] || {};
+      const userSnap = foreignShopSnapshots[code]   || {};
 
       const sections = [];
       let inStockCount = 0;
@@ -3813,13 +3847,22 @@
           totalItems++;
           if (search && !name.toLowerCase().includes(search)) continue;
           matchedAny = true;
-          const itemId = foreignBattleItemIdMap[name] || null;
-          const stockQty = itemId != null ? stockMap[itemId] : undefined;
-          const price    = itemId != null ? priceMap[itemId] : undefined;
+          const itemId   = foreignBattleItemIdMap[name] || null;
+          // Prefer the user's own DOM-scraped data when present — it's more
+          // current than anything YATA can serve and reflects what they
+          // personally saw. Fall back to YATA, then to "no data".
+          const userItem = itemId != null ? userSnap[itemId] : undefined;
+          const stockQty = (userItem && typeof userItem.qty === 'number')
+            ? userItem.qty
+            : (itemId != null ? stockMap[itemId] : undefined);
+          const price    = (userItem && typeof userItem.price === 'number')
+            ? userItem.price
+            : (itemId != null ? priceMap[itemId] : undefined);
+          const source   = userItem ? 'visit' : (typeof stockQty === 'number' ? 'yata' : 'none');
 
           let dotClass, stockLabel;
           if (typeof stockQty !== 'number') {
-            dotClass = 'gray';   stockLabel = 'no YATA data';
+            dotClass = 'gray';   stockLabel = 'no data';
           } else if (stockQty === 0) {
             dotClass = 'red';    stockLabel = 'EMPTY';
           } else if (stockQty < 5) {
@@ -3828,6 +3871,18 @@
           } else {
             dotClass = 'green';  stockLabel = stockQty + ' in stock';
             inStockCount++;
+          }
+
+          // Append a tiny provenance tag so users can tell their own visit
+          // data from community YATA data at a glance.
+          if (source === 'visit' && userItem?.ts) {
+            const ageMs  = Date.now() - userItem.ts;
+            const ageH   = Math.floor(ageMs / 3600000);
+            const ageMin = Math.floor(ageMs / 60000);
+            const ageTxt = ageH >= 1 ? ageH + 'h' : Math.max(1, ageMin) + 'm';
+            stockLabel += ' · you ' + ageTxt + ' ago';
+          } else if (source === 'yata' && typeof stockQty === 'number') {
+            stockLabel += ' · YATA';
           }
 
           const priceLabel = (typeof price === 'number' && price > 0)
@@ -4950,6 +5005,141 @@
     try { console.log('[TEEM Probe] Results:', results); } catch(e) {}
   }
 
+  // ── Foreign shop DOM scraper (v6.10.3) ──────────────────────────────────
+  //
+  // Hooks the travel agency page when the user is abroad. We can't query
+  // foreign shop stock via the API (probe confirmed) so we read it off the
+  // user's own page render. Defensive on multiple fronts:
+  //   - Uses MutationObserver because Torn's travel page is React-rendered;
+  //     content isn't there on initial parse
+  //   - Multiple selector strategies + name-match fallback so a Torn DOM
+  //     refactor doesn't silently break us
+  //   - Always logs to console so the user can share back what we saw if
+  //     the match heuristics miss anything
+  //   - Observer auto-disconnects after 60s so we're not running forever
+
+  async function detectCurrentCountryCode() {
+    if (!settings.apiKey) return null;
+    try {
+      const data = await apiGet(
+        `https://api.torn.com/user/?selections=travel&key=${settings.apiKey}&comment=TEEM`
+      );
+      if (!data || data.error) return null;
+      const t = data.travel;
+      // Only scrape when ACTUALLY there (landed, not still flying).
+      if (!t || t.destination === 'Torn' || (t.time_left ?? 0) > 0) return null;
+      return TORN_DEST_TO_CODE[t.destination] || null;
+    } catch(e) { return null; }
+  }
+
+  // Heuristic scraper. Walks the DOM looking for elements whose visible text
+  // matches a known foreign-battle-gear item name for the current country,
+  // then pulls a stock count and price from the nearest container. Returns
+  // a map of { itemId: { qty, price, name, ts } } for whatever it managed
+  // to find.
+  function scrapeForeignShopDOM(countryCode) {
+    const gear = FOREIGN_BATTLE_ITEMS[countryCode] || {};
+    const allNames = [...(gear.melee || []), ...(gear.temp || []), ...(gear.armor || [])];
+    if (!allNames.length) return {};
+
+    // Case-insensitive lookup name → canonical name
+    const nameLookup = new Map(allNames.map(n => [n.toLowerCase(), n]));
+    const found = {};
+    const unmatched = [];
+
+    // Walk every leaf-ish element and check if its text is one of our names.
+    // We deliberately scan a lot of elements (div/span/li/td/a) because Torn's
+    // exact markup is moving target — better to over-scan than miss.
+    const candidates = document.querySelectorAll('div, span, li, td, a, p, h3, h4, strong, b');
+    for (const el of candidates) {
+      const raw = (el.textContent || '').trim();
+      if (!raw || raw.length > 80) continue;
+      // Strip trailing parenthetical (e.g. "Macana (Melee)") for the match
+      const stripped = raw.replace(/\s*\([^)]*\)\s*$/, '').trim();
+      const lower = stripped.toLowerCase();
+      const canonical = nameLookup.get(lower);
+      if (!canonical) continue;
+
+      // Walk up looking for a sensible container that holds the stock + price too.
+      // Stop after 6 levels — beyond that we usually hit something too big.
+      let container = el;
+      for (let i = 0; i < 6 && container; i++) {
+        container = container.parentElement;
+        if (!container) break;
+        const txt = container.textContent || '';
+        const priceMatch = txt.match(/\$\s*([\d,]+)/);
+        const stockMatch = txt.match(/(\d+)\s*(?:in stock|available|left|quantity|qty|x stock)/i)
+          || txt.match(/Stock:\s*(\d+)/i)
+          || txt.match(/Available:\s*(\d+)/i);
+        if (priceMatch || stockMatch) {
+          const itemId = foreignBattleItemIdMap[canonical];
+          if (!itemId) {
+            unmatched.push(canonical + ' (no item ID yet — needs first market poll)');
+            break;
+          }
+          const entry = { name: canonical, ts: Date.now() };
+          if (priceMatch) entry.price = parseInt(priceMatch[1].replace(/,/g, ''));
+          if (stockMatch) entry.qty   = parseInt(stockMatch[1]);
+          found[itemId] = entry;
+          break;
+        }
+      }
+    }
+
+    if (unmatched.length) {
+      try { console.warn('[TEEM scraper] Name matched but no item ID:', unmatched); } catch(e) {}
+    }
+    return found;
+  }
+
+  function commitForeignShopSnapshot(countryCode, scraped) {
+    const count = Object.keys(scraped).length;
+    if (!count) return 0;
+    if (!foreignShopSnapshots[countryCode]) foreignShopSnapshots[countryCode] = {};
+    Object.assign(foreignShopSnapshots[countryCode], scraped);
+    saveForeignShopSnapshots();
+    return count;
+  }
+
+  // Public entry point — called once per page load from init().
+  function setupForeignShopScraper() {
+    if (!/\/travelagency\.php/i.test(window.location.pathname || '')) return;
+
+    detectCurrentCountryCode().then(code => {
+      if (!code) {
+        try { console.log('[TEEM scraper] Not abroad — skipping shop scrape'); } catch(e) {}
+        return;
+      }
+      try { console.log('[TEEM scraper] User is in', code.toUpperCase(), '— watching travel agency DOM'); } catch(e) {}
+
+      let lastCount = 0;
+      let notified = false;
+      const tryScrape = () => {
+        const scraped = scrapeForeignShopDOM(code);
+        const count = Object.keys(scraped).length;
+        if (count > lastCount) {
+          const newAdds = commitForeignShopSnapshot(code, scraped);
+          lastCount = count;
+          try { console.log('[TEEM scraper] Captured', newAdds, 'items from', code.toUpperCase(), ':', scraped); } catch(e) {}
+          if (!notified) {
+            notified = true;
+            try { showTeemNotice(`Captured ${newAdds} foreign shop items from ${code.toUpperCase()}`, 'ok'); } catch(e) {}
+          }
+          // Refresh the FBG tab if it's currently open
+          if (settings.activeTab === 'fbg') {
+            try { renderForeignBattleTab(); } catch(e) {}
+          }
+        }
+      };
+
+      // Initial pass + watch for React re-renders
+      tryScrape();
+      const observer = new MutationObserver(() => tryScrape());
+      observer.observe(document.body, { childList: true, subtree: true });
+      setTimeout(() => { try { observer.disconnect(); } catch(e) {} }, 60000);
+    });
+  }
+
   // ── Init ──────────────────────────────────────────────────────────────────────
 
   function init() {
@@ -5147,6 +5337,12 @@
 
     // Fetch my own battlestats on startup (silently)
     if (settings.apiKey) { setTimeout(() => fetchMyBattleStats(settings.apiKey), 3000); }
+
+    // Foreign shop DOM scraper — only runs if we're on the travel agency page
+    // AND the user is currently abroad. Otherwise no-ops.
+    try { setupForeignShopScraper(); } catch(e) {
+      try { console.warn('[TEEM scraper] setup failed:', e); } catch(e2) {}
+    }
   }
 
   // Navigate to the item market filtered to a specific item. We don't try
