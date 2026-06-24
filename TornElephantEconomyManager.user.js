@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TEEM - Torn's Elephant Economy Manager
 // @namespace    https://torn.com
-// @version      6.10.4
+// @version      6.10.5
 // @description  TEEM - Torn's Elephant Economy Manager. Market signals, travel profit rankings (now with live YATA foreign prices), war gear pricing, and crime $/hour tracker. Mobile-friendly.
 // @author       Wasteland
 // @match        https://www.torn.com/*
@@ -24,7 +24,7 @@
 
 
   const SCRIPT_KEY     = 'tmit_';
-  const SCRIPT_VERSION = '6.10.4';
+  const SCRIPT_VERSION = '6.10.5';
 
   // Torn PDA (mobile) runs userscripts inside a Flutter WebView. We detect it
   // so we can skip browser-only APIs (Notification) and switch the layout to
@@ -5021,8 +5021,16 @@
   async function detectCurrentCountryCode() {
     if (!settings.apiKey) return null;
     try {
-      const data = await apiGet(
-        `https://api.torn.com/user/?selections=travel&key=${settings.apiKey}&comment=TEEM`
+      // v6.10.5 — bypass the cross-tab cache (45s TTL) for this query.
+      // Travel state changes the instant you board a flight, so a stale
+      // read can report "at Torn" when you've just landed abroad. That
+      // mis-detect was the v6.10.4 bug where Japan/China items got
+      // captured with bogus prices: with abroadCode=null we fell back to
+      // an all-countries scrape that matched names against random global
+      // text on the page (sidebars, dropdowns, etc.) and grabbed any $
+      // value nearby. Going direct via _gmFetchRaw skips the cache.
+      const data = await _gmFetchRaw(
+        `https://api.torn.com/user/?selections=travel&key=${settings.apiKey}&comment=TEEM&_=${Date.now()}`
       );
       if (!data || data.error) return null;
       const t = data.travel;
@@ -5200,16 +5208,21 @@
     if (!isTravelPage()) return;
     try { console.log('[TEEM scraper] On travel page — watching DOM for shop content'); } catch(e) {}
 
-    // Determine the candidate country code. If the user is abroad, that's
-    // the one country to scrape. If they're at Torn on the booking page,
-    // try every country — Torn's Abroad Item Filter mixes them all.
+    // v6.10.5 — single-country mode ONLY. v6.10.4's all-countries fallback
+    // (when at Torn) produced junk data: scraping "Kodachi" / "Katana" /
+    // etc. across the entire DOM finds those names in non-shop contexts
+    // (TornTools sidebars, item lookup dropdowns, etc.) and grabs unrelated
+    // $ values as prices. Better to capture nothing than to fill the FBG
+    // tab with garbage. The user can still see other countries' stock via
+    // the Abroad Item Filter on the booking page — that's a Torn-native
+    // feature, not something we need to scrape.
     detectCurrentCountryCode().then(abroadCode => {
-      const codes = abroadCode ? [abroadCode] : Object.keys(FOREIGN_BATTLE_ITEMS);
-      try {
-        console.log('[TEEM scraper] Country mode:',
-          abroadCode ? ('abroad in ' + abroadCode.toUpperCase())
-                     : 'booking from Torn (will try all ' + codes.length + ' countries)');
-      } catch(e) {}
+      if (!abroadCode) {
+        try { console.log('[TEEM scraper] Not currently abroad — skipping scrape (won\'t guess across countries)'); } catch(e) {}
+        return;
+      }
+      const codes = [abroadCode];
+      try { console.log('[TEEM scraper] Confirmed abroad in', abroadCode.toUpperCase()); } catch(e) {}
 
       const lastCountByCode = {};
       let notifiedAny = false;
@@ -5372,6 +5385,15 @@
         });
         GM_registerMenuCommand('TEEM: Dump foreign shop scraper diagnostics', () => {
           dumpForeignShopDiagnostics();
+        });
+        GM_registerMenuCommand('TEEM: Clear foreign shop snapshots', () => {
+          const before = Object.keys(foreignShopSnapshots || {}).length;
+          foreignShopSnapshots = {};
+          saveForeignShopSnapshots();
+          try { showTeemNotice('Cleared ' + before + ' country snapshots', 'ok'); } catch(e) {}
+          if (settings.activeTab === 'fbg') {
+            try { renderForeignBattleTab(); } catch(e) {}
+          }
         });
       } catch(e) {}
     }
